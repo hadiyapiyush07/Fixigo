@@ -1,5 +1,6 @@
 {
   "dependencies": {
+    "@react-native/gradle-plugin": "^0.86.0",
     "cookie-parser": "^1.4.7",
     "crypto": "^1.0.1",
     "razorpay": "^2.9.6"
