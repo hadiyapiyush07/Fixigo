@@ -20,11 +20,14 @@ import CreateBookingScreen from '../screens/customer/CreateBookingScreen';
 import MyBookingsScreen    from '../screens/customer/MyBookingsScreen';
 import ProfileScreen       from '../screens/customer/ProfileScreen';
 import NotificationsScreen from '../screens/customer/NotificationsScreen';
+import PaymentScreen       from '../screens/customer/PaymentScreen';
 
 // Provider screens
 import DashboardScreen       from '../screens/provider/DashboardScreen';
 import ProviderProfileScreen from '../screens/provider/ProviderProfileScreen';
 import RequestScreen         from '../screens/provider/RequestsScreen';
+import EarningsScreen        from '../screens/provider/EarningsScreen';
+import ProviderBookingsScreen      from '../screens/provider/ProviderBookingDetailScreen';
 
 // Placeholder for unbuilt screens
 const PlaceholderScreen = ({ route }) => (
@@ -87,7 +90,7 @@ const ProviderTabs = () => (
   >
     <Tab.Screen name="Dashboard"       component={DashboardScreen}       options={{ tabBarLabel: 'Dashboard' }} />
     <Tab.Screen name="Requests"        component={RequestScreen}         options={{ tabBarLabel: 'Requests' }} />
-    <Tab.Screen name="Earnings"        component={PlaceholderScreen}     options={{ tabBarLabel: 'Earnings' }} />
+    <Tab.Screen name="Earnings"        component={EarningsScreen}        options={{ tabBarLabel: 'Earnings' }} />
     <Tab.Screen name="ProviderProfile" component={ProviderProfileScreen} options={{ tabBarLabel: 'Profile' }} />
   </Tab.Navigator>
 );
@@ -128,7 +131,7 @@ const AppNavigator = () => {
         screenOptions={{ headerShown: false, animation: 'fade' }}
       >
         <Stack.Screen name="ProviderTabs"  component={ProviderTabs} />
-        <Stack.Screen name="BookingDetail" component={PlaceholderScreen} />
+        <Stack.Screen name="BookingDetail" component={ProviderBookingsScreen } />
       </Stack.Navigator>
     );
   }
@@ -144,7 +147,7 @@ const AppNavigator = () => {
       <Stack.Screen name="BookingTrack"   component={BookingTrackScreen} />
       <Stack.Screen name="Review"         component={ReviewScreen} />
       <Stack.Screen name="CreateBooking"  component={CreateBookingScreen} />
-      <Stack.Screen name="Payment"        component={PlaceholderScreen} />
+      <Stack.Screen name="Payment"        component={PaymentScreen} />
     </Stack.Navigator>
   );
 };

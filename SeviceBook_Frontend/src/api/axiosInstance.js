@@ -1,3 +1,4 @@
+// src/api/axiosInstance.js
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -19,7 +20,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // const BASE_URL = 'http://10.0.2.2:5000/api'; // emulator
 // const BASE_URL = 'http://localhost:5000/api'; 
-const BASE_URL = 'http://172.17.2.85:5000/api'; // real phone — change WiFi to your PC's IP address
+// const BASE_URL = 'http://172.17.2.85:5000/api'; // real phone — change WiFi to your PC's IP address
+
+const BASE_URL = 'http://10.207.112.85:5000/api';
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -27,7 +30,6 @@ const axiosInstance = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// Attach token to every request automatically
 axiosInstance.interceptors.request.use(
   async (config) => {
     try {
@@ -41,28 +43,44 @@ axiosInstance.interceptors.request.use(
   (error) => Promise.reject(error)
 );
 
-// Auto refresh token when expired
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {
     const original = error.config;
-    if (
-      error.response?.status === 401 &&
-      !original._retry &&
-      error.response?.data?.message === 'Token expired. Please login again.'
-    ) {
+
+    if (error?.response?.status === 401 && original && !original._retry) {
       original._retry = true;
+
       try {
         const refreshToken = await AsyncStorage.getItem('refreshToken');
-        const res = await axios.post(`${BASE_URL}/auth/refresh-token`, { refreshToken });
-        const newToken = res.data.data.accessToken;
+        if (!refreshToken) throw new Error('No refresh token');
+
+        const res = await axios.post(`${BASE_URL}/auth/refresh-token`, {
+          refreshToken,
+        });
+
+        const newToken =
+          res?.data?.data?.accessToken ||
+          res?.data?.accessToken;
+
+        const newRefreshToken =
+          res?.data?.data?.refreshToken ||
+          res?.data?.refreshToken;
+
+        if (!newToken) throw new Error('No new access token');
+
         await AsyncStorage.setItem('accessToken', newToken);
+        if (newRefreshToken) {
+          await AsyncStorage.setItem('refreshToken', newRefreshToken);
+        }
+
         original.headers.Authorization = `Bearer ${newToken}`;
         return axiosInstance(original);
       } catch (e) {
         await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'user']);
       }
     }
+
     return Promise.reject(error);
   }
 );
