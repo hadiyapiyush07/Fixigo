@@ -1,4 +1,3 @@
-// src/screens/provider/RequestsScreen.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
@@ -9,21 +8,27 @@ import { StatusBadge } from '../../components/common/StatusBadge';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 
 const FILTER_TABS = [
-  { key: 'all',        label: 'All' },
-  { key: 'pending',    label: 'New' },
-  { key: 'confirmed',  label: 'Active' },
-  { key: 'completed',  label: 'Done' },
-  { key: 'cancelled',  label: 'Cancelled' },
+  { key: 'all',       label: 'All',       emoji: '📋' },
+  { key: 'pending',   label: 'New',       emoji: '🔔' },
+  { key: 'confirmed', label: 'Active',    emoji: '⚡' },
+  { key: 'completed', label: 'Done',      emoji: '✅' },
+  { key: 'cancelled', label: 'Cancelled', emoji: '❌' },
 ];
 
+const STATUS_FLOW = {
+  confirmed:           { next: 'provider_on_the_way', label: '🚗 I am On The Way',     color: '#3B82F6' },
+  provider_on_the_way: { next: 'in_progress',         label: '🔧 Start Service',        color: '#F59E0B' },
+  in_progress:         { next: 'completed',           label: '✅ Mark as Completed',    color: '#22C55E' },
+};
+
 const RequestsScreen = ({ navigation }) => {
-  const [bookings,    setBookings]    = useState([]);
-  const [loading,     setLoading]     = useState(false);
-  const [refreshing,  setRefreshing]  = useState(false);
-  const [page,        setPage]        = useState(1);
-  const [hasNextPage, setHasNextPage] = useState(true);
-  const [activeTab,   setActiveTab]   = useState('all');
-  const [actionLoading, setActionLoading] = useState(null); // bookingId being acted on
+  const [bookings,      setBookings]      = useState([]);
+  const [loading,       setLoading]       = useState(false);
+  const [refreshing,    setRefreshing]    = useState(false);
+  const [page,          setPage]          = useState(1);
+  const [hasNextPage,   setHasNextPage]   = useState(true);
+  const [activeTab,     setActiveTab]     = useState('all');
+  const [actionLoading, setActionLoading] = useState(null);
 
   useEffect(() => {
     loadBookings(1, activeTab, true);
@@ -41,11 +46,7 @@ const RequestsScreen = ({ navigation }) => {
       const res = await bookingAPI.getProviderBookings(params);
       const { data, pagination } = res.data.data;
 
-      if (reset) {
-        setBookings(data || []);
-      } else {
-        setBookings(prev => [...prev, ...(data || [])]);
-      }
+      setBookings(prev => reset ? (data || []) : [...prev, ...(data || [])]);
       setPage(pageNum);
       setHasNextPage(pagination?.hasNextPage || false);
     } catch (e) {
@@ -74,94 +75,76 @@ const RequestsScreen = ({ navigation }) => {
     }
   };
 
-  const handleReject = async (bookingId) => {
-    Alert.alert(
-      'Reject Booking',
-      'Are you sure you want to reject this booking?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Reject',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              setActionLoading(bookingId);
-              await bookingAPI.reject(bookingId, 'Not available at this time');
-              Alert.alert('Rejected', 'Booking rejected. Looking for another provider.');
-              loadBookings(1, activeTab, true);
-            } catch (e) {
-              Alert.alert('Error', e.response?.data?.message || 'Could not reject');
-            } finally {
-              setActionLoading(null);
-            }
-          },
+  const handleReject = (bookingId) => {
+    Alert.alert('Reject Booking', 'Are you sure you want to reject this booking?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Reject', style: 'destructive',
+        onPress: async () => {
+          try {
+            setActionLoading(bookingId);
+            await bookingAPI.reject(bookingId, 'Not available at this time');
+            Alert.alert('Rejected', 'Booking rejected.');
+            loadBookings(1, activeTab, true);
+          } catch (e) {
+            Alert.alert('Error', e.response?.data?.message || 'Could not reject');
+          } finally {
+            setActionLoading(null);
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
-  const handleUpdateStatus = async (bookingId, currentStatus) => {
-    const nextStatus = {
-      confirmed:           'provider_on_the_way',
-      provider_on_the_way: 'in_progress',
-      in_progress:         'completed',
-    };
+  const handleUpdateStatus = (bookingId, currentStatus) => {
+    const flow = STATUS_FLOW[currentStatus];
+    if (!flow) return;
 
-    const statusLabels = {
-      provider_on_the_way: 'On The Way',
-      in_progress:         'Start Service',
-      completed:           'Complete Service',
-    };
-
-    const next = nextStatus[currentStatus];
-    if (!next) return;
-
-    Alert.alert(
-      'Update Status',
-      `Mark as "${statusLabels[next]}"?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Confirm',
-          onPress: async () => {
-            try {
-              setActionLoading(bookingId);
-              await bookingAPI.updateStatus(bookingId, next);
-              loadBookings(1, activeTab, true);
-            } catch (e) {
-              Alert.alert('Error', e.response?.data?.message || 'Could not update status');
-            } finally {
-              setActionLoading(null);
-            }
-          },
+    Alert.alert('Update Status', `Mark as "${flow.label.replace(/^[^\w]+/, '')}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Confirm',
+        onPress: async () => {
+          try {
+            setActionLoading(bookingId);
+            await bookingAPI.updateStatus(bookingId, flow.next);
+            loadBookings(1, activeTab, true);
+          } catch (e) {
+            Alert.alert('Error', e.response?.data?.message || 'Could not update status');
+          } finally {
+            setActionLoading(null);
+          }
         },
-      ]
-    );
+      },
+    ]);
   };
 
   const BookingCard = ({ item }) => {
     const isActing = actionLoading === item._id;
+    const flow     = STATUS_FLOW[item.status];
 
     return (
       <View style={styles.card}>
-        {/* Top row */}
+        {/* Top */}
         <View style={styles.cardTop}>
-          <Text style={styles.serviceName}>{item.categoryId?.name || 'Service'}</Text>
+          <View style={{ flex: 1, marginRight: SPACING.sm }}>
+            <Text style={styles.serviceName} numberOfLines={1}>
+              {item.categoryId?.name || 'Service'}
+            </Text>
+            {item.subService?.name && (
+              <Text style={styles.subService}>→ {item.subService.name}  •  ₹{item.subService.price}</Text>
+            )}
+          </View>
           <StatusBadge status={item.status} />
         </View>
 
-        {/* Sub service */}
-        {item.subService?.name && (
-          <Text style={styles.subService}>→ {item.subService.name} • ₹{item.subService.price}</Text>
-        )}
-
-        {/* Customer info */}
-        <View style={styles.infoSection}>
-          <Text style={styles.infoRow}>👤 {item.customerId?.name || 'Customer'}  📱 {item.customerId?.phone}</Text>
-          <Text style={styles.infoRow}>📅 {new Date(item.scheduledDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</Text>
-          <Text style={styles.infoRow}>⏰ {item.scheduledTime}</Text>
-          <Text style={styles.infoRow}>📍 {item.address?.addressLine}, {item.address?.city} - {item.address?.pincode}</Text>
-          {item.description ? <Text style={styles.infoRow}>📝 {item.description}</Text> : null}
+        {/* Info block */}
+        <View style={styles.infoBlock}>
+          <InfoRow emoji="👤" text={`${item.customerId?.name || 'Customer'}   📱 ${item.customerId?.phone || ''}`} />
+          <InfoRow emoji="📅" text={new Date(item.scheduledDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })} />
+          <InfoRow emoji="⏰" text={item.scheduledTime} />
+          <InfoRow emoji="📍" text={`${item.address?.addressLine}, ${item.address?.city} - ${item.address?.pincode}`} />
+          {item.description ? <InfoRow emoji="📝" text={item.description} /> : null}
         </View>
 
         {/* Amount */}
@@ -170,7 +153,7 @@ const RequestsScreen = ({ navigation }) => {
           <Text style={styles.amount}>₹{item.pricing?.totalAmount || 0}</Text>
         </View>
 
-        {/* Action buttons */}
+        {/* Pending actions */}
         {item.status === 'pending' && (
           <View style={styles.actionRow}>
             <TouchableOpacity
@@ -178,7 +161,7 @@ const RequestsScreen = ({ navigation }) => {
               onPress={() => handleReject(item._id)}
               disabled={isActing}
             >
-              <Text style={styles.rejectBtnText}>✗ Reject</Text>
+              <Text style={styles.rejectBtnText}>✗  Reject</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={[styles.acceptBtn, isActing && styles.btnDisabled]}
@@ -186,39 +169,43 @@ const RequestsScreen = ({ navigation }) => {
               disabled={isActing}
             >
               {isActing
-                ? <ActivityIndicator color={COLORS.white} size="small" />
-                : <Text style={styles.acceptBtnText}>✓ Accept</Text>
-              }
+                ? <ActivityIndicator color="#FFFFFF" size="small" />
+                : <Text style={styles.acceptBtnText}>✓  Accept</Text>}
             </TouchableOpacity>
           </View>
         )}
 
-        {/* Status update buttons for active bookings */}
-        {['confirmed', 'provider_on_the_way', 'in_progress'].includes(item.status) && (
+        {/* Status progression */}
+        {flow && (
           <TouchableOpacity
-            style={[styles.updateBtn, isActing && styles.btnDisabled]}
+            style={[styles.updateBtn, { backgroundColor: flow.color }, isActing && styles.btnDisabled]}
             onPress={() => handleUpdateStatus(item._id, item.status)}
             disabled={isActing}
           >
             {isActing
-              ? <ActivityIndicator color={COLORS.white} size="small" />
-              : <Text style={styles.updateBtnText}>
-                  {item.status === 'confirmed'           && '🚗 I am On The Way'}
-                  {item.status === 'provider_on_the_way' && '🔧 Start Service'}
-                  {item.status === 'in_progress'         && '✅ Mark as Completed'}
-                </Text>
-            }
+              ? <ActivityIndicator color="#FFFFFF" size="small" />
+              : <Text style={styles.updateBtnText}>{flow.label}</Text>}
           </TouchableOpacity>
         )}
       </View>
     );
   };
 
+  const InfoRow = ({ emoji, text }) => (
+    <View style={styles.infoRow}>
+      <Text style={styles.infoEmoji}>{emoji}</Text>
+      <Text style={styles.infoText} numberOfLines={2}>{text}</Text>
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.title}>Job Requests</Text>
+        {loading && bookings.length === 0 && (
+          <ActivityIndicator color={COLORS.primary} size="small" />
+        )}
       </View>
 
       {/* Filter Tabs */}
@@ -228,7 +215,7 @@ const RequestsScreen = ({ navigation }) => {
           data={FILTER_TABS}
           keyExtractor={i => i.key}
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.tabs}
+          contentContainerStyle={styles.tabsContainer}
           renderItem={({ item }) => (
             <TouchableOpacity
               style={[styles.tab, activeTab === item.key && styles.tabActive]}
@@ -238,7 +225,9 @@ const RequestsScreen = ({ navigation }) => {
                 setPage(1);
                 setHasNextPage(true);
               }}
+              activeOpacity={0.75}
             >
+              <Text style={styles.tabEmoji}>{item.emoji}</Text>
               <Text style={[styles.tabText, activeTab === item.key && styles.tabTextActive]}>
                 {item.label}
               </Text>
@@ -247,13 +236,14 @@ const RequestsScreen = ({ navigation }) => {
         />
       </View>
 
+      {/* List */}
       <FlatList
         data={bookings}
         keyExtractor={item => item._id}
         renderItem={({ item }) => <BookingCard item={item} />}
         onEndReached={() => !loading && hasNextPage && loadBookings(page + 1, activeTab)}
         onEndReachedThreshold={0.4}
-        contentContainerStyle={styles.list}
+        contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
@@ -270,7 +260,7 @@ const RequestsScreen = ({ navigation }) => {
                 <Text style={styles.emptyText}>No {activeTab === 'all' ? '' : activeTab} bookings</Text>
                 <Text style={styles.emptySub}>Go online from Dashboard to receive requests</Text>
               </View>
-            : <ActivityIndicator color={COLORS.primary} style={{ marginTop: SPACING.xxxl }} />
+            : <ActivityIndicator color={COLORS.primary} style={{ marginTop: 60 }} />
         }
       />
     </View>
@@ -278,47 +268,85 @@ const RequestsScreen = ({ navigation }) => {
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
+  container:  { flex: 1, backgroundColor: '#F5F7FA' },
 
-  header:    { paddingHorizontal: SPACING.xl, paddingTop: SPACING.xl + SPACING.lg, paddingBottom: SPACING.md, backgroundColor: COLORS.white, ...SHADOWS.sm },
-  title:     { fontSize: FONT_SIZES.xxl, fontWeight: '800', color: COLORS.textPrimary },
+  header: {
+    flexDirection:     'row',
+    alignItems:        'center',
+    justifyContent:    'space-between',
+    paddingHorizontal: SPACING.xl,
+    paddingTop:        SPACING.xl + SPACING.lg,
+    paddingBottom:     SPACING.md,
+    backgroundColor:   '#FFFFFF',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 4,
+  },
+  title: { fontSize: FONT_SIZES.xxl, fontWeight: '800', color: '#111827' },
 
-  tabsWrapper: { backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: COLORS.border },
-  tabs:        { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, gap: SPACING.sm },
-  tab:         { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, borderRadius: BORDER_RADIUS.round, backgroundColor: COLORS.background, borderWidth: 1, borderColor: COLORS.border },
-  tabActive:   { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
-  tabText:     { fontSize: FONT_SIZES.sm, fontWeight: '500', color: COLORS.textSecondary },
-  tabTextActive: { color: COLORS.white, fontWeight: '700' },
+  tabsWrapper:    { backgroundColor: '#FFFFFF', borderBottomWidth: 1, borderBottomColor: '#E5E7EB' },
+  tabsContainer:  { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, gap: SPACING.sm },
+  tab: {
+    flexDirection:  'row',
+    alignItems:     'center',
+    gap:            5,
+    paddingHorizontal: SPACING.md,
+    paddingVertical:   8,
+    borderRadius:      20,
+    backgroundColor:   '#F3F4F6',
+    borderWidth:       1,
+    borderColor:       '#E5E7EB',
+  },
+  tabActive:      { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  tabEmoji:       { fontSize: 13 },
+  tabText:        { fontSize: FONT_SIZES.sm, fontWeight: '500', color: '#6B7280' },
+  tabTextActive:  { color: '#FFFFFF', fontWeight: '700' },
 
-  list: { padding: SPACING.xl, paddingBottom: SPACING.xxxl, gap: SPACING.md },
+  listContent: { padding: SPACING.xl, paddingBottom: 60, gap: SPACING.md },
 
-  card:        { backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, ...SHADOWS.sm },
-  cardTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
-  serviceName: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary },
-  subService:  { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: '600', marginBottom: SPACING.sm },
+  /* Card */
+  card: {
+    backgroundColor: '#FFFFFF',
+    borderRadius:    16,
+    padding:         SPACING.lg,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
+  },
+  cardTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SPACING.md },
+  serviceName: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: '#111827' },
+  subService:  { fontSize: FONT_SIZES.xs, color: COLORS.primary, fontWeight: '600', marginTop: 2 },
 
-  infoSection: { backgroundColor: COLORS.background, borderRadius: BORDER_RADIUS.md, padding: SPACING.md, marginBottom: SPACING.md, gap: 4 },
-  infoRow:     { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
+  infoBlock: { backgroundColor: '#F9FAFB', borderRadius: 12, padding: SPACING.md, marginBottom: SPACING.md, gap: 6 },
+  infoRow:   { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  infoEmoji: { fontSize: 13, marginTop: 1 },
+  infoText:  { fontSize: FONT_SIZES.sm, color: '#4B5563', flex: 1 },
 
-  amountRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SPACING.sm, borderTopWidth: 1, borderTopColor: COLORS.divider, marginBottom: SPACING.md },
-  amountLabel: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
-  amount:      { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.textPrimary },
+  amountRow: {
+    flexDirection:    'row',
+    justifyContent:   'space-between',
+    alignItems:       'center',
+    paddingVertical:  SPACING.sm,
+    borderTopWidth:   1,
+    borderTopColor:   '#F3F4F6',
+    marginBottom:     SPACING.md,
+  },
+  amountLabel: { fontSize: FONT_SIZES.sm, color: '#6B7280' },
+  amount:      { fontSize: FONT_SIZES.xl, fontWeight: '800', color: '#111827' },
 
-  actionRow:   { flexDirection: 'row', gap: SPACING.md },
-  acceptBtn:   { flex: 1, backgroundColor: COLORS.success, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.md, alignItems: 'center' },
-  acceptBtnText: { color: COLORS.white, fontWeight: '700', fontSize: FONT_SIZES.md },
-  rejectBtn:   { flex: 1, backgroundColor: COLORS.errorLight, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.md, alignItems: 'center' },
-  rejectBtnText: { color: COLORS.error, fontWeight: '700', fontSize: FONT_SIZES.md },
+  actionRow:     { flexDirection: 'row', gap: SPACING.md },
+  acceptBtn:     { flex: 1, backgroundColor: '#22C55E', paddingVertical: 13, borderRadius: 12, alignItems: 'center' },
+  acceptBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: FONT_SIZES.md },
+  rejectBtn:     { flex: 1, backgroundColor: '#FEE2E2', paddingVertical: 13, borderRadius: 12, alignItems: 'center' },
+  rejectBtnText: { color: '#EF4444', fontWeight: '700', fontSize: FONT_SIZES.md },
 
-  updateBtn:     { backgroundColor: COLORS.primary, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.md, alignItems: 'center' },
-  updateBtnText: { color: COLORS.white, fontWeight: '700', fontSize: FONT_SIZES.md },
+  updateBtn:     { paddingVertical: 13, borderRadius: 12, alignItems: 'center', marginTop: SPACING.sm },
+  updateBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: FONT_SIZES.md },
 
-  btnDisabled: { opacity: 0.6 },
+  btnDisabled: { opacity: 0.55 },
 
-  empty:    { alignItems: 'center', paddingTop: SPACING.huge },
+  empty:    { alignItems: 'center', paddingTop: 60, paddingHorizontal: SPACING.xl },
   emptyIcon:{ fontSize: 64, marginBottom: SPACING.lg },
-  emptyText:{ fontSize: FONT_SIZES.xl, fontWeight: '700', color: COLORS.textPrimary },
-  emptySub: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.sm, textAlign: 'center' },
+  emptyText:{ fontSize: FONT_SIZES.xl, fontWeight: '700', color: '#111827' },
+  emptySub: { fontSize: FONT_SIZES.sm, color: '#6B7280', marginTop: SPACING.sm, textAlign: 'center' },
 });
 
 export default RequestsScreen;
