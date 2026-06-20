@@ -97,7 +97,7 @@ const ProviderProfileScreen = ({ navigation }) => {
       <View style={styles.section}>
         <Text style={styles.sectionLabel}>Account</Text>
         <View style={styles.menuCard}>
-          <MenuItem icon="👤" label="Edit Profile"       sublabel="Update your personal info" onPress={() => {}} />
+          <MenuItem icon="👤" label="Edit Profile"       sublabel="Update your personal info" onPress={() => navigation.navigate('EditProviderProfile')} />
           <View style={styles.divider} />
           <MenuItem icon="🔔" label="Notifications"     sublabel="Manage your alerts"        onPress={() => {}} />
           <View style={styles.divider} />

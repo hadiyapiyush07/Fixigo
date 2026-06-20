@@ -17,7 +17,7 @@ const SplashScreen = () => {
     // When this completes → isInitialized becomes true in Redux
     // → AppNavigator re-renders → shows correct screen automatically
     dispatch(loadStoredAuth());
-  }, []);
+  }, [dispatch]);
 
   return (
     <View style={styles.container}>

@@ -2,20 +2,21 @@ const express    = require("express");
 const router     = express.Router();
 const {
   getNearbyProviders, getMyProviderProfile, getProviderById,
-  updateProviderProfile, toggleOnlineStatus, updateAvailability,
+  updateProviderProfile, toggleOnlineStatus, updateAvailability, getMyStats,
 } = require("../controllers/provider.controller");
 const { verifyToken }  = require("../middleware/auth.middleware");
 const { requireRole }  = require("../middleware/role.middleware");
 
-// ── Public ────────────────────────────────────────────────────────────────
-router.get("/nearby",  getNearbyProviders);
-router.get("/:id",     getProviderById);
-
 // ── Provider only ─────────────────────────────────────────────────────────
 router.get( "/me",             verifyToken, requireRole("provider"), getMyProviderProfile);
+router.get( "/my-stats",       verifyToken, requireRole("provider"), getMyStats);         // live DB stats
 router.put( "/profile",        verifyToken, requireRole("provider"), updateProviderProfile);
 router.put( "/online-status",  verifyToken, requireRole("provider"), toggleOnlineStatus);
 router.put( "/availability",   verifyToken, requireRole("provider"), updateAvailability);
+
+// ── Public ────────────────────────────────────────────────────────────────
+router.get("/nearby",  getNearbyProviders);
+router.get("/:id",     getProviderById);
 
 module.exports = router;
 

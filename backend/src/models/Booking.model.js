@@ -15,10 +15,25 @@ const bookingSchema = new mongoose.Schema(
       name:  { type: String, default: "" },
       price: { type: Number, default: 0 },
     },
+    subServices: [
+      {
+        name: { type: String },
+        price: { type: Number },
+        duration: { type: Number, default: 60 }
+      }
+    ],
+    rescheduleRequest: {
+      proposedDate: { type: Date, default: null },
+      proposedTime: { type: String, default: null },
+      requestedBy: { type: String, enum: ["customer", "provider", null], default: null },
+      status: { type: String, enum: ["pending", "approved", "declined", null], default: null },
+      reason: { type: String, default: "" }
+    },
     description: { type: String, default: "", maxlength: 500 },
+    images: [{ type: String }],
 
-    scheduledDate: { type: Date,   required: true },
-    scheduledTime: { type: String, required: true },  // "10:00 AM"
+    scheduledDate: { type: Date,   default: Date.now },   // Auto-set for instant bookings
+    scheduledTime: { type: String, default: "Instant" },  // "Instant" for on-demand bookings
 
     address: {
       addressLine: { type: String, required: true },
@@ -32,7 +47,7 @@ const bookingSchema = new mongoose.Schema(
 
     status: {
       type: String,
-      enum: ["pending", "confirmed", "provider_on_the_way", "in_progress", "completed", "cancelled", "rejected"],
+      enum: ["pending", "accepted", "confirmed", "provider_on_the_way", "arrived", "otp_verification", "in_progress", "payment_pending", "completed", "cancelled", "rejected", "expired"],
       default: "pending",
     },
 
@@ -48,6 +63,12 @@ const bookingSchema = new mongoose.Schema(
 
     // Providers who have already rejected — never notify them again
     rejectedProviders: [{ type: mongoose.Schema.Types.ObjectId, ref: "Provider" }],
+
+    // The provider currently notified who needs to respond
+    notifiedProviderId: { type: mongoose.Schema.Types.ObjectId, ref: "Provider", default: null },
+
+    // OTP to start service
+    startOtp: { type: String, default: null },
 
     // If provider doesn't respond in 2 minutes → try next provider
     providerResponseDeadline: { type: Date, default: null },

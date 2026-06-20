@@ -144,13 +144,39 @@ adminRouter.get("/providers", asyncHandler(async (req, res) => {
 
 // PUT /api/admin/providers/:id/verify
 adminRouter.put("/providers/:id/verify", asyncHandler(async (req, res) => {
-  const { isVerified } = req.body;
-  if (typeof isVerified !== "boolean") throw new ApiError(400, "isVerified (true/false) is required.");
+  const { isVerified, verificationStatus } = req.body;
+  
+  let updateObj = {};
+  if (verificationStatus !== undefined) {
+    if (!["pending", "verified", "rejected"].includes(verificationStatus)) {
+      throw new ApiError(400, "Invalid verificationStatus. Must be 'pending', 'verified', or 'rejected'.");
+    }
+    updateObj.verificationStatus = verificationStatus;
+    updateObj.isVerified = (verificationStatus === "verified");
+  } else if (isVerified !== undefined) {
+    if (typeof isVerified !== "boolean") {
+      throw new ApiError(400, "isVerified must be a boolean.");
+    }
+    updateObj.isVerified = isVerified;
+    updateObj.verificationStatus = isVerified ? "verified" : "rejected";
+  } else {
+    throw new ApiError(400, "Either isVerified or verificationStatus is required.");
+  }
+
+  // If rejected or pending, provider must go offline
+  if (updateObj.isVerified === false) {
+    updateObj.isOnline = false;
+    updateObj.status = "offline";
+  }
+
   const provider = await Provider.findByIdAndUpdate(
-    req.params.id, { isVerified }, { new: true }
+    req.params.id,
+    { $set: updateObj },
+    { new: true }
   ).populate("userId", "name email");
+
   if (!provider) throw new ApiError(404, "Provider not found.");
-  res.json(new ApiResponse(200, provider, `Provider ${isVerified ? "approved" : "rejected"}.`));
+  res.json(new ApiResponse(200, provider, `Provider verification status updated to ${provider.verificationStatus}.`));
 }));
 
 // GET /api/admin/bookings?status=pending&page=1

@@ -2,119 +2,155 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform,
+  TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
-import { bookingAPI } from '../../api/booking.api';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 
-// Time slots for scheduling
-const TIME_SLOTS = [
-  '08:00 AM', '09:00 AM', '10:00 AM', '11:00 AM',
-  '12:00 PM', '01:00 PM', '02:00 PM', '03:00 PM',
-  '04:00 PM', '05:00 PM', '06:00 PM', '07:00 PM',
-];
-
-// Quick date options
-const getDateOptions = () => {
-  const options = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
-    options.push({
-      label: i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' }),
-      value: d.toISOString().split('T')[0],
-      full:  d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
-    });
-  }
-  return options;
-};
+// Instant booking — no date/time selection needed.
+// The backend auto-sets scheduledDate = now, scheduledTime = 'Instant'
 
 const CreateBookingScreen = ({ navigation, route }) => {
-  const providerId  = route?.params?.providerId;
-  const categoryId  = route?.params?.categoryId;
-  const providerName= route?.params?.providerName || 'Provider';
+  const categoryId    = route?.params?.categoryId;
+  const categoryName  = route?.params?.categoryName  || 'Service';
+  const subService    = route?.params?.subService;
+  const subServices   = route?.params?.subServices || (subService ? [subService] : []);
 
-  const [loading,      setLoading]      = useState(false);
+  const basePrice     = route?.params?.basePrice || subServices.reduce((sum, s) => sum + s.price, 0) || 499;
+  const totalDuration = route?.params?.duration || subServices.reduce((sum, s) => sum + (s.duration || 60), 0) || 60;
+
+  // ── Form state ─────────────────────────────────────────────────────────
   const [addressLine,  setAddressLine]  = useState('');
   const [city,         setCity]         = useState('Surat');
   const [pincode,      setPincode]      = useState('');
-  const [selectedDate, setSelectedDate] = useState(getDateOptions()[0].value);
-  const [selectedTime, setSelectedTime] = useState('10:00 AM');
+  // Instant booking: no date/time chosen by user
   const [notes,        setNotes]        = useState('');
-  const [errors,       setErrors]       = useState({});
+  const [couponCode,   setCouponCode]   = useState('');
+  const [discount,     setDiscount]     = useState(0);
+  const [couponApplied, setCouponApplied] = useState(false);
+  
+  // Optional Images
+  const [images, setImages] = useState([]); // array of base64/uri
+  const [imageUris, setImageUris] = useState([]); // for preview
+  const [errors, setErrors] = useState({});
 
-  const dateOptions = getDateOptions();
+  const handlePickImage = () => {
+    if (imageUris.length >= 3) {
+      Alert.alert('Limit Reached', 'You can upload a maximum of 3 images.');
+      return;
+    }
+
+    launchImageLibrary({
+      mediaType: 'photo',
+      includeBase64: true,
+      quality: 0.5,
+    }, (response) => {
+      if (response.didCancel) return;
+      if (response.errorMessage) {
+        Alert.alert('Image Pick Error', response.errorMessage);
+        return;
+      }
+      const asset = response.assets?.[0];
+      if (asset) {
+        const base64Str = `data:${asset.type};base64,${asset.base64}`;
+        setImages(prev => [...prev, base64Str]);
+        setImageUris(prev => [...prev, asset.uri]);
+      }
+    });
+  };
+
+  const handleRemoveImage = (index) => {
+    setImages(prev => prev.filter((_, i) => i !== index));
+    setImageUris(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleApplyCoupon = () => {
+    if (couponApplied) {
+      setDiscount(0);
+      setCouponCode('');
+      setCouponApplied(false);
+      Alert.alert('Coupon Removed', 'Promo code removed successfully.');
+      return;
+    }
+
+    const code = couponCode.trim().toUpperCase();
+    if (code === 'FIXIGO50') {
+      setDiscount(50);
+      setCouponApplied(true);
+      Alert.alert('🎉 Promo Applied', 'Rs. 50 discount applied successfully!');
+    } else if (code === 'WELCOME100') {
+      if (basePrice < 300) {
+        Alert.alert('Coupon Error', 'WELCOME100 requires a minimum booking amount of Rs. 300.');
+        return;
+      }
+      setDiscount(100);
+      setCouponApplied(true);
+      Alert.alert('🎉 Promo Applied', 'Rs. 100 discount applied successfully!');
+    } else {
+      Alert.alert('Invalid Coupon', 'The promo code entered is invalid or expired.');
+    }
+  };
 
   const validate = () => {
     const e = {};
-    if (!addressLine.trim())           e.address = 'Address is required';
-    if (!city.trim())                  e.city    = 'City is required';
+    if (!addressLine.trim())            e.address = 'Address is required';
+    if (!city.trim())                   e.city    = 'City is required';
     if (!pincode || pincode.length < 6) e.pincode = 'Enter valid 6-digit pincode';
-    if (!selectedDate)                 e.date    = 'Please select a date';
-    if (!selectedTime)                 e.time    = 'Please select a time slot';
     setErrors(e);
     return Object.keys(e).length === 0;
   };
 
-  const handleConfirmBooking = async () => {
-    if (!validate()) return;
-
-    if (!providerId || !categoryId) {
-      Alert.alert('Error', 'Missing booking information. Please go back and try again.');
+  const handleProceedToSummary = () => {
+    if (!validate()) {
+      Alert.alert('Validation Error', 'Please complete all required fields.');
       return;
     }
 
-    try {
-      setLoading(true);
-
-      const payload = {
-        categoryId,
-        scheduledDate: selectedDate,
-        scheduledTime: selectedTime,
-        address: {
-          addressLine: addressLine.trim(),
-          city:        city.trim(),
-          pincode:     pincode.trim(),
-          location: {
-            type:        'Point',
-            coordinates: [72.8311, 21.1702], // default Surat — replace with GPS
-          },
-        },
-        description: notes.trim(),
-        subService: {
-          name:  'General Service',
-          price: 499,
-        },
-        pricing: {
-          baseAmount:     499,
-          convenienceFee: 49,
-          discount:       0,
-          totalAmount:    548,
-        },
-      };
-
-      const res       = await bookingAPI.create(payload);
-      const booking   = res?.data?.data || res?.data;
-      const bookingId = booking?._id;
-
-      if (!bookingId) throw new Error('Booking creation failed');
-
-      Alert.alert(
-        '🎉 Booking Created!',
-        'We are finding the best provider near you. You will be notified once confirmed.',
-        [{ text: 'Track Booking', onPress: () => navigation.navigate('BookingTrack', { bookingId }) }]
-      );
-    } catch (e) {
-      console.log('Booking error:', e);
-      Alert.alert('Booking Failed', e?.response?.data?.message || e.message || 'Please try again');
-    } finally {
-      setLoading(false);
+    if (!categoryId) {
+      Alert.alert('Error', 'Service category missing. Please go back and try again.');
+      return;
     }
+
+    // Compute prices
+    const taxes = Math.round(basePrice * 0.18); // 18% GST
+    const convenienceFee = 50;
+    const totalAmount = Math.max(0, basePrice + taxes + convenienceFee - discount);
+
+    navigation.navigate('BookingSummary', {
+      categoryId,
+      categoryName,
+      subServices,
+      subService: {
+        name: subServices.map(s => s.name).join(', '),
+        price: basePrice,
+        duration: totalDuration
+      },
+      // Instant booking — no scheduledDate/scheduledTime from frontend
+      notes: notes.trim(),
+      address: {
+        addressLine: addressLine.trim(),
+        city: city.trim(),
+        pincode: pincode.trim(),
+        location: {
+          type: 'Point',
+          coordinates: [72.8311, 21.1702] // Default Surat coords
+        }
+      },
+      couponCode: couponApplied ? couponCode.trim().toUpperCase() : null,
+      images,
+      pricing: {
+        baseAmount: basePrice,
+        taxes,
+        convenienceFee,
+        discount,
+        totalAmount
+      }
+    });
   };
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1 }}
+      style={{ flex: 1, backgroundColor: COLORS.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}
     >
       <ScrollView
@@ -125,57 +161,19 @@ const CreateBookingScreen = ({ navigation, route }) => {
       >
         {/* Header */}
         <View style={styles.headerCard}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+            <Text style={styles.backBtnText}>‹</Text>
+          </TouchableOpacity>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>Booking Details</Text>
+            <Text style={styles.headerSub}>{categoryName} - {subService?.name || 'General'}</Text>
+          </View>
           <Text style={styles.headerIcon}>📋</Text>
-          <View>
-            <Text style={styles.headerTitle}>Book Service</Text>
-            <Text style={styles.headerSub}>with {providerName}</Text>
-          </View>
-        </View>
-
-        {/* Date Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📅 Select Date</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.dateRow}>
-            {dateOptions.map(d => (
-              <TouchableOpacity
-                key={d.value}
-                style={[styles.dateChip, selectedDate === d.value && styles.dateChipActive]}
-                onPress={() => setSelectedDate(d.value)}
-              >
-                <Text style={[styles.dateChipLabel, selectedDate === d.value && styles.dateChipLabelActive]}>
-                  {d.label}
-                </Text>
-                <Text style={[styles.dateChipSub, selectedDate === d.value && styles.dateChipLabelActive]}>
-                  {d.full}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-          {errors.date && <Text style={styles.errorText}>{errors.date}</Text>}
-        </View>
-
-        {/* Time Slot Selection */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>⏰ Select Time Slot</Text>
-          <View style={styles.timeGrid}>
-            {TIME_SLOTS.map(t => (
-              <TouchableOpacity
-                key={t}
-                style={[styles.timeChip, selectedTime === t && styles.timeChipActive]}
-                onPress={() => setSelectedTime(t)}
-              >
-                <Text style={[styles.timeChipText, selectedTime === t && styles.timeChipTextActive]}>
-                  {t}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-          {errors.time && <Text style={styles.errorText}>{errors.time}</Text>}
         </View>
 
         {/* Address */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📍 Service Address</Text>
+          <Text style={styles.sectionTitle}>📍 Service Address *</Text>
 
           <Text style={styles.label}>House / Flat / Street *</Text>
           <TextInput
@@ -183,7 +181,7 @@ const CreateBookingScreen = ({ navigation, route }) => {
             placeholder="e.g. B-204, Sunrise Apartment, Near City Mall"
             placeholderTextColor={COLORS.textTertiary}
             value={addressLine}
-            onChangeText={setAddressLine}
+            onChangeText={v => { setAddressLine(v); if (errors.address) setErrors(p => ({ ...p, address: null })); }}
             multiline
             numberOfLines={2}
           />
@@ -197,7 +195,7 @@ const CreateBookingScreen = ({ navigation, route }) => {
                 placeholder="Surat"
                 placeholderTextColor={COLORS.textTertiary}
                 value={city}
-                onChangeText={setCity}
+                onChangeText={v => { setCity(v); if (errors.city) setErrors(p => ({ ...p, city: null })); }}
               />
               {errors.city && <Text style={styles.errorText}>{errors.city}</Text>}
             </View>
@@ -209,7 +207,7 @@ const CreateBookingScreen = ({ navigation, route }) => {
                 placeholder="395001"
                 placeholderTextColor={COLORS.textTertiary}
                 value={pincode}
-                onChangeText={setPincode}
+                onChangeText={v => { setPincode(v); if (errors.pincode) setErrors(p => ({ ...p, pincode: null })); }}
                 keyboardType="numeric"
                 maxLength={6}
               />
@@ -218,12 +216,60 @@ const CreateBookingScreen = ({ navigation, route }) => {
           </View>
         </View>
 
+        {/* Optional Images */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>📸 Upload Reference Images (Optional)</Text>
+          <Text style={styles.subtext}>Add up to 3 photos of the issue to help the provider:</Text>
+          
+          <View style={styles.imagePickerRow}>
+            {imageUris.map((uri, idx) => (
+              <View key={uri} style={styles.thumbWrapper}>
+                <Image source={{ uri }} style={styles.thumbnail} />
+                <TouchableOpacity style={styles.removeBtn} onPress={() => handleRemoveImage(idx)}>
+                  <Text style={styles.removeBtnText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+            ))}
+            {imageUris.length < 3 && (
+              <TouchableOpacity style={styles.pickerBtn} onPress={handlePickImage}>
+                <Text style={{ fontSize: 28, color: COLORS.textTertiary }}>+</Text>
+                <Text style={styles.pickerLabel}>Upload</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+
+        {/* Coupon Code */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>🏷 Coupon Code (Optional)</Text>
+          <View style={styles.couponRow}>
+            <TextInput
+              style={[styles.input, { flex: 1, marginTop: 0 }]}
+              placeholder="e.g. FIXIGO50, WELCOME100"
+              placeholderTextColor={COLORS.textTertiary}
+              value={couponCode}
+              onChangeText={setCouponCode}
+              autoCapitalize="characters"
+              editable={!couponApplied}
+            />
+            <TouchableOpacity
+              style={[styles.applyBtn, couponApplied && styles.applyBtnActive]}
+              onPress={handleApplyCoupon}
+            >
+              <Text style={styles.applyBtnText}>{couponApplied ? 'Remove' : 'Apply'}</Text>
+            </TouchableOpacity>
+          </View>
+          {couponApplied && (
+            <Text style={styles.appliedText}>✓ Coupon applied! Saved ₹{discount}</Text>
+          )}
+        </View>
+
         {/* Notes */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📝 Special Instructions (Optional)</Text>
+          <Text style={styles.sectionTitle}>📝 Additional Notes (Optional)</Text>
           <TextInput
             style={[styles.input, { height: 80, textAlignVertical: 'top' }]}
-            placeholder="Any specific requirements or instructions for the provider..."
+            placeholder="Any specific requirements or instructions..."
             placeholderTextColor={COLORS.textTertiary}
             value={notes}
             onChangeText={setNotes}
@@ -231,36 +277,13 @@ const CreateBookingScreen = ({ navigation, route }) => {
           />
         </View>
 
-        {/* Price Summary */}
-        <View style={styles.priceCard}>
-          <Text style={styles.priceSectionTitle}>💰 Price Summary</Text>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Base Amount</Text>
-            <Text style={styles.priceValue}>₹499</Text>
-          </View>
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Convenience Fee</Text>
-            <Text style={styles.priceValue}>₹49</Text>
-          </View>
-          <View style={styles.priceDivider} />
-          <View style={styles.priceRow}>
-            <Text style={styles.priceTotalLabel}>Total Amount</Text>
-            <Text style={styles.priceTotalValue}>₹548</Text>
-          </View>
-          <Text style={styles.paymentNote}>💵 Pay after service is completed</Text>
-        </View>
-
-        {/* Confirm Button */}
+        {/* Proceed Button */}
         <TouchableOpacity
-          style={[styles.confirmBtn, loading && { opacity: 0.7 }]}
-          onPress={handleConfirmBooking}
-          disabled={loading}
+          style={styles.confirmBtn}
+          onPress={handleProceedToSummary}
           activeOpacity={0.85}
         >
-          {loading
-            ? <ActivityIndicator color={COLORS.white} />
-            : <Text style={styles.confirmBtnText}>Confirm Booking →</Text>
-          }
+          <Text style={styles.confirmBtnText}>Proceed to Summary  →</Text>
         </TouchableOpacity>
 
         <View style={{ height: SPACING.xxxl }} />
@@ -276,31 +299,35 @@ const styles = StyleSheet.create({
   headerCard: {
     flexDirection:   'row',
     alignItems:      'center',
-    gap:             SPACING.lg,
+    gap:             SPACING.md,
     backgroundColor: COLORS.primary,
     borderRadius:    BORDER_RADIUS.xl,
     padding:         SPACING.xl,
     marginBottom:    SPACING.xl,
+    ...SHADOWS.md,
   },
-  headerIcon:  { fontSize: 40 },
+  backBtn:     { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
+  backBtnText: { fontSize: 24, color: COLORS.white, fontWeight: '300', lineHeight: 26 },
   headerTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.white },
   headerSub:   { fontSize: FONT_SIZES.sm, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
+  headerIcon:  { fontSize: 36 },
 
   section:      { backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, marginBottom: SPACING.lg, ...SHADOWS.sm },
   sectionTitle: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary, marginBottom: SPACING.md },
+  subtext:      { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginBottom: SPACING.md },
 
-  dateRow:          { gap: SPACING.sm, paddingRight: SPACING.md },
-  dateChip:         { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, alignItems: 'center', minWidth: 80 },
-  dateChipActive:   { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
-  dateChipLabel:    { fontSize: FONT_SIZES.sm, fontWeight: '700', color: COLORS.textPrimary },
-  dateChipSub:      { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2 },
+  dateRow:             { gap: SPACING.sm, paddingRight: SPACING.md },
+  dateChip:            { paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, alignItems: 'center', minWidth: 82 },
+  dateChipActive:      { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
+  dateChipLabel:       { fontSize: FONT_SIZES.sm, fontWeight: '700', color: COLORS.textPrimary },
+  dateChipDay:         { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2 },
   dateChipLabelActive: { color: COLORS.primary },
 
-  timeGrid:          { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
-  timeChip:          { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.background },
-  timeChipActive:    { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
-  timeChipText:      { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
-  timeChipTextActive:{ color: COLORS.primary, fontWeight: '700' },
+  timeGrid:           { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.sm },
+  timeChip:           { paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: COLORS.border, backgroundColor: COLORS.background },
+  timeChipActive:     { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
+  timeChipText:       { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
+  timeChipTextActive: { color: COLORS.primary, fontWeight: '700' },
 
   label:      { fontSize: FONT_SIZES.sm, fontWeight: '500', color: COLORS.textSecondary, marginBottom: 6, marginTop: SPACING.md },
   input:      { backgroundColor: COLORS.background, borderWidth: 1, borderColor: COLORS.border, borderRadius: BORDER_RADIUS.md, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, fontSize: FONT_SIZES.md, color: COLORS.textPrimary },
@@ -308,15 +335,19 @@ const styles = StyleSheet.create({
   rowInputs:  { flexDirection: 'row' },
   errorText:  { fontSize: FONT_SIZES.xs, color: COLORS.error, marginTop: 4 },
 
-  priceCard:        { backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, marginBottom: SPACING.lg, borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.sm },
-  priceSectionTitle:{ fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary, marginBottom: SPACING.md },
-  priceRow:         { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.sm },
-  priceLabel:       { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
-  priceValue:       { fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, fontWeight: '500' },
-  priceDivider:     { height: 1, backgroundColor: COLORS.border, marginVertical: SPACING.sm },
-  priceTotalLabel:  { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary },
-  priceTotalValue:  { fontSize: FONT_SIZES.lg, fontWeight: '800', color: COLORS.primary },
-  paymentNote:      { fontSize: FONT_SIZES.xs, color: COLORS.success, marginTop: SPACING.sm, textAlign: 'center' },
+  imagePickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md },
+  pickerBtn: { width: 75, height: 75, borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: COLORS.border, borderStyle: 'dashed', backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center' },
+  pickerLabel: { fontSize: 10, color: COLORS.textSecondary, fontWeight: '500' },
+  thumbWrapper: { position: 'relative', width: 75, height: 75 },
+  thumbnail: { width: '100%', height: '100%', borderRadius: BORDER_RADIUS.md },
+  removeBtn: { position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.error, alignItems: 'center', justifyContent: 'center' },
+  removeBtnText: { color: COLORS.white, fontSize: 10, fontWeight: '700' },
+
+  couponRow: { flexDirection: 'row', gap: SPACING.sm, alignItems: 'center' },
+  applyBtn: { backgroundColor: COLORS.primary, paddingHorizontal: SPACING.xl, paddingVertical: 12, borderRadius: BORDER_RADIUS.md },
+  applyBtnActive: { backgroundColor: COLORS.textSecondary },
+  applyBtnText: { color: COLORS.white, fontWeight: '700', fontSize: FONT_SIZES.md },
+  appliedText: { fontSize: FONT_SIZES.xs, color: COLORS.success, fontWeight: '600', marginTop: SPACING.xs },
 
   confirmBtn:     { backgroundColor: COLORS.primary, paddingVertical: SPACING.lg + 2, borderRadius: BORDER_RADIUS.lg, alignItems: 'center', ...SHADOWS.md },
   confirmBtnText: { color: COLORS.white, fontSize: FONT_SIZES.lg, fontWeight: '700' },

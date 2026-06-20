@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 // src/screens/customer/HomeScreen.jsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
@@ -33,9 +34,11 @@ const HomeScreen = ({ navigation }) => {
   const [refreshing,  setRefreshing]  = useState(false);
   const [page,        setPage]        = useState(1);
   const [hasNextPage, setHasNextPage] = useState(true);
-  const [selectedCat, setSelectedCat] = useState(null);
-  const [coords,      setCoords]      = useState(null);
   const [searchText,  setSearchText]  = useState('');
+  const [coords,      setCoords]      = useState(null);
+
+  // ✅ Store full category object (not just _id) so basePrice travels with it
+  const [selectedCat, setSelectedCat] = useState(null); // { _id, name, basePrice, ... }
 
   useEffect(() => { initScreen(); }, []);
 
@@ -45,10 +48,10 @@ const HomeScreen = ({ navigation }) => {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         {
-          title:           'Location Permission',
-          message:         'Fixigo needs your location to find nearby providers.',
-          buttonPositive:  'Allow',
-          buttonNegative:  'Deny',
+          title:          'Location Permission',
+          message:        'Fixigo needs your location to find nearby providers.',
+          buttonPositive: 'Allow',
+          buttonNegative: 'Deny',
         }
       );
       return granted === PermissionsAndroid.RESULTS.GRANTED;
@@ -59,7 +62,7 @@ const HomeScreen = ({ navigation }) => {
     Geolocation.getCurrentPosition(
       pos => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
       err => reject(err),
-      { enableHighAccuracy: true, timeout: 30000, maximumAge: 10000 }
+      { enableHighAccuracy: false, timeout: 30000, maximumAge: 60000 }
     );
   });
 
@@ -116,16 +119,16 @@ const HomeScreen = ({ navigation }) => {
       await fetchProviders(loc.latitude, loc.longitude, 1, null, true);
     } catch (e) {
       console.log('GPS error:', e);
+      // Fallback to Surat coordinates if GPS fails
+      const fallback = { latitude: 21.1702, longitude: 72.8311 };
+      setCoords(fallback);
+      await fetchProviders(fallback.latitude, fallback.longitude, 1, null, true);
     }
   };
 
-  const handleCategoryPress = async (cat) => {
-    if (!coords) return;
-    setSelectedCat(cat._id);
-    setProviders([]);
-    setPage(1);
-    setHasNextPage(true);
-    await fetchProviders(coords.latitude, coords.longitude, 1, cat._id, true);
+  // ✅ Store full category object, not just _id
+  const handleCategoryPress = (cat) => {
+    navigation.navigate('ServiceOptions', { category: cat });
   };
 
   const handleClearFilter = async () => {
@@ -151,47 +154,59 @@ const HomeScreen = ({ navigation }) => {
     setRefreshing(false);
   }, []);
 
-  // Filter providers by search text
   const filteredProviders = useMemo(() => {
     if (!searchText.trim()) return providers;
+    const q = searchText.toLowerCase();
     return providers.filter(p =>
-      p?.userId?.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-      p?.skills?.some(s => s?.name?.toLowerCase().includes(searchText.toLowerCase()))
+      p?.userId?.name?.toLowerCase().includes(q) ||
+      p?.skills?.some(s => s?.name?.toLowerCase().includes(q))
     );
   }, [providers, searchText]);
 
-  // ── Category Item ─────────────────────────────────────────────────────
+  // ── Category Item ────────────────────────────────────────────────────
   const CategoryItem = ({ item }) => (
     <TouchableOpacity
-      style={[styles.catItem, selectedCat === item._id && styles.catItemActive]}
+      style={[styles.catItem, selectedCat?._id === item._id && styles.catItemActive]}
       onPress={() => handleCategoryPress(item)}
       activeOpacity={0.8}
     >
-      <View style={[styles.catIconBox, selectedCat === item._id && styles.catIconBoxActive]}>
+      <View style={[styles.catIconBox, selectedCat?._id === item._id && styles.catIconBoxActive]}>
         <Text style={styles.catEmoji}>{CATEGORY_ICONS[item.name] || '🔨'}</Text>
       </View>
-      <Text style={[styles.catName, selectedCat === item._id && styles.catNameActive]}>
+      <Text style={[styles.catName, selectedCat?._id === item._id && styles.catNameActive]}>
         {item.name}
       </Text>
-      <Text style={styles.catPrice}>From ₹{item.basePrice || 199}</Text>
+      {/* ✅ Show real basePrice from DB */}
+      <Text style={styles.catPrice}>₹{item.basePrice || 199}+</Text>
     </TouchableOpacity>
   );
 
-  // ── Provider Card ──────────────────────────────────────────────────────
+  // ── Provider Card ────────────────────────────────────────────────────
   const ProviderCard = ({ item }) => {
-    const name   = item?.userId?.name || 'Provider';
-    const skills = Array.isArray(item?.skills)
+    const name    = item?.userId?.name || 'Provider';
+    const skills  = Array.isArray(item?.skills)
       ? item.skills.map(s => s?.name).filter(Boolean).join(' • ')
       : 'General Services';
-    const rating = Number(item?.rating?.average || 0).toFixed(1);
-    const reviews= item?.rating?.count || 0;
+    const rating  = Number(item?.rating?.average || 0).toFixed(1);
+    const reviews = item?.rating?.count || 0;
+
+    // ✅ Resolve categoryId and basePrice with clear priority
+    const resolvedCategoryId   = selectedCat?._id   || item?.skills?.[0]?._id        || null;
+    const resolvedCategoryName = selectedCat?.name   || item?.skills?.[0]?.name       || 'Service';
+    const resolvedBasePrice    = selectedCat?.basePrice || item?.skills?.[0]?.basePrice || 499;
+    const resolvedFee          = Math.round(resolvedBasePrice * 0.1);
+    const resolvedTotal        = resolvedBasePrice + resolvedFee;
 
     return (
       <TouchableOpacity
         style={styles.provCard}
         onPress={() => navigation.navigate('ProviderDetail', {
-          providerId: item?._id,
-          categoryId: selectedCat || null,
+          providerId:    item?._id,
+          categoryId:    resolvedCategoryId,
+          categoryName:  resolvedCategoryName,
+          basePrice:     resolvedBasePrice,
+          convenienceFee: resolvedFee,
+          totalAmount:   resolvedTotal,
         })}
         activeOpacity={0.9}
       >
@@ -212,8 +227,9 @@ const HomeScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Right */}
+        {/* Right side */}
         <View style={styles.provRight}>
+          {/* ✅ Real experience from DB */}
           <Text style={styles.provExp}>{item?.experience || 0}</Text>
           <Text style={styles.provExpLabel}>yrs exp</Text>
           <View style={styles.bookNowBtn}>
@@ -232,15 +248,12 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.greeting}>Hi, {user?.name?.split(' ')[0] || 'there'} 👋</Text>
           <Text style={styles.subGreeting}>What do you need help with?</Text>
         </View>
-        <TouchableOpacity
-          style={styles.profileAvatar}
-          onPress={() => navigation.navigate('Profile')}
-        >
+        <TouchableOpacity style={styles.profileAvatar} onPress={() => navigation.navigate('Profile')}>
           <Text style={styles.profileInitial}>{user?.name?.[0]?.toUpperCase() || 'U'}</Text>
         </TouchableOpacity>
       </View>
 
-      {/* Search bar */}
+      {/* Search */}
       <View style={styles.searchBox}>
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
@@ -261,8 +274,9 @@ const HomeScreen = ({ navigation }) => {
         data={filteredProviders}
         keyExtractor={item => item._id}
         renderItem={({ item }) => <ProviderCard item={item} />}
-        onEndReached={() => !provLoading && hasNextPage && coords &&
-          fetchProviders(coords.latitude, coords.longitude, page + 1, selectedCat)
+        onEndReached={() =>
+          !provLoading && hasNextPage && coords &&
+          fetchProviders(coords.latitude, coords.longitude, page + 1, selectedCat?._id)
         }
         onEndReachedThreshold={0.4}
         showsVerticalScrollIndicator={false}
@@ -280,13 +294,19 @@ const HomeScreen = ({ navigation }) => {
             ? <View style={styles.empty}>
                 <Text style={styles.emptyIcon}>😕</Text>
                 <Text style={styles.emptyText}>No providers found nearby</Text>
-                <Text style={styles.emptySub}>Try a different category or pull to refresh</Text>
+                <Text style={styles.emptySub}>
+                  {selectedCat ? 'Try a different category or ' : ''}Pull down to refresh
+                </Text>
+                {selectedCat && (
+                  <TouchableOpacity style={styles.clearBtn} onPress={handleClearFilter}>
+                    <Text style={styles.clearBtnText}>Clear Filter</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             : <ActivityIndicator color={COLORS.primary} style={{ marginTop: 60 }} />
         }
         ListHeaderComponent={
           <View>
-            {/* Categories */}
             <Text style={styles.sectionTitle}>Our Services</Text>
             {catLoading
               ? <ActivityIndicator color={COLORS.primary} style={{ margin: SPACING.xl }} />
@@ -299,13 +319,9 @@ const HomeScreen = ({ navigation }) => {
                   contentContainerStyle={styles.catList}
                 />
             }
-
-            {/* Provider section header */}
             <View style={styles.provSectionHeader}>
               <Text style={styles.sectionTitle}>
-                {selectedCat
-                  ? `${categories.find(c => c._id === selectedCat)?.name || ''} Providers`
-                  : 'Nearby Providers'}
+                {selectedCat ? `${selectedCat.name} Providers` : 'Nearby Providers'}
               </Text>
               {selectedCat && (
                 <TouchableOpacity onPress={handleClearFilter} style={styles.clearFilterBtn}>
@@ -333,22 +349,22 @@ const styles = StyleSheet.create({
     backgroundColor:   COLORS.white,
     ...SHADOWS.sm,
   },
-  greeting:      { fontSize: FONT_SIZES.xl, fontWeight: '700', color: COLORS.textPrimary },
-  subGreeting:   { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
-  profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
-  profileInitial:{ color: COLORS.white, fontWeight: '700', fontSize: FONT_SIZES.lg },
+  greeting:       { fontSize: FONT_SIZES.xl, fontWeight: '700', color: COLORS.textPrimary },
+  subGreeting:    { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
+  profileAvatar:  { width: 42, height: 42, borderRadius: 21, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
+  profileInitial: { color: COLORS.white, fontWeight: '700', fontSize: FONT_SIZES.lg },
 
   searchBox: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    backgroundColor: COLORS.white,
-    marginHorizontal: SPACING.xl,
-    marginTop:       SPACING.lg,
-    marginBottom:    SPACING.sm,
-    borderRadius:    BORDER_RADIUS.lg,
+    flexDirection:     'row',
+    alignItems:        'center',
+    backgroundColor:   COLORS.white,
+    marginHorizontal:  SPACING.xl,
+    marginTop:         SPACING.lg,
+    marginBottom:      SPACING.sm,
+    borderRadius:      BORDER_RADIUS.lg,
     paddingHorizontal: SPACING.lg,
-    borderWidth:     1,
-    borderColor:     COLORS.border,
+    borderWidth:       1,
+    borderColor:       COLORS.border,
     ...SHADOWS.sm,
   },
   searchIcon:  { fontSize: 16, marginRight: SPACING.sm },
@@ -358,12 +374,8 @@ const styles = StyleSheet.create({
   list:         { paddingBottom: SPACING.xxxl },
   sectionTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary, paddingHorizontal: SPACING.xl, marginTop: SPACING.lg, marginBottom: SPACING.md },
 
-  catList: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.md, gap: SPACING.sm },
-  catItem: {
-    width: 90, alignItems: 'center', padding: SPACING.md,
-    backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1.5, borderColor: COLORS.border, ...SHADOWS.sm,
-  },
+  catList:          { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.md, gap: SPACING.sm },
+  catItem:          { width: 90, alignItems: 'center', padding: SPACING.md, backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border, ...SHADOWS.sm },
   catItemActive:    { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
   catIconBox:       { width: 52, height: 52, borderRadius: 26, backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.sm },
   catIconBoxActive: { backgroundColor: COLORS.white },
@@ -373,14 +385,17 @@ const styles = StyleSheet.create({
   catPrice:         { fontSize: 10, color: COLORS.textTertiary, marginTop: 2 },
 
   provSectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: SPACING.xl },
-  clearFilterBtn:    { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primaryLight, paddingHorizontal: SPACING.md, paddingVertical: 4, borderRadius: BORDER_RADIUS.round },
+  clearFilterBtn:    { backgroundColor: COLORS.primaryLight, paddingHorizontal: SPACING.md, paddingVertical: 4, borderRadius: BORDER_RADIUS.round },
   clearFilterText:   { fontSize: FONT_SIZES.xs, color: COLORS.primary, fontWeight: '600' },
 
   provCard: {
-    flexDirection: 'row', alignItems: 'center',
-    backgroundColor: COLORS.white,
-    marginHorizontal: SPACING.xl, marginBottom: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg,
+    flexDirection:    'row',
+    alignItems:       'center',
+    backgroundColor:  COLORS.white,
+    marginHorizontal: SPACING.xl,
+    marginBottom:     SPACING.md,
+    borderRadius:     BORDER_RADIUS.lg,
+    padding:          SPACING.lg,
     ...SHADOWS.sm,
   },
   provAvatarBox:  { position: 'relative', marginRight: SPACING.md },
@@ -394,16 +409,18 @@ const styles = StyleSheet.create({
   ratingText:     { fontSize: FONT_SIZES.sm, fontWeight: '700', color: COLORS.textPrimary, marginLeft: 3 },
   reviewText:     { fontSize: FONT_SIZES.xs, color: COLORS.textTertiary, marginLeft: 3 },
 
-  provRight:     { alignItems: 'center', gap: 2 },
-  provExp:       { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.primary },
-  provExpLabel:  { fontSize: 10, color: COLORS.textTertiary },
-  bookNowBtn:    { backgroundColor: COLORS.primaryLight, paddingHorizontal: SPACING.sm, paddingVertical: 3, borderRadius: BORDER_RADIUS.sm, marginTop: 4 },
-  bookNowText:   { fontSize: 10, color: COLORS.primary, fontWeight: '700' },
+  provRight:    { alignItems: 'center', gap: 2 },
+  provExp:      { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.primary },
+  provExpLabel: { fontSize: 10, color: COLORS.textTertiary },
+  bookNowBtn:   { backgroundColor: COLORS.primaryLight, paddingHorizontal: SPACING.sm, paddingVertical: 3, borderRadius: BORDER_RADIUS.sm, marginTop: 4 },
+  bookNowText:  { fontSize: 10, color: COLORS.primary, fontWeight: '700' },
 
-  empty:    { alignItems: 'center', paddingTop: 60, paddingHorizontal: SPACING.xl },
-  emptyIcon:{ fontSize: 52, marginBottom: SPACING.lg },
-  emptyText:{ fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary },
-  emptySub: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.sm, textAlign: 'center' },
+  empty:       { alignItems: 'center', paddingTop: 60, paddingHorizontal: SPACING.xl },
+  emptyIcon:   { fontSize: 52, marginBottom: SPACING.lg },
+  emptyText:   { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary },
+  emptySub:    { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.sm, textAlign: 'center' },
+  clearBtn:    { marginTop: SPACING.lg, backgroundColor: COLORS.primaryLight, paddingHorizontal: SPACING.xl, paddingVertical: SPACING.sm, borderRadius: BORDER_RADIUS.round },
+  clearBtnText:{ color: COLORS.primary, fontWeight: '700', fontSize: FONT_SIZES.sm },
 });
 
 export default HomeScreen;

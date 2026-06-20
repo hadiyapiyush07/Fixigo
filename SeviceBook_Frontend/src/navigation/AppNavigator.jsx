@@ -21,6 +21,8 @@ import MyBookingsScreen    from '../screens/customer/MyBookingsScreen';
 import ProfileScreen       from '../screens/customer/ProfileScreen';
 import NotificationsScreen from '../screens/customer/NotificationsScreen';
 import PaymentScreen       from '../screens/customer/PaymentScreen';
+import ServiceOptionsScreen from '../screens/customer/ServiceOptionsScreen';
+import BookingSummaryScreen from '../screens/customer/BookingSummaryScreen';
 
 // Provider screens
 import DashboardScreen       from '../screens/provider/DashboardScreen';
@@ -28,6 +30,7 @@ import ProviderProfileScreen from '../screens/provider/ProviderProfileScreen';
 import RequestScreen         from '../screens/provider/RequestsScreen';
 import EarningsScreen        from '../screens/provider/EarningsScreen';
 import ProviderBookingsScreen      from '../screens/provider/ProviderBookingDetailScreen';
+import EditProviderProfileScreen from '../screens/provider/EditProviderProfileScreen';
 
 // Placeholder for unbuilt screens
 const PlaceholderScreen = ({ route }) => (
@@ -132,6 +135,7 @@ const AppNavigator = () => {
       >
         <Stack.Screen name="ProviderTabs"  component={ProviderTabs} />
         <Stack.Screen name="BookingDetail" component={ProviderBookingsScreen } />
+        <Stack.Screen name="EditProviderProfile" component={EditProviderProfileScreen} />
       </Stack.Navigator>
     );
   }
@@ -148,6 +152,8 @@ const AppNavigator = () => {
       <Stack.Screen name="Review"         component={ReviewScreen} />
       <Stack.Screen name="CreateBooking"  component={CreateBookingScreen} />
       <Stack.Screen name="Payment"        component={PaymentScreen} />
+      <Stack.Screen name="ServiceOptions" component={ServiceOptionsScreen} />
+      <Stack.Screen name="BookingSummary" component={BookingSummaryScreen} />
     </Stack.Navigator>
   );
 };

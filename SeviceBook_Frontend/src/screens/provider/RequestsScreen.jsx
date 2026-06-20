@@ -4,6 +4,7 @@ import {
   RefreshControl, ActivityIndicator, Alert,
 } from 'react-native';
 import { bookingAPI } from '../../api/booking.api';
+import { providerAPI } from '../../api/provider.api';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 
@@ -29,12 +30,34 @@ const RequestsScreen = ({ navigation }) => {
   const [hasNextPage,   setHasNextPage]   = useState(true);
   const [activeTab,     setActiveTab]     = useState('all');
   const [actionLoading, setActionLoading] = useState(null);
+  
+  const [isVerified, setIsVerified] = useState(true);
+  const [verificationStatus, setVerificationStatus] = useState('pending');
 
   useEffect(() => {
-    loadBookings(1, activeTab, true);
-  }, [activeTab]);
+    checkVerification();
+  }, []);
+
+  useEffect(() => {
+    if (isVerified) {
+      loadBookings(1, activeTab, true);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, isVerified]);
+
+  const checkVerification = async () => {
+    try {
+      const res = await providerAPI.getMyProfile();
+      const verified = res.data.data?.isVerified || false;
+      setIsVerified(verified);
+      setVerificationStatus(res.data.data?.verificationStatus || 'pending');
+    } catch (e) {
+      console.log('Error checking verification:', e.message);
+    }
+  };
 
   const loadBookings = async (pageNum = 1, status = 'all', reset = false) => {
+    if (!isVerified) return;
     if (loading && !reset) return;
     if (!reset && !hasNextPage) return;
 
@@ -58,9 +81,13 @@ const RequestsScreen = ({ navigation }) => {
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await loadBookings(1, activeTab, true);
+    await checkVerification();
+    if (isVerified) {
+      await loadBookings(1, activeTab, true);
+    }
     setRefreshing(false);
-  }, [activeTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, isVerified]);
 
   const handleAccept = async (bookingId) => {
     try {
@@ -197,6 +224,27 @@ const RequestsScreen = ({ navigation }) => {
       <Text style={styles.infoText} numberOfLines={2}>{text}</Text>
     </View>
   );
+
+  if (!isVerified) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.title}>Job Requests</Text>
+        </View>
+        <View style={[styles.empty, { justifyContent: 'center', flex: 1, paddingBottom: 100 }]}>
+          <Text style={styles.emptyIcon}>{verificationStatus === 'rejected' ? '❌' : '⏳'}</Text>
+          <Text style={[styles.emptyText, { textAlign: 'center' }]}>
+            {verificationStatus === 'rejected' ? 'Verification Rejected' : 'Verification Pending'}
+          </Text>
+          <Text style={styles.emptySub}>
+            {verificationStatus === 'rejected'
+              ? 'Your profile verification was rejected. Please update your profile or contact support.'
+              : 'Your profile is under verification. Please wait until the admin approves your account.'}
+          </Text>
+        </View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>

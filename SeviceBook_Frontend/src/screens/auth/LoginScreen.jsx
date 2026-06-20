@@ -24,7 +24,7 @@ const LoginScreen = ({ navigation }) => {
       Alert.alert('Login Failed', error);
       dispatch(clearError());
     }
-  }, [error]);
+  }, [error, dispatch]);
 
   const validate = () => {
     const e = {};
