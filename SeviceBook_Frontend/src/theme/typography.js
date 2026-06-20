@@ -1,5 +1,5 @@
 // src/theme/typography.js
-// All theme exports in ONE file — no import confusion
+// Centralized Design System (Colors, Typography, Spacing, Shadows, etc.)
 
 export const COLORS = {
   primary:        '#1D6AE5',
@@ -29,15 +29,20 @@ export const COLORS = {
   overlay:        'rgba(0,0,0,0.5)',
 };
 
-export const BOOKING_STATUS_COLORS = {
+export const STATUS_COLORS = {
   pending:             { bg: '#FEF3D7', text: '#B7770D', border: '#FDCB6E' },
   confirmed:           { bg: '#E8F0FD', text: '#1455C0', border: '#1D6AE5' },
   provider_on_the_way: { bg: '#F3E8FD', text: '#6C3483', border: '#9B59B6' },
+  arrived:             { bg: '#E0F7F3', text: '#007A63', border: '#00B894' },
+  otp_verification:    { bg: '#FEF0E0', text: '#9A4E0A', border: '#E67E22' },
   in_progress:         { bg: '#FEF0E0', text: '#9A4E0A', border: '#E67E22' },
   completed:           { bg: '#E0F7F3', text: '#007A63', border: '#00B894' },
   cancelled:           { bg: '#FDECEA', text: '#C0392B', border: '#E74C3C' },
   rejected:            { bg: '#F5F6FA', text: '#636E72', border: '#95A5A6' },
 };
+
+// Aliased for backwards compatibility
+export const BOOKING_STATUS_COLORS = STATUS_COLORS;
 
 export const FONT_SIZES = {
   xs:   10,
@@ -50,45 +55,46 @@ export const FONT_SIZES = {
   huge: 34,
 };
 
+// Strict 8px grid
 export const SPACING = {
   xs:   4,
   sm:   8,
-  md:   12,
-  lg:   16,
-  xl:   20,
-  xxl:  24,
-  xxxl: 32,
-  huge: 48,
+  md:   16,
+  lg:   24,
+  xl:   32,
+  xxl:  40,
+  xxxl: 48,
 };
 
 export const BORDER_RADIUS = {
-  sm:    6,
-  md:    10,
-  lg:    14,
-  xl:    20,
-  round: 50,
+  sm:   4,
+  md:   8,
+  lg:   12,
+  xl:   16,
+  xxl:  24,
+  round: 9999,
 };
 
 export const SHADOWS = {
   sm: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
     elevation: 2,
   },
   md: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.09,
-    shadowRadius: 6,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
     elevation: 4,
   },
   lg: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.12,
-    shadowRadius: 12,
+    shadowColor: COLORS.shadow,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.15,
+    shadowRadius: 16,
     elevation: 8,
   },
 };

@@ -26,11 +26,11 @@ const PaymentScreen = ({ route, navigation }) => {
 
     if (selected === 'cod') {
       Alert.alert('✅ Booking Confirmed!', 'Your booking is confirmed. Pay the provider after the service.', [
-        { text: 'OK', onPress: () => navigation.navigate('MyBookings') },
+        { text: 'OK', onPress: () => navigation.navigate('CustomerTabs', { screen: 'MyBookings' }) },
       ]);
     } else {
       Alert.alert('✅ Payment Successful!', `₹${totalAmount} paid via ${selected.toUpperCase()}. Your booking is confirmed.`, [
-        { text: 'View Booking', onPress: () => navigation.navigate('MyBookings') },
+        { text: 'View Booking', onPress: () => navigation.navigate('CustomerTabs', { screen: 'MyBookings' }) },
       ]);
     }
   };

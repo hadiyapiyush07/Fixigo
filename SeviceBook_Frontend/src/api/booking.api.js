@@ -16,6 +16,7 @@ export const bookingAPI = {
   accept:  (id)     => api.put(`/bookings/${id}/accept`),
   reject:  (id, reason) => api.put(`/bookings/${id}/reject`, { reason }),
   updateStatus: (id, status) => api.put(`/bookings/${id}/status`, { status }),
+  verifyOtp: (id, otp) => api.post(`/bookings/${id}/verify-otp`, { otp }),
   providerCancel: (id, reason) => api.put(`/bookings/${id}/provider-cancel`, { reason }),
   requestReschedule: (id, data) => api.put(`/bookings/${id}/request-reschedule`, data),
 };

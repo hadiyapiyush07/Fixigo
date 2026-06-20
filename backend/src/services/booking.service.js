@@ -2,58 +2,102 @@
 const Booking      = require("../models/Booking.model");
 const Provider     = require("../models/Provider.model");
 const User         = require("../models/User.model");
-const { Notification } = require("../models/Other.model");
+const Notification = require("../models/Notification.model");
 const ApiError     = require("../utils/ApiError");
 const { getPagination, paginate } = require("../utils/pagination");
-const { sendPushNotification }    = require("../config/firebase");
+const notificationService = require("./notification.service");
 
 // Find nearest provider and notify them
-const notifyNextProvider = async (booking) => {
-  const provider = await Provider.findOne({
-    isVerified: true,
-    status:     "online",
-    skills:     booking.categoryId,
-    _id:        { $nin: booking.rejectedProviders },
-    currentLocation: {
-      $nearSphere: {
-        $geometry: { type: "Point", coordinates: booking.address.location.coordinates },
-        $maxDistance: 15000,
-      },
-    },
-  }).populate("userId", "name fcmToken");
+const RADIUS_STEPS = [3000, 5000, 8000, 12000, 20000];
 
-  if (!provider) {
+const notifyNextProvider = async (booking) => {
+  const coordinates = booking.address?.location?.coordinates;
+  console.log(`\n🔍 [notifyNextProvider] Searching for Booking ${booking._id}`);
+  console.log(`📍 Booking coordinates:`, coordinates);
+  console.log(`🛠️ Booking Category:`, booking.categoryId);
+
+  if (!coordinates || coordinates.length !== 2) {
+    console.error(`❌ [notifyNextProvider] Invalid coordinates! Aborting search.`);
+    return;
+  }
+
+  let selectedProvider = null;
+
+  for (const radius of RADIUS_STEPS) {
+    console.log(`\n🔄 [notifyNextProvider] Expanding search to radius: ${radius}m`);
+    
+    // Find all providers matching criteria within this radius
+    const providers = await Provider.find({
+      skills: booking.categoryId,
+      _id: { $nin: booking.rejectedProviders },
+      currentLocation: {
+        $nearSphere: {
+          $geometry: { type: "Point", coordinates },
+          $maxDistance: radius,
+        }
+      }
+    }).populate("userId", "name fcmToken");
+
+    console.log(`📊 Found ${providers.length} providers in ${radius}m radius`);
+
+    for (const provider of providers) {
+      console.log(`  -> Checking Provider: ${provider._id} (User: ${provider.userId?.name})`);
+      console.log(`     Status: ${provider.status}, isOnline: ${provider.isOnline}, isVerified: ${provider.isVerified}`);
+      
+      if (!provider.isOnline || provider.status !== 'online') {
+        console.log(`     ❌ Rejected: Offline or busy`);
+        continue;
+      }
+      if (!provider.isVerified) {
+        console.log(`     ❌ Rejected: Unverified (${provider.verificationStatus})`);
+        continue;
+      }
+      
+      // If passed all checks:
+      selectedProvider = provider;
+      console.log(`     ✅ SELECTED Provider ${provider._id} at radius ${radius}m`);
+      break;
+    }
+    
+    if (selectedProvider) break;
+  }
+
+  if (!selectedProvider) {
+    console.log(`❌ [notifyNextProvider] Exhausted all radii up to 20km. No providers matched.`);
     await Booking.findByIdAndUpdate(booking._id, {
       status: "rejected",
       $push:  { statusHistory: { status: "rejected", note: "No available providers nearby" } },
     });
     const customer = await User.findById(booking.customerId).select("fcmToken");
-    if (customer && customer.fcmToken) {
-      await sendPushNotification(customer.fcmToken, "No Providers Available",
-        "We couldn't find a provider nearby. Please try again.", { bookingId: String(booking._id) });
+    if (customer) {
+      await notificationService.sendNotification({
+        userId: customer._id,
+        fcmToken: customer.fcmToken,
+        title: "No Providers Available",
+        body: "We couldn't find a provider nearby. Please try again.",
+        type: "booking_rejected",
+        data: { bookingId: String(booking._id) }
+      });
     }
     return;
   }
 
   const deadline = new Date(Date.now() + 2 * 60 * 1000);
   await Booking.findByIdAndUpdate(booking._id, {
-    notifiedProviderId: provider._id,
+    notifiedProviderId: selectedProvider._id,
     providerResponseDeadline: deadline
   });
 
-  if (provider.userId && provider.userId.fcmToken) {
-    await sendPushNotification(provider.userId.fcmToken, "New Job Request!",
-      "A new booking request is available near you.",
-      { bookingId: String(booking._id), screen: "BookingRequest", type: "booking_request" });
+  if (selectedProvider.userId) {
+    await notificationService.sendNotification({
+      userId: selectedProvider.userId._id,
+      fcmToken: selectedProvider.userId.fcmToken,
+      title: "New Job Request!",
+      body: "A new booking request is waiting for your response.",
+      type: "booking_request",
+      data: { bookingId: String(booking._id), screen: "BookingRequest" }
+    });
   }
-
-  await Notification.create({
-    userId: provider.userId._id,
-    title:  "New Job Request!",
-    body:   "A new booking request is waiting for your response.",
-    type:   "booking_request",
-    data:   { bookingId: String(booking._id) },
-  });
 };
 
 const createBooking = async (customerId, bookingData) => {
@@ -159,25 +203,29 @@ const acceptBooking = async (bookingId, providerUserId) => {
   if (booking.status !== "pending") throw new ApiError(400, "Booking is no longer pending.");
 
   const updated = await Booking.findByIdAndUpdate(bookingId, {
-    status: "accepted",
+    status: "confirmed", // Automatically confirms on accept
     providerId: provider._id,
     notifiedProviderId: null,
     acceptedAt: new Date(),
-    $push: { statusHistory: { status: "accepted", changedBy: providerUserId, note: "Provider accepted" } },
+    $push: { 
+      statusHistory: [
+        { status: "accepted", changedBy: providerUserId, note: "Provider accepted" },
+        { status: "confirmed", changedBy: providerUserId, note: "Auto-transition to confirmed" }
+      ]
+    },
   }, { new: true }).populate("customerId", "name phone fcmToken");
 
-  if (updated.customerId && updated.customerId.fcmToken) {
-    await sendPushNotification(updated.customerId.fcmToken, "Booking Confirmed!",
-      "A provider has accepted your request.",
-      { bookingId: String(bookingId), screen: "BookingTrack" });
+  if (updated.customerId) {
+    await notificationService.sendNotification({
+      userId: updated.customerId._id,
+      fcmToken: updated.customerId.fcmToken,
+      title: "Booking Confirmed!",
+      body: "A provider has accepted your request and is assigned.",
+      type: "booking_confirmed",
+      data: { bookingId: String(bookingId), screen: "BookingTrack" }
+    });
   }
-  await Notification.create({
-    userId: updated.customerId._id,
-    title:  "Booking Confirmed!",
-    body:   "A provider accepted your request and is on the way.",
-    type:   "booking_confirmed",
-    data:   { bookingId: String(bookingId) },
-  });
+
   return updated;
 };
 
@@ -200,7 +248,8 @@ const rejectBooking = async (bookingId, providerUserId, reason) => {
 
 const updateBookingStatus = async (bookingId, status, userId, otp) => {
   const transitions = {
-    accepted:            ["confirmed", "cancelled"],
+    pending:             ["cancelled"],
+    accepted:            ["confirmed", "cancelled"], // Kept for safety
     confirmed:           ["provider_on_the_way", "cancelled"],
     provider_on_the_way: ["arrived", "cancelled"],
     arrived:             ["otp_verification", "in_progress", "cancelled"],
@@ -208,17 +257,14 @@ const updateBookingStatus = async (bookingId, status, userId, otp) => {
     in_progress:         ["payment_pending"],
     payment_pending:     ["completed"],
   };
-  const booking = await Booking.findById(bookingId);
+  const booking = await Booking.findById(bookingId).populate("customerId", "fcmToken _id");
   if (!booking) throw new ApiError(404, "Booking not found.");
   if (!transitions[booking.status] || !transitions[booking.status].includes(status)) {
-    throw new ApiError(400, `Cannot move from "${booking.status}" to "${status}".`);
+    throw new ApiError(400, `Cannot move from "${booking.status}" to "${status}". Strict forward transitions enforced.`);
   }
 
-  // OTP Validation when entering "in_progress" state
-  if (status === "in_progress") {
-    if (!otp) {
-      throw new ApiError(400, "OTP is required to start the service.");
-    }
+  // Legacy fallback: handled directly via updateBookingStatus without verifyOtp endpoint
+  if (status === "in_progress" && otp) {
     if (booking.startOtp !== otp.toString().trim()) {
       throw new ApiError(400, "Invalid OTP. Please ask the customer for the correct OTP.");
     }
@@ -250,76 +296,76 @@ const updateBookingStatus = async (bookingId, status, userId, otp) => {
     }
   }
 
-  const updated = await Booking.findByIdAndUpdate(bookingId, update, { new: true })
-    .populate("customerId", "name fcmToken")
-    .populate("categoryId", "name icon")
-    .populate({ path: "providerId", populate: { path: "userId", select: "name phone profilePhoto" } });
-
-  const messages = {
-    provider_on_the_way: "Your provider is on the way!",
-    arrived:             "Your provider has arrived at your location.",
-    otp_verification:    "Verify OTP with your provider to start the service.",
-    in_progress:         "Service has started.",
-    payment_pending:     "Service completed. Payment is pending.",
-    completed:           "Service completed! Please rate your experience.",
+  // Inject Notifications based on status
+  const notifyMap = {
+    provider_on_the_way: { title: "Provider On The Way", body: "Your provider has started the journey.", type: "provider_on_the_way" },
+    arrived:             { title: "Provider Arrived", body: "Your provider has arrived at your location.", type: "provider_arrived" },
+    in_progress:         { title: "Service Started", body: "Your provider has started working.", type: "service_started" },
+    payment_pending:     { title: "Payment Pending", body: "Service is complete. Please complete the payment.", type: "payment_pending" },
+    completed:           { title: "Service Complete", body: "Thank you for using Fixigo!", type: "booking_completed" },
   };
 
-  if (updated.customerId && updated.customerId.fcmToken && messages[status]) {
-    await sendPushNotification(updated.customerId.fcmToken, "Booking Update",
-      messages[status], { bookingId: String(bookingId), screen: "BookingTrack" });
+  if (notifyMap[status] && booking.customerId) {
+    await notificationService.sendNotification({
+      userId: booking.customerId._id,
+      fcmToken: booking.customerId.fcmToken,
+      title: notifyMap[status].title,
+      body: notifyMap[status].body,
+      type: notifyMap[status].type,
+      data: { bookingId: String(bookingId) }
+    });
   }
-  return updated;
+
+  const updatedBooking = await Booking.findByIdAndUpdate(bookingId, update, { new: true });
+  
+  // Real-time Socket Emitting
+  const { emitToBooking } = require("../socket/socket");
+  emitToBooking(bookingId, "statusUpdated", { status, timestamp: new Date() });
+  
+  return updatedBooking;
 };
 
-const cancelBooking = async (bookingId, userId, reason) => {
-  const booking = await Booking.findById(bookingId);
+const cancelBooking = async (bookingId, customerUserId, reason) => {
+  const booking = await Booking.findById(bookingId).populate("providerId", "userId");
   if (!booking) throw new ApiError(404, "Booking not found.");
-  if (String(booking.customerId) !== String(userId)) throw new ApiError(403, "You can only cancel your own bookings.");
-
-  if (!["pending", "accepted", "confirmed", "provider_on_the_way", "arrived", "otp_verification"].includes(booking.status)) {
-    throw new ApiError(400, "Cannot cancel at this stage.");
+  if (booking.status === "completed" || booking.status === "cancelled") {
+    throw new ApiError(400, `Booking is already ${booking.status}`);
   }
 
-  // Reset assigned provider status back to online
+  const structuredReason = reason || "Cancelled by customer";
+  booking.status = "cancelled";
+  booking.cancellation = { cancelledBy: customerUserId, reason: structuredReason, cancelledAt: new Date() };
+  booking.statusHistory.push({ status: "cancelled", changedBy: customerUserId, note: structuredReason });
+  await booking.save();
+
   if (booking.providerId) {
-    await Provider.findByIdAndUpdate(booking.providerId, { status: "online" });
-  }
-
-  const updated = await Booking.findByIdAndUpdate(bookingId, {
-    status: "cancelled",
-    cancellation: { cancelledBy: userId, reason, cancelledAt: new Date() },
-    $push: { statusHistory: { status: "cancelled", changedBy: userId, note: reason || "Cancelled by customer" } },
-  }, { new: true });
-
-  // ── Notify the notified (pending-response) provider if present ──
-  if (booking.notifiedProviderId) {
-    try {
-      const notifiedProvider = await Provider.findById(booking.notifiedProviderId)
-        .populate("userId", "fcmToken name");
-      if (notifiedProvider && notifiedProvider.userId) {
-        if (notifiedProvider.userId.fcmToken) {
-          await sendPushNotification(
-            notifiedProvider.userId.fcmToken,
-            "Booking Cancelled",
-            "The booking request you received has been cancelled by the customer.",
-            { bookingId: String(bookingId), type: "booking_cancelled" }
-          );
-        }
-        await Notification.create({
-          userId: notifiedProvider.userId._id,
-          title:  "Booking Cancelled",
-          body:   "The booking request you received has been cancelled by the customer.",
-          type:   "booking_cancelled",
-          data:   { bookingId: String(bookingId) },
-        });
-      }
-    } catch (err) {
-      // Non-fatal: log but don't block the cancellation response
-      console.error("⚠️  [cancelBooking] Failed to notify provider:", err.message);
+    await Provider.findByIdAndUpdate(booking.providerId._id, { status: "online" });
+    const providerUser = await User.findById(booking.providerId.userId).select("fcmToken");
+    if (providerUser) {
+      await notificationService.sendNotification({
+        userId: providerUser._id,
+        fcmToken: providerUser.fcmToken,
+        title: "Booking Cancelled",
+        body: `Customer cancelled the booking: ${structuredReason}`,
+        type: "booking_cancelled",
+        data: { bookingId: String(bookingId) }
+      });
+    }
+  } else if (booking.notifiedProviderId) {
+    // Notify the provider who was just asked but didn't accept yet
+    const provider = await Provider.findById(booking.notifiedProviderId).populate("userId", "fcmToken");
+    if (provider && provider.userId) {
+      await notificationService.sendNotification({
+        userId: provider.userId._id,
+        fcmToken: provider.userId.fcmToken,
+        title: "Booking Cancelled",
+        body: "The customer cancelled their request.",
+        type: "booking_cancelled",
+        data: { bookingId: String(bookingId) }
+      });
     }
   }
-
-  return updated;
+  return booking;
 };
 
 const getCustomerBookings = async (customerId, query) => {
@@ -412,10 +458,21 @@ const cancelJobByProvider = async (bookingId, providerUserId, reason) => {
       }
     },
     { new: true }
-  );
+  ).populate("customerId", "fcmToken _id");
 
   // Trigger searching next provider
   await notifyNextProvider(updatedBooking);
+
+  if (updatedBooking.customerId) {
+    await notificationService.sendNotification({
+      userId: updatedBooking.customerId._id,
+      fcmToken: updatedBooking.customerId.fcmToken,
+      title: "Provider Unassigned",
+      body: "We are reassigning your booking to another professional.",
+      type: "booking_reassigned",
+      data: { bookingId: String(bookingId) }
+    });
+  }
 
   return updatedBooking;
 };
@@ -498,8 +555,123 @@ const respondReschedule = async (bookingId, userId, { response }) => {
   }
 };
 
+const verifyOtp = async (bookingId, providerUserId, otp) => {
+  const provider = await Provider.findOne({ userId: providerUserId });
+  if (!provider) throw new ApiError(404, "Provider not found.");
+
+  const booking = await Booking.findById(bookingId).populate("customerId", "fcmToken _id");
+  if (!booking) throw new ApiError(404, "Booking not found.");
+  
+  if (String(booking.providerId) !== String(provider._id)) {
+    throw new ApiError(403, "You are not assigned to this booking.");
+  }
+  
+  if (booking.status !== "arrived" && booking.status !== "otp_verification") {
+    throw new ApiError(400, "Booking must be in arrived status to verify OTP.");
+  }
+
+  if (booking.otpBlockedUntil && new Date() < booking.otpBlockedUntil) {
+    throw new ApiError(403, `Too many attempts. Blocked until ${new Date(booking.otpBlockedUntil).toLocaleTimeString()}`);
+  }
+
+  if (booking.startOtp !== otp.toString().trim()) {
+    booking.otpAttempts = (booking.otpAttempts || 0) + 1;
+    if (booking.otpAttempts >= 5) {
+      booking.otpBlockedUntil = new Date(Date.now() + 15 * 60 * 1000); // 15 mins block
+    }
+    await booking.save();
+    throw new ApiError(400, "Invalid OTP. Please ask the customer for the correct OTP.");
+  }
+
+  // OTP Expiry (10 mins)
+  if (booking.otpGeneratedAt && (Date.now() - new Date(booking.otpGeneratedAt).getTime() > 10 * 60 * 1000)) {
+    throw new ApiError(400, "OTP has expired. Please ask the customer to generate a new OTP.");
+  }
+
+  // Success
+  booking.otpVerified = true;
+  booking.otpVerifiedAt = new Date();
+  booking.startOtp = null; // Clear OTP
+  booking.status = "in_progress";
+  booking.startedAt = new Date();
+  booking.statusHistory.push({ status: "otp_verification", changedBy: providerUserId, note: "OTP Verified" });
+  booking.statusHistory.push({ status: "in_progress", changedBy: providerUserId, note: "Service Started" });
+  await booking.save();
+
+  await Provider.findByIdAndUpdate(provider._id, { status: "busy" });
+
+  if (booking.customerId?.fcmToken) {
+    await notificationService.sendNotification({
+      userId: booking.customerId._id,
+      fcmToken: booking.customerId.fcmToken,
+      title: "Service Started!",
+      body: "OTP verified successfully. Your service is now in progress.",
+      type: "service_started",
+      data: { bookingId: String(bookingId), screen: "BookingTrack" }
+    });
+  }
+
+  // Real-time Socket Emitting
+  const { emitToBooking } = require("../socket/socket");
+  emitToBooking(bookingId, "statusUpdated", { status: "in_progress", timestamp: new Date() });
+
+  return Booking.findById(bookingId).populate("customerId", "name fcmToken _id");
+};
+
+const getLiveLocation = async (bookingId) => {
+  const booking = await Booking.findById(bookingId);
+  if (!booking || !booking.providerId) throw new ApiError(404, "Provider or Booking not found.");
+
+  const provider = await Provider.findById(booking.providerId);
+  if (!provider || !provider.currentLocation || !provider.currentLocation.coordinates) {
+    throw new ApiError(404, "Location not available.");
+  }
+
+  return {
+    latitude: provider.currentLocation.coordinates[1],
+    longitude: provider.currentLocation.coordinates[0],
+    heading: provider.heading || 0,
+    speed: provider.speed || 0,
+    updatedAt: provider.lastLocationUpdated || provider.updatedAt
+  };
+};
+
+const Review = require("../models/Review.model");
+
+const submitReview = async (bookingId, customerId, rating, reviewText) => {
+  const booking = await Booking.findById(bookingId);
+  if (!booking) throw new ApiError(404, "Booking not found.");
+  if (String(booking.customerId) !== String(customerId)) throw new ApiError(403, "Not authorized.");
+  if (booking.status !== "completed") throw new ApiError(400, "Service must be completed to review.");
+  if (booking.isRated) throw new ApiError(400, "Booking already reviewed.");
+
+  const review = await Review.create({
+    bookingId, customerId, providerId: booking.providerId, rating, reviewText
+  });
+
+  booking.isRated = true;
+  booking.reviewId = review._id;
+  await booking.save();
+
+  // Recalculate provider rating
+  const stats = await Review.aggregate([
+    { $match: { providerId: booking.providerId } },
+    { $group: { _id: "$providerId", avgRating: { $avg: "$rating" }, count: { $sum: 1 } } }
+  ]);
+
+  if (stats.length > 0) {
+    await Provider.findByIdAndUpdate(booking.providerId, {
+      "rating.average": Math.round(stats[0].avgRating * 10) / 10,
+      "rating.count": stats[0].count
+    });
+  }
+
+  return review;
+};
+
 module.exports = {
   createBooking, acceptBooking, rejectBooking, updateBookingStatus,
   cancelBooking, getCustomerBookings, getProviderBookings, getBookingById,
-  cancelJobByProvider, requestReschedule, respondReschedule,
+  cancelJobByProvider, requestReschedule, respondReschedule, verifyOtp,
+  getLiveLocation, submitReview
 };

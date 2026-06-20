@@ -5,7 +5,11 @@ import {
   TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
 import { launchImageLibrary } from 'react-native-image-picker';
+import { useSelector } from 'react-redux';
+import axios from 'axios';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
+
+const API_URL = 'http://10.0.2.2:5000/api';
 
 // Instant booking — no date/time selection needed.
 // The backend auto-sets scheduledDate = now, scheduledTime = 'Instant'
@@ -64,7 +68,9 @@ const CreateBookingScreen = ({ navigation, route }) => {
     setImageUris(prev => prev.filter((_, i) => i !== index));
   };
 
-  const handleApplyCoupon = () => {
+  const { accessToken } = useSelector(state => state.auth);
+
+  const handleApplyCoupon = async () => {
     if (couponApplied) {
       setDiscount(0);
       setCouponCode('');
@@ -74,20 +80,28 @@ const CreateBookingScreen = ({ navigation, route }) => {
     }
 
     const code = couponCode.trim().toUpperCase();
-    if (code === 'FIXIGO50') {
-      setDiscount(50);
+    if (!code) {
+      Alert.alert('Error', 'Please enter a valid coupon code.');
+      return;
+    }
+
+    try {
+      // API call to validate and calculate discount
+      const res = await axios.post(`${API_URL}/coupons/apply`, {
+        code,
+        basePrice
+      }, {
+        headers: { Authorization: `Bearer ${accessToken}` }
+      });
+      
+      const { discountAmount, description } = res.data.data;
+      
+      setDiscount(discountAmount);
       setCouponApplied(true);
-      Alert.alert('🎉 Promo Applied', 'Rs. 50 discount applied successfully!');
-    } else if (code === 'WELCOME100') {
-      if (basePrice < 300) {
-        Alert.alert('Coupon Error', 'WELCOME100 requires a minimum booking amount of Rs. 300.');
-        return;
-      }
-      setDiscount(100);
-      setCouponApplied(true);
-      Alert.alert('🎉 Promo Applied', 'Rs. 100 discount applied successfully!');
-    } else {
-      Alert.alert('Invalid Coupon', 'The promo code entered is invalid or expired.');
+      Alert.alert('🎉 Promo Applied', `${description}\n\n₹${discountAmount} discount applied!`);
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Invalid or expired coupon code.';
+      Alert.alert('Coupon Error', msg);
     }
   };
 
@@ -111,10 +125,9 @@ const CreateBookingScreen = ({ navigation, route }) => {
       return;
     }
 
-    // Compute prices
-    const taxes = Math.round(basePrice * 0.18); // 18% GST
+    // Compute prices (No GST)
     const convenienceFee = 50;
-    const totalAmount = Math.max(0, basePrice + taxes + convenienceFee - discount);
+    const totalAmount = Math.max(0, basePrice + convenienceFee - discount);
 
     navigation.navigate('BookingSummary', {
       categoryId,
@@ -140,7 +153,6 @@ const CreateBookingScreen = ({ navigation, route }) => {
       images,
       pricing: {
         baseAmount: basePrice,
-        taxes,
         convenienceFee,
         discount,
         totalAmount

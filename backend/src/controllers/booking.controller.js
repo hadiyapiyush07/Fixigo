@@ -111,8 +111,28 @@ const respondRescheduleBooking = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, booking, `Reschedule ${response}.`));
 });
 
+const verifyOtp = asyncHandler(async (req, res) => {
+  const { otp } = req.body;
+  if (!otp) throw new ApiError(400, "OTP is required.");
+  const booking = await bookingService.verifyOtp(req.params.id, req.user._id, otp);
+  res.status(200).json(new ApiResponse(200, booking, "OTP Verified. Service Started."));
+});
+
+const getLiveLocation = asyncHandler(async (req, res) => {
+  const location = await bookingService.getLiveLocation(req.params.id);
+  res.status(200).json(new ApiResponse(200, location, "Live location fetched."));
+});
+
+const submitReview = asyncHandler(async (req, res) => {
+  const { rating, reviewText } = req.body;
+  if (!rating || rating < 1 || rating > 5) throw new ApiError(400, "Rating between 1 and 5 is required.");
+  const review = await bookingService.submitReview(req.params.id, req.user._id, rating, reviewText);
+  res.status(200).json(new ApiResponse(200, review, "Review submitted successfully."));
+});
+
 module.exports = {
   createBooking, getMyBookings, getProviderBookings,
   getBookingById, acceptBooking, rejectBooking, updateBookingStatus, cancelBooking,
-  providerCancelBooking, requestRescheduleBooking, respondRescheduleBooking,
+  providerCancelBooking, requestRescheduleBooking, respondRescheduleBooking, verifyOtp,
+  getLiveLocation, submitReview
 };

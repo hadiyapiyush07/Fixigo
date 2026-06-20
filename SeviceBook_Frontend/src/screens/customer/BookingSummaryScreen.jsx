@@ -22,6 +22,7 @@ const BookingSummaryScreen = ({ navigation, route }) => {
   } = route.params;
 
   const [submitting, setSubmitting] = useState(false);
+  const fmtINR = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
   const handleConfirm = async () => {
     try {
@@ -213,18 +214,13 @@ const BookingSummaryScreen = ({ navigation, route }) => {
           <Text style={styles.sectionTitle}>💰 Price Breakdown</Text>
           
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Estimated Service Price</Text>
-            <Text style={styles.priceValue}>₹{pricing.baseAmount}</Text>
-          </View>
-
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Taxes & GST (18%)</Text>
-            <Text style={styles.priceValue}>₹{pricing.taxes}</Text>
+            <Text style={styles.priceLabel}>Base Amount</Text>
+            <Text style={styles.priceValue}>{fmtINR(pricing?.baseAmount)}</Text>
           </View>
 
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Convenience Fee</Text>
-            <Text style={styles.priceValue}>₹{pricing.convenienceFee}</Text>
+            <Text style={styles.priceValue}>{fmtINR(pricing?.convenienceFee)}</Text>
           </View>
 
           {pricing.discount > 0 && (

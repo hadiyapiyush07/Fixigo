@@ -76,7 +76,14 @@ const getMyStats = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, stats, "Provider stats fetched."));
 });
 
+// GET /api/providers/my-earnings
+const getMyEarnings = asyncHandler(async (req, res) => {
+  const { timeframe } = req.query; // 'this_week', 'this_month', 'all_time'
+  const earnings = await providerService.getProviderEarnings(req.user._id, timeframe);
+  res.status(200).json(new ApiResponse(200, earnings, "Provider earnings fetched."));
+});
+
 module.exports = {
   getNearbyProviders, getMyProviderProfile, getProviderById,
-  updateProviderProfile, toggleOnlineStatus, updateAvailability, getMyStats,
+  updateProviderProfile, toggleOnlineStatus, updateAvailability, getMyStats, getMyEarnings
 };

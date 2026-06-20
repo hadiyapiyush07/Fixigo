@@ -32,8 +32,12 @@ const userSchema = new mongoose.Schema(
     profilePhoto:          { type: String, default: null },  // Cloudinary URL
     profilePhotoPublicId:  { type: String, default: null },  // Cloudinary public_id for deletion
 
-    // Firebase push notification token — updated every app open
-    fcmToken: { type: String, default: null, select: false },
+    // Firebase push notification tokens (Array to support multiple devices)
+    fcmTokens: { type: [String], default: [], select: false },
+    devicePlatform: { type: String, enum: ['android', 'ios', 'web', null], default: null },
+    appVersion: { type: String, default: null },
+    lastActive: { type: Date, default: Date.now },
+    notificationsEnabled: { type: Boolean, default: true },
 
     isActive:       { type: Boolean, default: true },
     isPhoneVerified:{ type: Boolean, default: false },

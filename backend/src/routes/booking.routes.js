@@ -22,11 +22,14 @@ router.get( "/provider",    requireRole("provider"), getProviderBookings);
 router.put( "/:id/accept",  requireRole("provider"), acceptBooking);
 router.put( "/:id/reject",  requireRole("provider"), rejectBooking);
 router.put( "/:id/status",  requireRole("provider"), updateBookingStatus);
+router.post("/:id/verify-otp", requireRole("provider"), require("../controllers/booking.controller").verifyOtp);
 router.put( "/:id/provider-cancel", requireRole("provider"), providerCancelBooking);
 router.put( "/:id/request-reschedule", verifyToken, requestRescheduleBooking);
 
 // Common detail route
 router.get("/:id", getBookingById);
+router.get("/:id/live-location", require("../controllers/booking.controller").getLiveLocation);
+router.post("/:id/review", requireRole("customer"), require("../controllers/booking.controller").submitReview);
 
 module.exports = router;
 

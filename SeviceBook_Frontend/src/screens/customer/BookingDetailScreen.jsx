@@ -5,8 +5,9 @@ import {
   TouchableOpacity, ActivityIndicator, Alert, RefreshControl,
 } from 'react-native';
 import { bookingAPI } from '../../api/booking.api';
+import { socketService } from '../../services/socket.service';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
-import { StatusBadge } from '../../components/common/StatusBadge';
+import { StatusBadge } from '../../components/ui/StatusBadge';
 
 const STATUS_STEPS = [
   { key: 'pending',             label: 'Booking Placed',     icon: '📋' },
@@ -44,7 +45,20 @@ const BookingDetailScreen = ({ navigation, route }) => {
     }
   }, [bookingId]);
 
-  useEffect(() => { loadBooking(); }, [loadBooking]);
+  useEffect(() => { 
+    loadBooking(); 
+
+    if (bookingId) {
+      socketService.joinBookingRoom(bookingId);
+      const handleUpdate = () => loadBooking();
+      socketService.on('booking:status_update', handleUpdate);
+
+      return () => {
+        socketService.leaveBookingRoom(bookingId);
+        socketService.off('booking:status_update', handleUpdate);
+      };
+    }
+  }, [loadBooking, bookingId]);
 
   const onRefresh = async () => {
     setRefreshing(true);

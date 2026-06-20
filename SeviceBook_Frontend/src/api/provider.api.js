@@ -6,6 +6,7 @@ export const providerAPI = {
   getById:              (id)     => api.get(`/providers/${id}`),
   getMyProfile:         ()       => api.get('/providers/me'),
   getMyStats:           ()       => api.get('/providers/my-stats'),   // live MongoDB stats
+  getMyEarnings:        (timeframe) => api.get(`/providers/my-earnings?timeframe=${timeframe}`),
   updateProfile:        (data)   => api.put('/providers/profile', data),
   toggleOnline:         (data)   => api.put('/providers/online-status', data),
   updateAvailability:   (availability) => api.put('/providers/availability', { availability }),

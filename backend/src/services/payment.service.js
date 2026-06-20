@@ -137,7 +137,7 @@ const verifyPayment = async ({
   }
 
   // Step 6: Notify customer payment success
-  const { Notification } = require("../models/Other.model");
+  const Notification = require("../models/Notification.model");
   const User = require("../models/User.model");
   const customer = await User.findById(customerId).select("fcmToken");
   if (customer && customer.fcmToken) {

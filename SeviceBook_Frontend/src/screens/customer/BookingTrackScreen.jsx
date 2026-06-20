@@ -1,10 +1,12 @@
-// src/screens/customer/BookingTrackScreen.jsx
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Animated,
+  TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Animated, Linking
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { bookingAPI } from '../../api/booking.api';
+import { socketService } from '../../services/socket.service';
+import LiveTrackingMap from '../../components/LiveTrackingMap';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 
 // ── Status display config ─────────────────────────────────────────────────
@@ -24,22 +26,22 @@ const STATUS_INFO = {
 
 // ── Professional timeline steps ───────────────────────────────────────────
 const TIMELINE_STEPS = [
-  { status: 'pending',             label: 'Booking Created',     icon: '📋' },
-  { status: 'accepted',            label: 'Provider Assigned',   icon: '👤' },
-  { status: 'confirmed',           label: 'Accepted',            icon: '✅' },
-  { status: 'provider_on_the_way', label: 'On The Way',          icon: '🚗' },
-  { status: 'arrived',             label: 'Arrived',             icon: '📍' },
-  { status: 'otp_verification',    label: 'OTP Verified',        icon: '🔑' },
-  { status: 'in_progress',         label: 'Service Started',     icon: '🔧' },
-  { status: 'payment_pending',     label: 'Payment Pending',     icon: '💳' },
-  { status: 'completed',           label: 'Completed',           icon: '🎉' },
+  { id: 'created', label: 'Booking Created',     icon: '📋' },
+  { id: 'assigned',label: 'Provider Assigned',   icon: '👤' },
+  { id: 'accepted',label: 'Accepted',            icon: '✅' },
+  { id: 'on_way',  label: 'On The Way',          icon: '🚗' },
+  { id: 'arrived', label: 'Arrived',             icon: '📍' },
+  { id: 'otp',     label: 'OTP Verified',        icon: '🔑' },
+  { id: 'started', label: 'Service Started',     icon: '🔧' },
+  { id: 'payment', label: 'Payment Pending',     icon: '💳' },
+  { id: 'done',    label: 'Completed',           icon: '🎉' },
 ];
 
 // Terminal statuses — stop auto-polling when we reach these
 const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'rejected']);
 
 // Active statuses — poll aggressively
-const ACTIVE_POLL_MS  = 8000;   // 8s while booking is active
+const ACTIVE_POLL_MS  = 3000;   // 3s while booking is active
 const PASSIVE_POLL_MS = 30000;  // 30s for terminal (just in case)
 
 const BookingTrackScreen = ({ route, navigation }) => {
@@ -50,6 +52,7 @@ const BookingTrackScreen = ({ route, navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(null);
   const [secondsAgo,  setSecondsAgo]  = useState(0);
+  const [providerLocation, setProviderLocation] = useState(null);
 
   const timerRef   = useRef(null);
   const counterRef = useRef(null);
@@ -72,26 +75,44 @@ const BookingTrackScreen = ({ route, navigation }) => {
     }
   }, [bookingId]);
 
-  // ── Auto-polling setup ────────────────────────────────────────────────────
+  useFocusEffect(
+    useCallback(() => {
+      // Polling Fallback (every 5s)
+      const pollInterval = setInterval(() => {
+        loadBooking(true);
+      }, 5000);
+
+      return () => clearInterval(pollInterval);
+    }, [loadBooking])
+  );
+
+  // ── Initial load & Socket.IO Real-time setup ─────────────────────────────
   useEffect(() => {
     loadBooking();
 
-    const isTerminal = booking && TERMINAL_STATUSES.has(booking.status);
-    const interval   = isTerminal ? PASSIVE_POLL_MS : ACTIVE_POLL_MS;
+    if (!bookingId) return;
 
-    timerRef.current = setInterval(() => loadBooking(true), interval);
-    return () => clearInterval(timerRef.current);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [bookingId]);
+    socketService.joinBookingRoom(bookingId);
 
-  // Restart interval when status changes (to pick up correct poll rate)
-  useEffect(() => {
-    if (!booking) return;
-    clearInterval(timerRef.current);
-    const isTerminal = TERMINAL_STATUSES.has(booking.status);
-    timerRef.current = setInterval(() => loadBooking(true), isTerminal ? PASSIVE_POLL_MS : ACTIVE_POLL_MS);
-    return () => clearInterval(timerRef.current);
-  }, [booking?.status, loadBooking]);
+    const handleUpdate = () => loadBooking(true);
+    socketService.on('booking:status_update', handleUpdate);
+
+    const handleLocationUpdate = (data) => {
+      setProviderLocation({
+        latitude: data.latitude,
+        longitude: data.longitude
+      });
+      setLastUpdated(Date.now());
+      setSecondsAgo(0);
+    };
+    socketService.on('location:update', handleLocationUpdate);
+
+    return () => {
+      socketService.leaveBookingRoom(bookingId);
+      socketService.off('booking:status_update', handleUpdate);
+      socketService.off('location:update', handleLocationUpdate);
+    };
+  }, [bookingId, loadBooking]);
 
   // ── "Last updated X seconds ago" counter ─────────────────────────────────
   useEffect(() => {
@@ -160,6 +181,15 @@ const BookingTrackScreen = ({ route, navigation }) => {
     );
   };
 
+  const handleChat = () => {
+    if (!booking?.providerId?._id) return;
+    navigation.navigate('Chat', {
+      bookingId,
+      receiverId: booking.providerId._id,
+      receiverName: booking.providerId.userId?.name || 'Provider'
+    });
+  };
+
   const onRefresh = async () => {
     setRefreshing(true);
     await loadBooking();
@@ -195,11 +225,34 @@ const BookingTrackScreen = ({ route, navigation }) => {
   const canRate     = isCompleted && !booking.isRated;
 
   // ── Timeline helpers ──────────────────────────────────────────────────────
-  const statusOrder = TIMELINE_STEPS.map(s => s.status);
-  const currentIdx  = statusOrder.indexOf(status);
+  const getCurrentStepIndex = () => {
+    if (!booking) return 0;
+    const s = booking.status;
+    if (s === 'completed') return 8;
+    if (s === 'payment_pending') return 7;
+    if (s === 'in_progress') return 6;
+    if (s === 'otp_verification') return 5;
+    if (s === 'arrived') return 4;
+    if (s === 'provider_on_the_way') return 3;
+    if (s === 'confirmed' || s === 'accepted') return 2;
+    if (booking.providerId) return 1;
+    return 0;
+  };
+  const currentIdx = getCurrentStepIndex();
 
-  const getStepTimestamp = (stepStatus) => {
-    const entry = booking.statusHistory?.find(h => h.status === stepStatus);
+  const getStepTimestamp = (stepId) => {
+    if (!booking || !booking.statusHistory) return null;
+    let targetStatus;
+    if (stepId === 'created') targetStatus = 'pending';
+    if (stepId === 'assigned' || stepId === 'accepted') targetStatus = 'confirmed'; // Approximate, as assigned is virtual
+    if (stepId === 'on_way') targetStatus = 'provider_on_the_way';
+    if (stepId === 'arrived') targetStatus = 'arrived';
+    if (stepId === 'otp') targetStatus = 'otp_verification';
+    if (stepId === 'started') targetStatus = 'in_progress';
+    if (stepId === 'payment') targetStatus = 'payment_pending';
+    if (stepId === 'done') targetStatus = 'completed';
+
+    const entry = booking.statusHistory?.find(h => h.status === targetStatus || (stepId === 'accepted' && h.status === 'accepted'));
     if (!entry?.changedAt) return null;
     const d = new Date(entry.changedAt);
     return d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) +
@@ -207,8 +260,16 @@ const BookingTrackScreen = ({ route, navigation }) => {
            d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
   };
 
-  // ── INR formatter ─────────────────────────────────────────────────────────
+  // ── Helpers ───────────────────────────────────────────────────────────────
   const fmtINR = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+
+
+
+  const handleCopyOtp = () => {
+    if (booking?.startOtp) {
+      Alert.alert('Please remember your OTP', 'Copying OTP is currently unsupported on this device.');
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -248,12 +309,54 @@ const BookingTrackScreen = ({ route, navigation }) => {
           </Text>
         </Animated.View>
 
+        {/* ── Live Tracking Map ────────────────────────────────────────────── */}
+        {(status === 'accepted' || status === 'confirmed' || status === 'provider_on_the_way' || status === 'arrived') && (
+          <LiveTrackingMap 
+            providerLocation={providerLocation}
+            customerLocation={{
+              latitude: booking.address?.location?.coordinates[1] || 0,
+              longitude: booking.address?.location?.coordinates[0] || 0,
+            }}
+          />
+        )}
+
+        {/* ── Quick Actions ──────────────────────────────────────────────── */}
+        {provider && status !== 'cancelled' && status !== 'completed' && (
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
+            <TouchableOpacity 
+              style={{ flex: 1, backgroundColor: '#3B82F6', paddingVertical: 12, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
+              onPress={() => Linking.openURL(`tel:${provider.userId?.phone || ''}`)}
+            >
+              <Text style={{ fontSize: 16 }}>📞</Text>
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>Call</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={{ flex: 1, backgroundColor: '#10B981', paddingVertical: 12, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
+              onPress={() => handleChat(provider.userId?.phone)}
+            >
+              <Text style={{ fontSize: 16 }}>💬</Text>
+              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>Chat</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* ── OTP Card ─────────────────────────────────────────────────── */}
-        {booking.startOtp && status === 'otp_verification' && (
-          <View style={styles.otpCard}>
-            <Text style={styles.otpLabel}>SHARE THIS OTP WITH YOUR PROVIDER</Text>
-            <Text style={styles.otpCode}>{booking.startOtp}</Text>
-            <Text style={styles.otpHint}>🔒 One-Time Password — do not share with anyone else</Text>
+        {booking.startOtp && (status === 'arrived' || status === 'otp_verification') && (
+          <View style={[styles.otpCard, { backgroundColor: '#F5F3FF', borderColor: '#8B5CF6', borderWidth: 2, padding: 24, borderRadius: 16 }]}>
+            <Text style={{ fontSize: 12, fontWeight: '800', color: '#6D28D9', letterSpacing: 1.5, marginBottom: 16, textAlign: 'center' }}>
+              SHARE THIS OTP WITH YOUR PROVIDER
+            </Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+              <Text style={{ fontSize: 48, fontWeight: '900', letterSpacing: 12, color: '#4C1D95' }}>
+                {booking.startOtp}
+              </Text>
+              <TouchableOpacity onPress={handleCopyOtp} style={{ padding: 8, backgroundColor: '#DDD6FE', borderRadius: 8 }}>
+                <Text style={{ fontSize: 20 }}>📋</Text>
+              </TouchableOpacity>
+            </View>
+            <Text style={{ fontSize: 12, color: '#7C3AED', marginTop: 16, textAlign: 'center', fontWeight: '500' }}>
+              🔒 Share this OTP only after the provider reaches your location.
+            </Text>
           </View>
         )}
 
@@ -289,10 +392,10 @@ const BookingTrackScreen = ({ route, navigation }) => {
               const isDone    = idx < currentIdx || isCompleted;
               const isCurrent = idx === currentIdx && !isCompleted;
               const isFuture  = idx > currentIdx && !isCompleted;
-              const ts        = getStepTimestamp(step.status);
+              const ts        = getStepTimestamp(step.id);
 
               return (
-                <View key={step.status} style={styles.timelineRow}>
+                <View key={step.id} style={styles.timelineRow}>
                   {/* Left — dot + connector */}
                   <View style={styles.timelineLeft}>
                     <View style={[
@@ -388,10 +491,6 @@ const BookingTrackScreen = ({ route, navigation }) => {
                     <Text style={[styles.priceValue, { color: '#16A34A' }]}>- {fmtINR(booking.pricing.discount)}</Text>
                   </View>
                 )}
-                <View style={styles.priceRow}>
-                  <Text style={styles.priceLabel}>Taxes & GST (18%)</Text>
-                  <Text style={styles.priceValue}>{fmtINR(booking.pricing.tax || (booking.pricing.baseAmount * 0.18))}</Text>
-                </View>
                 <View style={styles.priceRow}>
                   <Text style={styles.priceLabel}>Convenience Fee</Text>
                   <Text style={styles.priceValue}>{fmtINR(booking.pricing.convenienceFee)}</Text>

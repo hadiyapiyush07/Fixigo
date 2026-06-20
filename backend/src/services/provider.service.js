@@ -2,7 +2,7 @@
 // provider.service.js
 // ════════════════════════════════════════════════════════════
 const Provider  = require("../models/Provider.model");
-const Review    = require("../models/Other.model").Review;
+const Review    = require("../models/Review.model");
 const ApiError  = require("../utils/ApiError");
 const { getPagination, paginate } = require("../utils/pagination");
 
@@ -196,10 +196,15 @@ const toggleOnlineStatus = async (userId, isOnline, latitude, longitude) => {
   return { isOnline: updated.isOnline, status: updated.status, currentLocation: updated.currentLocation };
 };
 
-const updateLocation = async (userId, longitude, latitude) => {
+const updateLocation = async (userId, longitude, latitude, heading = 0, speed = 0) => {
   await Provider.findOneAndUpdate(
     { userId },
-    { currentLocation: { type: "Point", coordinates: [longitude, latitude] } }
+    { 
+      currentLocation: { type: "Point", coordinates: [longitude, latitude] },
+      heading,
+      speed,
+      lastLocationUpdated: new Date()
+    }
   );
 };
 
@@ -233,37 +238,185 @@ const getProviderStats = async (userId) => {
   const provider = await Provider.findOne({ userId }).select("_id");
   if (!provider) throw new ApiError(404, "Provider not found.");
 
-  const providerId = provider._id;
+  const providerId = new mongoose.Types.ObjectId(provider._id);
 
   // Start of today (midnight in local time)
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
 
-  const [total, completed, todayJobs, earningsAgg] = await Promise.all([
-    // Total bookings ever assigned to this provider
-    Booking.countDocuments({ providerId }),
-
-    // Completed bookings
-    Booking.countDocuments({ providerId, status: "completed" }),
-
-    // Bookings created today
-    Booking.countDocuments({ providerId, createdAt: { $gte: todayStart } }),
-
-    // Sum of totalAmount for completed bookings
-    Booking.aggregate([
-      { $match: { providerId: new mongoose.Types.ObjectId(providerId), status: "completed" } },
-      { $group: { _id: null, total: { $sum: "$pricing.totalAmount" } } },
-    ]),
+  // Use a single aggregation pipeline with $facet to compute all 8 stats simultaneously
+  const statsResult = await Booking.aggregate([
+    { $match: { providerId: providerId } },
+    {
+      $facet: {
+        totalDocs: [{ $count: "count" }],
+        completedDocs: [
+          { $match: { status: "completed" } },
+          { $count: "count" }
+        ],
+        cancelledDocs: [
+          { $match: { status: "cancelled" } },
+          { $count: "count" }
+        ],
+        todayDocs: [
+          { $match: { createdAt: { $gte: todayStart } } },
+          { $count: "count" }
+        ],
+        earningsAgg: [
+          { $match: { status: "completed" } },
+          { $group: { _id: null, total: { $sum: "$pricing.totalAmount" } } }
+        ],
+        todayEarningsAgg: [
+          { $match: { status: "completed", createdAt: { $gte: todayStart } } },
+          { $group: { _id: null, total: { $sum: "$pricing.totalAmount" } } }
+        ],
+        pendingPaymentsAgg: [
+          { $match: { status: "payment_pending" } },
+          { $group: { _id: null, total: { $sum: "$pricing.totalAmount" } } }
+        ],
+        onlinePaymentsAgg: [
+          { $match: { status: "completed", paymentMethod: { $in: ["razorpay", "wallet"] } } },
+          { $group: { _id: null, total: { $sum: "$pricing.totalAmount" } } }
+        ],
+        cashPaymentsAgg: [
+          { $match: { status: "completed", paymentMethod: "cash" } },
+          { $group: { _id: null, total: { $sum: "$pricing.totalAmount" } } }
+        ]
+      }
+    }
   ]);
 
-  const earnings = earningsAgg[0]?.total || 0;
+  const stats = statsResult[0];
 
-  return { total, completed, todayJobs, earnings };
+  return {
+    total:           stats.totalDocs[0]?.count || 0,
+    completed:       stats.completedDocs[0]?.count || 0,
+    cancelled:       stats.cancelledDocs[0]?.count || 0,
+    todayJobs:       stats.todayDocs[0]?.count || 0,
+    earnings:        stats.earningsAgg[0]?.total || 0,
+    todayEarnings:   stats.todayEarningsAgg[0]?.total || 0,
+    pendingPayments: stats.pendingPaymentsAgg[0]?.total || 0,
+    onlinePayments:  stats.onlinePaymentsAgg[0]?.total || 0,
+    cashPayments:    stats.cashPaymentsAgg[0]?.total || 0,
+  };
+};
+
+const getProviderEarnings = async (providerId, timeframe) => {
+  const Settlement = require("../models/Settlement.model");
+  const mongoose = require("mongoose");
+  
+  let dateFilter = {};
+  const now = new Date();
+  const todayStart = new Date(now);
+  todayStart.setHours(0, 0, 0, 0);
+
+  if (timeframe === "this_week") {
+    const weekStart = new Date(now);
+    const day = weekStart.getDay();
+    const diff = weekStart.getDate() - day + (day === 0 ? -6 : 1); // adjust when day is sunday
+    weekStart.setDate(diff);
+    weekStart.setHours(0, 0, 0, 0);
+    dateFilter = { createdAt: { $gte: weekStart } };
+  } else if (timeframe === "this_month") {
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    dateFilter = { createdAt: { $gte: monthStart } };
+  }
+
+  // Transaction History (from timeframe)
+  const transactions = await Booking.find({
+    providerId: providerId,
+    status: { $in: ["completed", "payment_pending"] },
+    ...dateFilter
+  })
+    .sort({ createdAt: -1 })
+    .populate("customerId", "name")
+    .select("pricing customerId subService status createdAt paymentMethod");
+
+  // Format transaction history
+  const history = transactions.map(t => ({
+    id: t._id,
+    service: t.subService?.name || "Service",
+    customer: t.customerId?.name || "Customer",
+    amount: t.pricing?.totalAmount || 0,
+    date: t.createdAt,
+    status: t.status === "completed" ? "paid" : "pending",
+    paymentMethod: t.paymentMethod || "online"
+  }));
+
+  // Aggregations for timeframe
+  const earningsAgg = await Booking.aggregate([
+    { $match: { providerId: new mongoose.Types.ObjectId(providerId), ...dateFilter } },
+    {
+      $facet: {
+        totalDocs: [
+          { $match: { status: "completed" } },
+          { $group: { _id: null, total: { $sum: "$pricing.totalAmount" } } }
+        ],
+        pendingDocs: [
+          { $match: { status: "payment_pending" } },
+          { $group: { _id: null, total: { $sum: "$pricing.totalAmount" } } }
+        ],
+        cashDocs: [
+          { $match: { status: "completed", paymentMethod: "cash" } },
+          { $group: { _id: null, total: { $sum: "$pricing.totalAmount" } } }
+        ],
+        onlineDocs: [
+          { $match: { status: "completed", paymentMethod: { $in: ["razorpay", "wallet", "online"] } } },
+          { $group: { _id: null, total: { $sum: "$pricing.totalAmount" } } }
+        ]
+      }
+    }
+  ]);
+
+  const stats = earningsAgg[0];
+  const timeframeEarnings = stats.totalDocs[0]?.total || 0;
+  const pendingAmount = stats.pendingDocs[0]?.total || 0;
+  const cashPayments = stats.cashDocs[0]?.total || 0;
+  const onlinePayments = stats.onlineDocs[0]?.total || 0;
+
+  // Today's Earnings (Always today, regardless of timeframe)
+  const todayAgg = await Booking.aggregate([
+    { $match: { providerId: new mongoose.Types.ObjectId(providerId), status: "completed", createdAt: { $gte: todayStart } } },
+    { $group: { _id: null, total: { $sum: "$pricing.totalAmount" } } }
+  ]);
+  const todayEarnings = todayAgg[0]?.total || 0;
+
+  // Settlements (All time for calculating withdrawable, but we can return recent ones)
+  const allCompletedOnlineAgg = await Booking.aggregate([
+    { $match: { providerId: new mongoose.Types.ObjectId(providerId), status: "completed", paymentMethod: { $in: ["razorpay", "wallet", "online"] } } },
+    { $group: { _id: null, total: { $sum: "$pricing.totalAmount" } } }
+  ]);
+  const allTimeOnline = allCompletedOnlineAgg[0]?.total || 0;
+
+  const settledAgg = await Settlement.aggregate([
+    { $match: { providerId: new mongoose.Types.ObjectId(providerId), transferStatus: "completed" } },
+    { $group: { _id: null, total: { $sum: "$amount" } } }
+  ]);
+  const alreadySettled = settledAgg[0]?.total || 0;
+  
+  // Withdrawable Balance calculation
+  const withdrawableBalance = Math.max(0, allTimeOnline - alreadySettled);
+
+  // Settlement History
+  const settlementHistory = await Settlement.find({ providerId })
+    .sort({ createdAt: -1 })
+    .limit(20);
+
+  return {
+    totalEarnings: timeframeEarnings,
+    todayEarnings,
+    pendingAmount,
+    withdrawableBalance,
+    cashPayments,
+    onlinePayments,
+    history,
+    settlementHistory
+  };
 };
 
 module.exports = {
   getProviderById, getProviderByUserId, getNearbyProviders,
   updateProviderProfile, toggleOnlineStatus, updateLocation,
-  updateAvailability, recalculateRating, getProviderStats,
+  updateAvailability, recalculateRating, getProviderStats, getProviderEarnings,
 };
 

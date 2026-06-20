@@ -1,216 +1,131 @@
-import React from 'react';
-import {
-  View, Text, StyleSheet, TouchableOpacity,
-  Alert, ScrollView, StatusBar,
-} from 'react-native';
-import { useDispatch, useSelector } from 'react-redux';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { useDispatch } from 'react-redux';
 import { logoutUser } from '../../store/slices/authSlice';
-import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../../theme/typography';
-
-const MenuItem = ({ icon, label, sublabel, onPress, danger }) => (
-  <TouchableOpacity
-    style={styles.menuItem}
-    onPress={onPress}
-    activeOpacity={0.7}
-  >
-    <View style={[styles.menuIcon, danger && styles.menuIconDanger]}>
-      <Text style={styles.menuIconText}>{icon}</Text>
-    </View>
-    <View style={styles.menuContent}>
-      <Text style={[styles.menuLabel, danger && { color: '#EF4444' }]}>{label}</Text>
-      {sublabel ? <Text style={styles.menuSublabel}>{sublabel}</Text> : null}
-    </View>
-    {!danger && <Text style={styles.menuChevron}>›</Text>}
-  </TouchableOpacity>
-);
+import { providerAPI } from '../../api/provider.api';
+import { COLORS, FONT_SIZES, SPACING } from '../../theme/typography';
+import { Card } from '../../components/ui/Card';
+import { Avatar } from '../../components/ui/Avatar';
+import { PrimaryButton } from '../../components/ui/PrimaryButton';
+import { SectionHeader } from '../../components/ui/SectionHeader';
+import { LoadingSkeleton } from '../../components/ui/LoadingSkeleton';
 
 const ProviderProfileScreen = ({ navigation }) => {
   const dispatch = useDispatch();
-  const { user } = useSelector(s => s.auth);
+  const [profile, setProfile] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const initials = user?.name
-    ? user.name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)
-    : '?';
+  useEffect(() => {
+    fetchProfile();
+  }, []);
 
-  const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: () => dispatch(logoutUser()),
-      },
-    ]);
+  const fetchProfile = async () => {
+    try {
+      const res = await providerAPI.getMyProfile();
+      setProfile(res.data.data);
+    } catch (e) {
+      console.log('Error fetching profile', e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
+  const handleLogout = () => {
+    dispatch(logoutUser());
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.safe}>
+        <LoadingSkeleton height={150} style={{ margin: SPACING.lg }} />
+        <LoadingSkeleton height={200} style={{ margin: SPACING.lg }} />
+      </View>
+    );
+  }
+
+  const uName = profile?.userId?.name || 'Provider Name';
+  const uPhone = profile?.userId?.phone || '';
+  const isVerified = profile?.isVerified;
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      <StatusBar barStyle="light-content" />
-
-      {/* Hero Header */}
-      <View style={styles.hero}>
-        <View style={styles.avatarWrap}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initials}</Text>
-          </View>
-          <View style={styles.onlineBadge}>
-            <View style={styles.onlineDot} />
-          </View>
-        </View>
-
-        <Text style={styles.name}>{user?.name}</Text>
-        <View style={styles.roleBadge}>
-          <Text style={styles.roleBadgeText}>🔧 Service Provider</Text>
-        </View>
-
-        <View style={styles.contactRow}>
-          {user?.email && (
-            <View style={styles.contactChip}>
-              <Text style={styles.contactText}>✉️  {user.email}</Text>
+    <View style={styles.safe}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchProfile(); }} />}
+        contentContainerStyle={styles.scroll}
+      >
+        <Card style={styles.headerCard}>
+          <Avatar name={uName} size={80} />
+          <Text style={styles.name}>{uName} {isVerified && '✅'}</Text>
+          <Text style={styles.phone}>{uPhone}</Text>
+          
+          <View style={styles.metricsRow}>
+            <View style={styles.metric}>
+              <Text style={styles.metricVal}>⭐ {profile?.aggregateRating ? Number(profile.aggregateRating).toFixed(1) : 'New'}</Text>
+              <Text style={styles.metricLabel}>Rating</Text>
             </View>
-          )}
-          {user?.phone && (
-            <View style={styles.contactChip}>
-              <Text style={styles.contactText}>📱  {user.phone}</Text>
+            <View style={styles.metricDivider} />
+            <View style={styles.metric}>
+              <Text style={styles.metricVal}>💼 {profile?.completedJobs || 0}</Text>
+              <Text style={styles.metricLabel}>Jobs Done</Text>
             </View>
-          )}
-        </View>
-      </View>
+            <View style={styles.metricDivider} />
+            <View style={styles.metric}>
+              <Text style={styles.metricVal}>📅 {profile?.experience || 1} yr</Text>
+              <Text style={styles.metricLabel}>Experience</Text>
+            </View>
+          </View>
+        </Card>
 
-      {/* Info Cards */}
-      <View style={styles.statsRow}>
-        <View style={styles.infoCard}>
-          <Text style={styles.infoCardValue}>4.8 ⭐</Text>
-          <Text style={styles.infoCardLabel}>Rating</Text>
-        </View>
-        <View style={[styles.infoCard, { borderLeftWidth: 1, borderRightWidth: 1, borderColor: '#E5E7EB' }]}>
-          <Text style={styles.infoCardValue}>128</Text>
-          <Text style={styles.infoCardLabel}>Total Jobs</Text>
-        </View>
-        <View style={styles.infoCard}>
-          <Text style={styles.infoCardValue}>2 yrs</Text>
-          <Text style={styles.infoCardLabel}>Experience</Text>
-        </View>
-      </View>
-
-      {/* Menu */}
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Account</Text>
-        <View style={styles.menuCard}>
-          <MenuItem icon="👤" label="Edit Profile"       sublabel="Update your personal info" onPress={() => navigation.navigate('EditProviderProfile')} />
+        <SectionHeader title="Professional Info" />
+        <Card>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Bio</Text>
+            <Text style={styles.infoVal}>{profile?.bio || 'No bio added yet.'}</Text>
+          </View>
           <View style={styles.divider} />
-          <MenuItem icon="🔔" label="Notifications"     sublabel="Manage your alerts"        onPress={() => {}} />
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Skills</Text>
+            <Text style={styles.infoVal}>{profile?.skills?.length ? profile.skills.join(', ') : 'No skills listed.'}</Text>
+          </View>
           <View style={styles.divider} />
-          <MenuItem icon="🔒" label="Change Password"   sublabel="Keep your account secure"  onPress={() => {}} />
-        </View>
-      </View>
+          <View style={styles.infoRow}>
+            <Text style={styles.infoLabel}>Working Radius</Text>
+            <Text style={styles.infoVal}>{profile?.workingRadius || 10} km</Text>
+          </View>
+        </Card>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionLabel}>Services</Text>
-        <View style={styles.menuCard}>
-          <MenuItem icon="🛠️"  label="My Services"       sublabel="View & manage your services" onPress={() => {}} />
-          <View style={styles.divider} />
-          <MenuItem icon="💰" label="Earnings & Payouts" sublabel="Track your earnings"          onPress={() => navigation.navigate('Earnings')} />
-          <View style={styles.divider} />
-          <MenuItem icon="📊" label="Performance Stats"  sublabel="Reviews, ratings & more"     onPress={() => {}} />
+        <View style={styles.btnGroup}>
+          <PrimaryButton title="Edit Profile" variant="primary" style={{ marginBottom: SPACING.md }} onPress={() => navigation.navigate('EditProviderProfile')} />
+          <PrimaryButton title="Support" variant="secondary" style={{ marginBottom: SPACING.md }} />
+          <PrimaryButton title="Logout" variant="danger" onPress={handleLogout} />
         </View>
-      </View>
-
-      <View style={styles.section}>
-        <View style={styles.menuCard}>
-          <MenuItem icon="🚪" label="Logout" danger onPress={handleLogout} />
-        </View>
-      </View>
-
-      <View style={{ height: 40 }} />
-    </ScrollView>
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
+  safe: { flex: 1, backgroundColor: COLORS.background },
+  scroll: { padding: SPACING.lg },
+  headerCard: { alignItems: 'center', paddingTop: SPACING.xl, paddingBottom: SPACING.lg },
+  name: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.textPrimary, marginTop: SPACING.md },
+  phone: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, marginTop: 4 },
+  
+  metricsRow: { flexDirection: 'row', marginTop: SPACING.xl, width: '100%', justifyContent: 'space-evenly' },
+  metric: { alignItems: 'center' },
+  metricVal: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.primary },
+  metricLabel: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 4 },
+  metricDivider: { width: 1, backgroundColor: COLORS.border, height: '80%' },
 
-  /* Hero */
-  hero: {
-    backgroundColor: COLORS.primary,
-    alignItems:      'center',
-    paddingTop:      60,
-    paddingBottom:   36,
-    paddingHorizontal: SPACING.xl,
-  },
-  avatarWrap: { position: 'relative', marginBottom: 14 },
-  avatar: {
-    width: 96, height: 96, borderRadius: 48,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 3, borderColor: 'rgba(255,255,255,0.6)',
-  },
-  avatarText:  { fontSize: 36, fontWeight: '800', color: '#FFFFFF' },
-  onlineBadge: {
-    position: 'absolute', bottom: 4, right: 4,
-    backgroundColor: '#22C55E', borderRadius: 10,
-    width: 20, height: 20,
-    alignItems: 'center', justifyContent: 'center',
-    borderWidth: 2, borderColor: COLORS.primary,
-  },
-  onlineDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#FFFFFF' },
+  infoRow: { marginBottom: SPACING.md },
+  infoLabel: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginBottom: 4 },
+  infoVal: { fontSize: FONT_SIZES.md, color: COLORS.textPrimary, fontWeight: '500' },
+  divider: { height: 1, backgroundColor: COLORS.border, marginBottom: SPACING.md },
 
-  name: { fontSize: 24, fontWeight: '800', color: '#FFFFFF', textAlign: 'center' },
-
-  roleBadge: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 14, paddingVertical: 4,
-    borderRadius: 20, marginTop: 8,
-  },
-  roleBadgeText: { color: '#FFFFFF', fontSize: FONT_SIZES.sm, fontWeight: '600' },
-
-  contactRow: { marginTop: 14, gap: 8, alignItems: 'center' },
-  contactChip: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 14, paddingVertical: 6,
-    borderRadius: 20,
-  },
-  contactText: { color: 'rgba(255,255,255,0.9)', fontSize: FONT_SIZES.xs },
-
-  /* Stats row */
-  statsRow: {
-    flexDirection:   'row',
-    backgroundColor: '#FFFFFF',
-    marginHorizontal: SPACING.xl,
-    marginTop:       -20,
-    borderRadius:    16,
-    overflow:        'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1, shadowRadius: 12, elevation: 6,
-  },
-  infoCard: { flex: 1, alignItems: 'center', paddingVertical: 18 },
-  infoCardValue: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: '#111827' },
-  infoCardLabel: { fontSize: FONT_SIZES.xs, color: '#6B7280', marginTop: 2 },
-
-  /* Sections */
-  section:      { paddingHorizontal: SPACING.xl, marginTop: SPACING.xl },
-  sectionLabel: { fontSize: FONT_SIZES.xs, fontWeight: '700', color: '#9CA3AF', letterSpacing: 1, marginBottom: 10, textTransform: 'uppercase' },
-
-  menuCard: {
-    backgroundColor: '#FFFFFF', borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
-  },
-  menuItem: { flexDirection: 'row', alignItems: 'center', padding: SPACING.lg },
-  menuIcon: {
-    width: 40, height: 40, borderRadius: 12,
-    backgroundColor: '#F3F4F6',
-    alignItems: 'center', justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  menuIconDanger: { backgroundColor: '#FEE2E2' },
-  menuIconText:   { fontSize: 18 },
-  menuContent:    { flex: 1 },
-  menuLabel:      { fontSize: FONT_SIZES.md, fontWeight: '600', color: '#111827' },
-  menuSublabel:   { fontSize: FONT_SIZES.xs, color: '#9CA3AF', marginTop: 1 },
-  menuChevron:    { fontSize: 22, color: '#D1D5DB', fontWeight: '300' },
-  divider:        { height: 1, backgroundColor: '#F9FAFB', marginLeft: 72 },
+  btnGroup: { marginTop: SPACING.xl }
 });
 
 export default ProviderProfileScreen;
