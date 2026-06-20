@@ -1,22 +1,27 @@
 // src/screens/customer/BookingDetailScreen.jsx
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, Alert, RefreshControl,
 } from 'react-native';
 import { bookingAPI } from '../../api/booking.api';
+import { socketService } from '../../services/socket.service';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
-import { StatusBadge } from '../../components/common/StatusBadge';
+import { StatusBadge } from '../../components/ui/StatusBadge';
 
 const STATUS_STEPS = [
   { key: 'pending',             label: 'Booking Placed',     icon: '📋' },
-  { key: 'confirmed',           label: 'Provider Confirmed', icon: '✅' },
+  { key: 'accepted',            label: 'Provider Accepted',  icon: '🤝' },
+  { key: 'confirmed',           label: 'Job Confirmed',      icon: '✅' },
   { key: 'provider_on_the_way', label: 'Provider On Way',    icon: '🚗' },
+  { key: 'arrived',             label: 'Provider Arrived',   icon: '📍' },
+  { key: 'otp_verification',    label: 'OTP Verification',   icon: '🔑' },
   { key: 'in_progress',         label: 'Work In Progress',   icon: '🔧' },
+  { key: 'payment_pending',     label: 'Payment Pending',    icon: '💵' },
   { key: 'completed',           label: 'Completed',          icon: '🎉' },
 ];
 
-const STATUS_ORDER = ['pending','confirmed','provider_on_the_way','in_progress','completed'];
+const STATUS_ORDER = ['pending', 'accepted', 'confirmed', 'provider_on_the_way', 'arrived', 'otp_verification', 'in_progress', 'payment_pending', 'completed'];
 
 const BookingDetailScreen = ({ navigation, route }) => {
   const bookingId = route?.params?.bookingId;
@@ -24,7 +29,7 @@ const BookingDetailScreen = ({ navigation, route }) => {
   const [loading,    setLoading]    = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const loadBooking = async () => {
+  const loadBooking = useCallback(async () => {
     if (!bookingId) {
       Alert.alert('Error', 'Booking ID missing');
       setLoading(false);
@@ -38,9 +43,22 @@ const BookingDetailScreen = ({ navigation, route }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [bookingId]);
 
-  useEffect(() => { loadBooking(); }, [bookingId]);
+  useEffect(() => { 
+    loadBooking(); 
+
+    if (bookingId) {
+      socketService.joinBookingRoom(bookingId);
+      const handleUpdate = () => loadBooking();
+      socketService.on('booking:status_update', handleUpdate);
+
+      return () => {
+        socketService.leaveBookingRoom(bookingId);
+        socketService.off('booking:status_update', handleUpdate);
+      };
+    }
+  }, [loadBooking, bookingId]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -72,8 +90,8 @@ const BookingDetailScreen = ({ navigation, route }) => {
   const currentStatusIndex = STATUS_ORDER.indexOf(booking.status);
   const isCancelled  = booking.status === 'cancelled';
   const isCompleted  = booking.status === 'completed';
-  const canTrack     = ['confirmed','provider_on_the_way','in_progress'].includes(booking.status);
-  const canCancel    = booking.status === 'pending';
+  const canTrack     = ['accepted', 'confirmed', 'provider_on_the_way', 'arrived', 'otp_verification', 'in_progress', 'payment_pending'].includes(booking.status);
+  const canCancel    = ['pending', 'accepted', 'confirmed', 'provider_on_the_way', 'arrived', 'otp_verification'].includes(booking.status);
   const canRate      = isCompleted && !booking.isRated;
 
   const handleCancel = () => {

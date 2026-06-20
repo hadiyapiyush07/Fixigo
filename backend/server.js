@@ -81,17 +81,51 @@ const startServer = async () => {
     console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n");
   });
 
-  // ── Crash handlers ───────────────────────────────────────
-  // Catch unhandled promise rejections (async errors not caught anywhere)
-  process.on("unhandledRejection", (err) => {
-    console.error("UNHANDLED REJECTION:", err.message);
-    server.close(() => process.exit(1));
+  // ── Server-level error handler ───────────────────────────
+  // Catches EADDRINUSE immediately instead of crashing with an unhandled event
+  server.on("error", (err) => {
+    if (err.code === "EADDRINUSE") {
+      console.error(`\n❌  Port ${PORT} is already in use.`);
+      console.error(`   → Stop the other server first, then run npm run dev again.\n`);
+    } else {
+      console.error("Server error:", err.message);
+    }
+    process.exit(1);
   });
 
-  // Catch SIGTERM signal (sent by hosting platforms when shutting down)
-  process.on("SIGTERM", () => {
-    console.log("SIGTERM received — shutting down gracefully");
-    server.close(() => process.exit(0));
+  // ── Graceful shutdown helper ─────────────────────────────
+  const gracefulShutdown = (signal) => {
+    console.log(`\n⏳  ${signal} received — closing HTTP server...`);
+    server.close(() => {
+      console.log("✅  HTTP server closed. Exiting.");
+      process.exit(0);
+    });
+
+    // Force-exit after 5 seconds if server didn't close in time
+    setTimeout(() => {
+      console.error("⚠️  Forced exit after 5s timeout.");
+      process.exit(1);
+    }, 5000).unref();
+  };
+
+  // ── Signal handlers ──────────────────────────────────────
+  // SIGINT  = Ctrl+C in terminal, AND what nodemon sends on restart
+  // SIGTERM = what hosting platforms (Heroku, Railway) send on deploy/shutdown
+  process.on("SIGINT",  () => gracefulShutdown("SIGINT"));
+  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+
+  // ── Crash handler ────────────────────────────────────────
+  // Catch unhandled promise rejections (async errors not caught anywhere)
+  process.on("unhandledRejection", (err) => {
+    console.error("\n❌  UNHANDLED REJECTION:", err?.message || err);
+    console.error(err?.stack || "");
+    gracefulShutdown("unhandledRejection");
+  });
+
+  process.on("uncaughtException", (err) => {
+    console.error("\n❌  UNCAUGHT EXCEPTION:", err?.message || err);
+    console.error(err?.stack || "");
+    gracefulShutdown("uncaughtException");
   });
 };
 

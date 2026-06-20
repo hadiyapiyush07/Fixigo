@@ -23,9 +23,22 @@ const providerSchema = new mongoose.Schema(
     ],
 
     idProof: { type: String, default: null },  // Cloudinary URL of govt ID
+    aadhaar: { type: String, default: null },
+    pan: { type: String, default: null },
+    selfie: { type: String, default: null },
+    workingRadius: { type: Number, default: 10 }, // in km
+    emergencyContact: { type: String, default: null },
+    bankDetails: {
+      accountNo: { type: String, default: null },
+      ifscCode: { type: String, default: null },
+      accountHolderName: { type: String, default: null }
+    },
+    status: { type: String, enum: ["offline", "online", "busy"], default: "offline" },
+    address: { type: String, default: null },
 
     // Admin must approve before provider can receive jobs
     isVerified: { type: Boolean, default: false },
+    verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
 
     // Provider toggles online/offline (like Uber driver status)
     isOnline: { type: Boolean, default: false },
@@ -36,6 +49,9 @@ const providerSchema = new mongoose.Schema(
       type:        { type: String, enum: ["Point"], default: "Point" },
       coordinates: { type: [Number], default: [0, 0] },
     },
+    heading: { type: Number, default: 0 },
+    speed: { type: Number, default: 0 },
+    lastLocationUpdated: { type: Date, default: Date.now },
 
     serviceArea: {
       city:     { type: String, default: "" },

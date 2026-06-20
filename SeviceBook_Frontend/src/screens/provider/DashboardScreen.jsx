@@ -4,35 +4,89 @@ import {
   TouchableOpacity, RefreshControl, Animated,
   PermissionsAndroid, Platform, Alert,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { useDispatch, useSelector } from 'react-redux';
 import { bookingAPI } from '../../api/booking.api';
 import { providerAPI } from '../../api/provider.api';
 import { logoutUser } from '../../store/slices/authSlice';
-import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
-import { StatusBadge } from '../../components/common/StatusBadge';
+import { socketService } from '../../services/socket.service';
+
+import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../../theme/typography';
+import { Card } from '../../components/ui/Card';
+import { Avatar } from '../../components/ui/Avatar';
+import { StatusBadge } from '../../components/ui/StatusBadge';
+import { LoadingSkeleton } from '../../components/ui/LoadingSkeleton';
+import { SectionHeader } from '../../components/ui/SectionHeader';
+import { EmptyState } from '../../components/ui/EmptyState';
+
 import Geolocation from '@react-native-community/geolocation';
+
+const getTimeAgo = (dateStr) => {
+  if (!dateStr) return '';
+  const diff = Math.floor((new Date() - new Date(dateStr)) / 60000);
+  if (diff < 1) return 'Just now';
+  if (diff < 60) return `${diff} mins ago`;
+  const hrs = Math.floor(diff / 60);
+  if (hrs < 24) return `${hrs} hrs ago`;
+  return `${Math.floor(hrs / 24)} days ago`;
+};
+
+const getDistance = (coord1, coord2) => {
+  if (!coord1 || !coord2 || coord1.length < 2 || coord2.length < 2) return null;
+  const [lon1, lat1] = coord1;
+  const [lon2, lat2] = coord2;
+  const R = 6371;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+            Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+            Math.sin(dLon/2) * Math.sin(dLon/2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  return (R * c).toFixed(1);
+};
 
 const DashboardScreen = ({ navigation }) => {
   const dispatch = useDispatch();
   const { user } = useSelector(s => s.auth);
 
-  const [isOnline, setIsOnline]         = useState(false);
-  const [bookings, setBookings]         = useState([]);
-  const [stats, setStats]               = useState({ total: 0, completed: 0, pending: 0 });
-  const [loading, setLoading]           = useState(false);
-  const [refreshing, setRefreshing]     = useState(false);
+  const [isOnline, setIsOnline] = useState(false);
+  const [providerProfile, setProviderProfile] = useState(null);
+  const [activeBooking, setActiveBooking] = useState(null);
+  const [bookings, setBookings] = useState([]);
+  const [stats, setStats] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [togglingOnline, setTogglingOnline] = useState(false);
 
-  // Animated values for the toggle
-  const toggleAnim   = useRef(new Animated.Value(0)).current;
-  const pulseAnim    = useRef(new Animated.Value(1)).current;
-  const glowAnim     = useRef(new Animated.Value(0)).current;
+  const toggleAnim = useRef(new Animated.Value(0)).current;
+
+  useFocusEffect(
+    React.useCallback(() => {
+      loadDashboard(false); // Silent load when focused
+      
+      const interval = setInterval(() => {
+        if (!togglingOnline) loadDashboard(false);
+      }, 20000); // 20 seconds polling as requested
+
+      return () => clearInterval(interval);
+    }, [togglingOnline])
+  );
 
   useEffect(() => {
-    loadDashboard();
+    // Keep socket listener for instant updates
+    socketService.on('booking:status_update', handleSocketUpdate);
+    socketService.on('booking:new', handleSocketUpdate);
+
+    return () => {
+      socketService.off('booking:status_update', handleSocketUpdate);
+      socketService.off('booking:new', handleSocketUpdate);
+    };
   }, []);
 
-  // Sync animation when isOnline changes
+  const handleSocketUpdate = () => {
+    loadDashboard(false);
+  };
+
   useEffect(() => {
     Animated.spring(toggleAnim, {
       toValue: isOnline ? 1 : 0,
@@ -40,422 +94,257 @@ const DashboardScreen = ({ navigation }) => {
       friction: 6,
       tension: 80,
     }).start();
-
-    if (isOnline) {
-      // Pulse glow when online
-      Animated.loop(
-        Animated.sequence([
-          Animated.timing(pulseAnim, { toValue: 1.15, duration: 900, useNativeDriver: true }),
-          Animated.timing(pulseAnim, { toValue: 1, duration: 900, useNativeDriver: true }),
-        ])
-      ).start();
-      Animated.timing(glowAnim, { toValue: 1, duration: 400, useNativeDriver: false }).start();
-    } else {
-      pulseAnim.stopAnimation();
-      Animated.spring(pulseAnim, { toValue: 1, useNativeDriver: true }).start();
-      Animated.timing(glowAnim, { toValue: 0, duration: 300, useNativeDriver: false }).start();
-    }
   }, [isOnline]);
 
-  const loadDashboard = async () => {
+  const loadDashboard = async (showLoading = true) => {
+    if (showLoading) setLoading(true);
     try {
-      setLoading(true);
-      const res   = await bookingAPI.getProviderBookings({ page: 1, limit: 5 });
-      const data  = res.data.data?.data || [];
-      setBookings(data);
-
-      const total     = res.data.data?.pagination?.total || 0;
-      const completed = data.filter(b => b.status === 'completed').length;
-      const pending   = data.filter(b => b.status === 'pending' || b.status === 'confirmed').length;
-      setStats({ total, completed, pending });
-
       const profRes = await providerAPI.getMyProfile();
-      setIsOnline(profRes.data.data?.isOnline || false);
-    } catch (e) {
-      console.log('Dashboard error:', e.message);
-    } finally {
-      setLoading(false);
-    }
-  };
+      const profile = profRes.data.data;
+      setProviderProfile(profile);
+      setIsOnline(profile?.isOnline || false);
 
-  const onRefresh = async () => {
-    setRefreshing(true);
-    await loadDashboard();
-    setRefreshing(false);
+      const [bookingsRes, statsRes] = await Promise.all([
+        bookingAPI.getProviderBookings({ page: 1, limit: 10 }),
+        providerAPI.getMyStats(),
+      ]);
+
+      const data = bookingsRes.data.data?.data || [];
+      setBookings(data);
+      setStats(statsRes.data.data || {});
+
+      const active = data.find(b => 
+        ['provider_on_the_way', 'arrived', 'otp_verification', 'in_progress'].includes(b.status)
+      );
+      setActiveBooking(active);
+    } catch (e) {
+      console.log('Dashboard load error:', e);
+    } finally {
+      if (showLoading) setLoading(false);
+      setRefreshing(false);
+    }
   };
 
   const handleToggleOnline = async (newValue) => {
+    if (providerProfile && !providerProfile.isVerified) {
+      Alert.alert('Verification Required', 'Your profile is pending verification.');
+      return;
+    }
+    if (providerProfile && providerProfile.status === 'busy') {
+      Alert.alert('Status Locked', 'You cannot change availability while on a job.');
+      return;
+    }
+    
     if (togglingOnline) return;
     setTogglingOnline(true);
+    setIsOnline(newValue);
 
     try {
-      // Android location permission
       if (Platform.OS === 'android') {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
-          {
-            title: 'Location Permission',
-            message: 'We need your location to show you to nearby customers.',
-            buttonPositive: 'Allow',
-          }
-        );
+        const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          Alert.alert('Permission Denied', 'Location access is required to go online.');
+          Alert.alert('Permission Denied', 'Location access is required.');
+          setIsOnline(!newValue);
           setTogglingOnline(false);
           return;
         }
       }
 
-      // Optimistically update UI for instant feel
-      setIsOnline(newValue);
-
       Geolocation.getCurrentPosition(
         async ({ coords: { latitude, longitude } }) => {
           try {
             await providerAPI.toggleOnline({ isOnline: newValue, latitude, longitude });
-          } catch (apiError) {
-            // Revert on failure
+            await loadDashboard(false);
+          } catch (e) {
             setIsOnline(!newValue);
-            Alert.alert('Update Failed', 'Could not update your status. Please try again.');
           } finally {
             setTogglingOnline(false);
           }
         },
-        (err) => {
-          console.log('GPS Error:', err);
-          // Still allow toggle if GPS fails (fallback)
-          providerAPI
-            .toggleOnline({ isOnline: newValue })
-            .catch(() => {
-              setIsOnline(!newValue);
-              Alert.alert('Error', 'Could not update status.');
-            })
-            .finally(() => setTogglingOnline(false));
+        () => {
+          setIsOnline(!newValue);
+          setTogglingOnline(false);
+          Alert.alert('Location Error', 'Could not fetch your location.');
         },
-        { enableHighAccuracy: false, timeout: 15000, maximumAge: 10000 }
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
       );
-    } catch (err) {
+    } catch (error) {
       setIsOnline(!newValue);
       setTogglingOnline(false);
-      Alert.alert('Error', 'Something went wrong. Please try again.');
     }
   };
 
-  const handleLogout = () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: async () => {
-          await dispatch(logoutUser());
-          navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
-        },
-      },
-    ]);
-  };
+  const pendingRequests = bookings.filter(b => b.status === 'pending');
 
-  // Interpolations
-  const thumbTranslate = toggleAnim.interpolate({ inputRange: [0, 1], outputRange: [2, 26] });
-  const trackColor     = toggleAnim.interpolate({ inputRange: [0, 1], outputRange: ['#D1D5DB', '#22C55E'] });
-  const glowOpacity    = glowAnim.interpolate({ inputRange: [0, 1], outputRange: [0, 0.25] });
-
-  const CustomToggle = () => (
-    <TouchableOpacity
-      onPress={() => handleToggleOnline(!isOnline)}
-      disabled={togglingOnline}
-      activeOpacity={0.85}
-      hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-    >
-      <Animated.View style={[styles.track, { backgroundColor: trackColor }]}>
-        {/* Glow ring */}
-        <Animated.View style={[styles.glowRing, { opacity: glowOpacity }]} />
-        <Animated.View
-          style={[
-            styles.thumb,
-            { transform: [{ translateX: thumbTranslate }] },
-            togglingOnline && styles.thumbLoading,
-          ]}
-        >
-          {togglingOnline && (
-            <View style={styles.loadingDots}>
-              <View style={styles.dot} />
-            </View>
-          )}
-        </Animated.View>
-      </Animated.View>
-    </TouchableOpacity>
-  );
-
-  const StatCard = ({ icon, label, value, color }) => (
-    <View style={[styles.statCard, { borderTopColor: color }]}>
-      <Text style={styles.statIcon}>{icon}</Text>
-      <Text style={[styles.statValue, { color }]}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
+  if (loading) {
+    return (
+      <View style={styles.safe}>
+        <LoadingSkeleton height={150} style={{ margin: SPACING.md }} />
+        <LoadingSkeleton height={100} style={{ margin: SPACING.md }} />
+        <LoadingSkeleton height={200} style={{ margin: SPACING.md }} />
+      </View>
+    );
+  }
 
   return (
-    <ScrollView
-      style={styles.container}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
-      }
-    >
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hello, {user?.name?.split(' ')[0]} 👋</Text>
-          <Text style={styles.subGreeting}>Service Provider Dashboard</Text>
+    <View style={styles.safe}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadDashboard(); }} />}
+      >
+        {/* Header Section */}
+        <View style={styles.header}>
+          <View style={styles.headerTop}>
+            <View>
+              <Text style={styles.greeting}>Hello {user?.name?.split(' ')[0] || 'Provider'} 👋</Text>
+              <View style={styles.onlineStatusRow}>
+                <View style={[styles.dot, { backgroundColor: isOnline ? COLORS.success : COLORS.textTertiary }]} />
+                <Text style={styles.statusText}>{isOnline ? 'Online' : 'Offline'}</Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => navigation.navigate('ProviderProfile')}>
+              <Avatar name={user?.name} size={48} />
+            </TouchableOpacity>
+          </View>
+
+          {/* Toggle Online Button */}
+          <Card style={styles.toggleCard}>
+            <View style={styles.toggleInfo}>
+              <Text style={styles.toggleTitle}>{isOnline ? "You're Online" : "You're Offline"}</Text>
+              <Text style={styles.toggleSub}>{isOnline ? 'Waiting for job requests' : 'Go online to receive jobs'}</Text>
+            </View>
+            <TouchableOpacity 
+              activeOpacity={0.9} 
+              onPress={() => handleToggleOnline(!isOnline)}
+              disabled={togglingOnline}
+              style={styles.switchBox}
+            >
+              <View style={[styles.switchTrack, { backgroundColor: isOnline ? COLORS.success : COLORS.border }]}>
+                <Animated.View style={[styles.switchThumb, {
+                  transform: [{
+                    translateX: toggleAnim.interpolate({ inputRange: [0, 1], outputRange: [2, 28] })
+                  }]
+                }]} />
+              </View>
+            </TouchableOpacity>
+          </Card>
         </View>
-        <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </TouchableOpacity>
-      </View>
 
-      {/* ── Online Toggle Card ── */}
-      <View style={[styles.onlineCard, isOnline && styles.onlineCardActive]}>
-        <View style={styles.onlineLeft}>
-          <Animated.View
-            style={[
-              styles.statusDotWrapper,
-              { transform: [{ scale: pulseAnim }] },
-            ]}
-          >
-            <View style={[styles.onlineDot, { backgroundColor: isOnline ? '#22C55E' : '#9CA3AF' }]} />
-            {isOnline && <View style={styles.onlineDotRing} />}
-          </Animated.View>
-
-          <View style={{ flex: 1 }}>
-            <Text style={styles.onlineTitle}>
-              {isOnline ? 'You are Online' : 'You are Offline'}
-            </Text>
-            <Text style={styles.onlineSubtitle}>
-              {togglingOnline
-                ? 'Updating status…'
-                : isOnline
-                ? 'Receiving new job requests'
-                : 'Toggle ON to receive requests'}
-            </Text>
+        {/* Overview Stats */}
+        <View style={styles.section}>
+          <SectionHeader title="Today's Overview" />
+          <View style={styles.statsGrid}>
+            <Card style={styles.statBox}>
+              <Text style={styles.statVal}>{stats.todayJobs || 0}</Text>
+              <Text style={styles.statLabel}>Today's Jobs</Text>
+            </Card>
+            <Card style={styles.statBox}>
+              <Text style={styles.statVal}>{pendingRequests.length}</Text>
+              <Text style={styles.statLabel}>Pending</Text>
+            </Card>
+            <Card style={styles.statBox}>
+              <Text style={styles.statVal}>{stats.completed || 0}</Text>
+              <Text style={styles.statLabel}>Completed</Text>
+            </Card>
           </View>
         </View>
 
-        <CustomToggle />
-      </View>
-
-      {/* Stats */}
-      <Text style={styles.sectionTitle}>Your Stats</Text>
-      <View style={styles.statsRow}>
-        <StatCard icon="📋" label="Total Jobs"  value={stats.total}     color={COLORS.primary} />
-        <StatCard icon="✅" label="Completed"   value={stats.completed} color="#22C55E" />
-        <StatCard icon="⏳" label="Active"      value={stats.pending}   color="#F59E0B" />
-      </View>
-
-      {/* Recent Bookings */}
-      <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Recent Bookings</Text>
-        <TouchableOpacity onPress={() => navigation.navigate('Requests')}>
-          <Text style={styles.seeAll}>See all →</Text>
-        </TouchableOpacity>
-      </View>
-
-      {bookings.length === 0 && !loading ? (
-        <View style={styles.emptyBox}>
-          <Text style={styles.emptyIcon}>📭</Text>
-          <Text style={styles.emptyText}>No bookings yet</Text>
-          <Text style={styles.emptySub}>Go online to start receiving job requests</Text>
-        </View>
-      ) : (
-        bookings.map(item => (
-          <TouchableOpacity
-            key={item._id}
-            style={styles.bookingCard}
-            onPress={() => navigation.navigate('Requests')}
-            activeOpacity={0.92}
-          >
-            <View style={styles.bookingTop}>
-              <Text style={styles.bookingService}>{item.categoryId?.name || 'Service'}</Text>
-              <StatusBadge status={item.status} />
-            </View>
-            <Text style={styles.bookingInfo}>👤 {item.customerId?.name || 'Customer'}</Text>
-            <Text style={styles.bookingInfo}>
-              📅 {new Date(item.scheduledDate).toLocaleDateString('en-IN')}  ⏰ {item.scheduledTime}
-            </Text>
-            <Text style={styles.bookingInfo}>📍 {item.address?.city}, {item.address?.pincode}</Text>
-
-            <View style={styles.bookingBottom}>
-              <Text style={styles.bookingAmount}>₹{item.pricing?.totalAmount || 0}</Text>
-              {item.status === 'pending' && (
-                <View style={styles.actionRow}>
-                  <TouchableOpacity
-                    style={styles.rejectBtn}
-                    onPress={async () => {
-                      try {
-                        await bookingAPI.reject(item._id, 'Not available');
-                        loadDashboard();
-                      } catch (e) {
-                        Alert.alert('Error', e.response?.data?.message || 'Failed');
-                      }
-                    }}
-                  >
-                    <Text style={styles.rejectText}>Reject</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.acceptBtn}
-                    onPress={async () => {
-                      try {
-                        await bookingAPI.accept(item._id);
-                        Alert.alert('✅ Accepted', 'Booking accepted successfully!');
-                        loadDashboard();
-                      } catch (e) {
-                        Alert.alert('Error', e.response?.data?.message || 'Failed');
-                      }
-                    }}
-                  >
-                    <Text style={styles.acceptText}>Accept</Text>
-                  </TouchableOpacity>
+        {/* Active Job */}
+        <View style={styles.section}>
+          <SectionHeader title="Current Active Job" />
+          {activeBooking ? (
+            <Card onPress={() => navigation.navigate('BookingDetail', { bookingId: activeBooking._id })}>
+              <View style={styles.activeRow}>
+                <View>
+                  <Text style={styles.activeService}>{activeBooking.serviceId?.name || 'Service'}</Text>
+                  <Text style={styles.activeCustomer}>{activeBooking.customerId?.name || 'Customer'}</Text>
                 </View>
-              )}
-            </View>
-          </TouchableOpacity>
-        ))
-      )}
+                <StatusBadge status={activeBooking.status} />
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.activeMeta}>
+                <Text style={styles.metaTxt}>📍 {activeBooking.distance || '?'} km away</Text>
+                <Text style={styles.metaTxt}>₹ {activeBooking.totalAmount}</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.manageBtn}
+                onPress={() => navigation.navigate('BookingDetail', { bookingId: activeBooking._id })}
+              >
+                <Text style={styles.manageBtnTxt}>Manage Job</Text>
+              </TouchableOpacity>
+            </Card>
+          ) : (
+            <EmptyState 
+              icon="☕" 
+              title="No Active Job" 
+              subtitle="You have no ongoing services right now." 
+              style={{ backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.xl }}
+            />
+          )}
+        </View>
 
-      <View style={{ height: 32 }} />
-    </ScrollView>
+        {/* Quick Actions */}
+        <View style={styles.section}>
+          <SectionHeader title="Quick Actions" />
+          <View style={styles.quickGrid}>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('Requests')}>
+              <Text style={styles.quickIcon}>📥</Text>
+              <Text style={styles.quickLabel}>Requests</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('Earnings')}>
+              <Text style={styles.quickIcon}>💰</Text>
+              <Text style={styles.quickLabel}>Earnings</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.quickBtn} onPress={() => navigation.navigate('ProviderProfile')}>
+              <Text style={styles.quickIcon}>👤</Text>
+              <Text style={styles.quickLabel}>Profile</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        <View style={{ height: SPACING.xxxl }} />
+      </ScrollView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
+  safe: { flex: 1, backgroundColor: COLORS.background },
+  header: { padding: SPACING.lg, paddingBottom: 0 },
+  headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  greeting: { fontSize: FONT_SIZES.xxl, fontWeight: '800', color: COLORS.textPrimary },
+  onlineStatusRow: { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
+  dot: { width: 8, height: 8, borderRadius: 4, marginRight: 6 },
+  statusText: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, fontWeight: '600' },
+  
+  toggleCard: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: SPACING.xl },
+  toggleInfo: { flex: 1 },
+  toggleTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary },
+  toggleSub: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
+  
+  switchBox: { width: 56, height: 32, justifyContent: 'center' },
+  switchTrack: { width: 56, height: 32, borderRadius: 16, justifyContent: 'center' },
+  switchThumb: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.white, ...COLORS.shadow },
 
-  /* Header */
-  header: {
-    flexDirection:     'row',
-    justifyContent:    'space-between',
-    alignItems:        'center',
-    paddingHorizontal: SPACING.xl,
-    paddingTop:        SPACING.xl + SPACING.lg,
-    paddingBottom:     SPACING.lg,
-    backgroundColor:   '#FFFFFF',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 4,
-  },
-  greeting:    { fontSize: FONT_SIZES.xl, fontWeight: '700', color: '#111827' },
-  subGreeting: { fontSize: FONT_SIZES.sm, color: '#6B7280', marginTop: 2 },
-  logoutBtn:   { backgroundColor: '#FEE2E2', paddingHorizontal: SPACING.md, paddingVertical: 6, borderRadius: 20 },
-  logoutText:  { color: '#EF4444', fontSize: FONT_SIZES.sm, fontWeight: '600' },
+  section: { paddingHorizontal: SPACING.lg, marginTop: SPACING.xl },
+  statsGrid: { flexDirection: 'row', gap: SPACING.sm },
+  statBox: { flex: 1, alignItems: 'center', paddingVertical: SPACING.lg },
+  statVal: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.primary },
+  statLabel: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 4, fontWeight: '600' },
 
-  /* Online Card */
-  onlineCard: {
-    flexDirection:    'row',
-    justifyContent:   'space-between',
-    alignItems:       'center',
-    backgroundColor:  '#FFFFFF',
-    marginHorizontal: SPACING.xl,
-    marginTop:        SPACING.xl,
-    padding:          SPACING.lg,
-    borderRadius:     16,
-    borderWidth:      1.5,
-    borderColor:      '#E5E7EB',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
-  },
-  onlineCardActive: {
-    borderColor: '#86EFAC',
-    backgroundColor: '#F0FDF4',
-  },
-  onlineLeft: { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
+  activeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  activeService: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary },
+  activeCustomer: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
+  divider: { height: 1, backgroundColor: COLORS.border, my: SPACING.md, marginVertical: SPACING.md },
+  activeMeta: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.lg },
+  metaTxt: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textPrimary },
+  manageBtn: { backgroundColor: COLORS.primary, padding: SPACING.md, borderRadius: BORDER_RADIUS.md, alignItems: 'center' },
+  manageBtnTxt: { color: COLORS.white, fontWeight: '700', fontSize: FONT_SIZES.md },
 
-  statusDotWrapper: { width: 16, height: 16, alignItems: 'center', justifyContent: 'center' },
-  onlineDot:        { width: 12, height: 12, borderRadius: 6, position: 'absolute' },
-  onlineDotRing:    { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#22C55E', opacity: 0.4, position: 'absolute' },
-
-  onlineTitle:    { fontSize: FONT_SIZES.md, fontWeight: '700', color: '#111827' },
-  onlineSubtitle: { fontSize: FONT_SIZES.xs, color: '#6B7280', marginTop: 2 },
-
-  /* Custom Toggle */
-  track: {
-    width: 54,
-    height: 30,
-    borderRadius: 15,
-    justifyContent: 'center',
-    padding: 2,
-    overflow: 'visible',
-  },
-  glowRing: {
-    position:      'absolute',
-    top:           -6,
-    left:          -6,
-    right:         -6,
-    bottom:        -6,
-    borderRadius:  21,
-    backgroundColor: '#22C55E',
-  },
-  thumb: {
-    width:        26,
-    height:       26,
-    borderRadius: 13,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius:  4,
-    elevation:     4,
-    alignItems:    'center',
-    justifyContent:'center',
-  },
-  thumbLoading: { opacity: 0.7 },
-  loadingDots:  { width: 6, height: 6, borderRadius: 3, backgroundColor: '#9CA3AF' },
-  dot:          { width: 6, height: 6, borderRadius: 3, backgroundColor: '#9CA3AF' },
-
-  /* Stats */
-  sectionTitle:  { fontSize: FONT_SIZES.lg, fontWeight: '700', color: '#111827', paddingHorizontal: SPACING.xl, marginTop: SPACING.xl, marginBottom: SPACING.md },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: SPACING.xl },
-  seeAll:        { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: '600' },
-
-  statsRow: { flexDirection: 'row', paddingHorizontal: SPACING.xl, gap: SPACING.md, marginBottom: SPACING.sm },
-  statCard:  {
-    flex: 1, backgroundColor: '#FFFFFF', borderRadius: 14,
-    padding: SPACING.md, alignItems: 'center',
-    borderTopWidth: 3,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05, shadowRadius: 6, elevation: 2,
-  },
-  statIcon:  { fontSize: 22, marginBottom: 4 },
-  statValue: { fontSize: FONT_SIZES.xxl, fontWeight: '800' },
-  statLabel: { fontSize: FONT_SIZES.xs, color: '#6B7280', marginTop: 2 },
-
-  /* Booking Cards */
-  bookingCard: {
-    backgroundColor:  '#FFFFFF',
-    marginHorizontal: SPACING.xl,
-    marginBottom:     SPACING.md,
-    borderRadius:     14,
-    padding:          SPACING.lg,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
-  },
-  bookingTop:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
-  bookingService: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: '#111827' },
-  bookingInfo:    { fontSize: FONT_SIZES.sm, color: '#6B7280', marginBottom: 3 },
-  bookingBottom:  {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    marginTop: SPACING.sm, borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: SPACING.sm,
-  },
-  bookingAmount: { fontSize: FONT_SIZES.lg, fontWeight: '800', color: '#111827' },
-
-  actionRow:  { flexDirection: 'row', gap: SPACING.sm },
-  acceptBtn:  { backgroundColor: '#22C55E', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, borderRadius: 20 },
-  acceptText: { color: '#FFFFFF', fontWeight: '700', fontSize: FONT_SIZES.sm },
-  rejectBtn:  { backgroundColor: '#FEE2E2', paddingHorizontal: SPACING.lg, paddingVertical: SPACING.sm, borderRadius: 20 },
-  rejectText: { color: '#EF4444', fontWeight: '700', fontSize: FONT_SIZES.sm },
-
-  emptyBox:  { alignItems: 'center', padding: SPACING.xxxl },
-  emptyIcon: { fontSize: 64, marginBottom: SPACING.lg },
-  emptyText: { fontSize: FONT_SIZES.xl, fontWeight: '700', color: '#111827' },
-  emptySub:  { fontSize: FONT_SIZES.sm, color: '#6B7280', marginTop: SPACING.sm, textAlign: 'center' },
+  quickGrid: { flexDirection: 'row', gap: SPACING.md },
+  quickBtn: { flex: 1, backgroundColor: COLORS.surface, padding: SPACING.md, borderRadius: BORDER_RADIUS.lg, alignItems: 'center', borderWidth: 1, borderColor: COLORS.border },
+  quickIcon: { fontSize: 24, marginBottom: 8 },
+  quickLabel: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textPrimary },
 });
 
 export default DashboardScreen;

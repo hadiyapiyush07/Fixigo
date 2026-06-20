@@ -1,9 +1,10 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 // src/screens/customer/HomeScreen.jsx
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  RefreshControl, ActivityIndicator, Alert,
-  Platform, PermissionsAndroid, TextInput,
+  RefreshControl, ActivityIndicator, Alert, ScrollView,
+  Platform, PermissionsAndroid, TextInput, Image
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import { categoryAPI } from '../../api/category.api';
@@ -18,24 +19,27 @@ const CATEGORY_ICONS = {
   'Home Cleaning':    '🧹',
   'Painter':          '🎨',
   'Carpenter':        '🪚',
-  'Appliance Repair': '📺',
+  'Appliance Repair': '🧰',
   'Pest Control':     '🐛',
   'Salon':            '💇',
+  'Washing Machine':  '🧼',
+  'Refrigerator':     '🧊',
 };
+
+const PROMO_BANNERS = [
+  { id: '1', title: 'Flat ₹100 Off', subtitle: 'On your first booking', code: 'WELCOME100', color: '#3B82F6' },
+  { id: '2', title: '50% Off AC Repair', subtitle: 'Limited time offer', code: 'FIXIGO50', color: '#10B981' },
+  { id: '3', title: 'Expert Cleaners', subtitle: 'Deep clean your home', code: 'CLEAN20', color: '#8B5CF6' },
+];
 
 const HomeScreen = ({ navigation }) => {
   const { user } = useSelector(s => s.auth);
 
   const [categories,  setCategories]  = useState([]);
   const [providers,   setProviders]   = useState([]);
-  const [catLoading,  setCatLoading]  = useState(true);
-  const [provLoading, setProvLoading] = useState(false);
+  const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
-  const [page,        setPage]        = useState(1);
-  const [hasNextPage, setHasNextPage] = useState(true);
-  const [selectedCat, setSelectedCat] = useState(null);
   const [coords,      setCoords]      = useState(null);
-  const [searchText,  setSearchText]  = useState('');
 
   useEffect(() => { initScreen(); }, []);
 
@@ -45,10 +49,10 @@ const HomeScreen = ({ navigation }) => {
       const granted = await PermissionsAndroid.request(
         PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
         {
-          title:           'Location Permission',
-          message:         'Fixigo needs your location to find nearby providers.',
-          buttonPositive:  'Allow',
-          buttonNegative:  'Deny',
+          title:          'Location Permission',
+          message:        'Fixigo needs your location to find nearby providers.',
+          buttonPositive: 'Allow',
+          buttonNegative: 'Deny',
         }
       );
       return granted === PermissionsAndroid.RESULTS.GRANTED;
@@ -59,351 +63,291 @@ const HomeScreen = ({ navigation }) => {
     Geolocation.getCurrentPosition(
       pos => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
       err => reject(err),
-      { enableHighAccuracy: true, timeout: 30000, maximumAge: 10000 }
+      { enableHighAccuracy: false, timeout: 30000, maximumAge: 60000 }
     );
   });
 
-  const loadCategories = async () => {
-    try {
-      setCatLoading(true);
-      const res = await categoryAPI.getAll();
-      setCategories(res?.data?.data || []);
-    } catch (e) {
-      console.log('Categories error:', e.message);
-    } finally {
-      setCatLoading(false);
-    }
-  };
-
-  const fetchProviders = async (lat, lng, pageNum = 1, categoryId = null, reset = false) => {
-    if (provLoading && !reset) return;
-    if (!reset && !hasNextPage) return;
-    setProvLoading(true);
-    try {
-      const res = await providerAPI.getNearby({
-        latitude:  lat,
-        longitude: lng,
-        ...(categoryId ? { categoryId } : {}),
-        page:  pageNum,
-        limit: 10,
-      });
-      const raw        = res?.data?.data || res?.data;
-      const data       = Array.isArray(raw?.data) ? raw.data : Array.isArray(raw) ? raw : [];
-      const pagination = raw?.pagination || {};
-
-      if (reset) setProviders(data);
-      else       setProviders(prev => [...prev, ...data]);
-
-      setPage(pageNum);
-      setHasNextPage(Boolean(pagination?.hasNextPage));
-    } catch (e) {
-      console.log('Providers error:', e.message);
-    } finally {
-      setProvLoading(false);
-    }
-  };
-
   const initScreen = async () => {
-    await loadCategories();
-    const ok = await requestLocationPermission();
-    if (!ok) {
-      Alert.alert('Permission Needed', 'Enable location to find providers near you.');
-      return;
-    }
     try {
-      const loc = await getCurrentLocation();
+      setLoading(true);
+      const hasPerm = await requestLocationPermission();
+      let loc = null;
+      if (hasPerm) {
+        loc = await getCurrentLocation().catch(() => null);
+      }
+      if (!loc) {
+        // Fallback Surat coords
+        loc = { latitude: 21.1702, longitude: 72.8311 };
+      }
       setCoords(loc);
-      await fetchProviders(loc.latitude, loc.longitude, 1, null, true);
+
+      const [catRes, provRes] = await Promise.all([
+        categoryAPI.getAll().catch(() => null),
+        providerAPI.getNearby({
+          latitude: loc.latitude, longitude: loc.longitude, page: 1, limit: 5
+        }).catch(() => null)
+      ]);
+
+      if (catRes?.data?.data) {
+        // Filter out "Pest Control" category per user request
+        const filteredCats = catRes.data.data.filter(c => c.name !== 'Pest Control');
+        setCategories(filteredCats);
+      }
+      if (provRes?.data?.data) {
+        let pData = Array.isArray(provRes.data.data) ? provRes.data.data : provRes.data.data.data || [];
+        // Sort explicitly by online status, then rating, then completed jobs
+        pData.sort((a, b) => {
+          if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
+          if ((b.aggregateRating || 0) !== (a.aggregateRating || 0)) return (b.aggregateRating || 0) - (a.aggregateRating || 0);
+          return (b.completedJobs || 0) - (a.completedJobs || 0);
+        });
+        setProviders(pData.slice(0, 5));
+      }
     } catch (e) {
-      console.log('GPS error:', e);
+      console.warn(e);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const handleCategoryPress = async (cat) => {
-    if (!coords) return;
-    setSelectedCat(cat._id);
-    setProviders([]);
-    setPage(1);
-    setHasNextPage(true);
-    await fetchProviders(coords.latitude, coords.longitude, 1, cat._id, true);
-  };
-
-  const handleClearFilter = async () => {
-    setSelectedCat(null);
-    setProviders([]);
-    setPage(1);
-    setHasNextPage(true);
-    if (coords) await fetchProviders(coords.latitude, coords.longitude, 1, null, true);
-  };
-
-  const onRefresh = useCallback(async () => {
+  const handleRefresh = () => {
     setRefreshing(true);
-    await loadCategories();
-    const ok = await requestLocationPermission();
-    if (ok) {
-      try {
-        const loc = await getCurrentLocation();
-        setCoords(loc);
-        setSelectedCat(null);
-        await fetchProviders(loc.latitude, loc.longitude, 1, null, true);
-      } catch (e) {}
-    }
-    setRefreshing(false);
-  }, []);
+    initScreen();
+  };
 
-  // Filter providers by search text
-  const filteredProviders = useMemo(() => {
-    if (!searchText.trim()) return providers;
-    return providers.filter(p =>
-      p?.userId?.name?.toLowerCase().includes(searchText.toLowerCase()) ||
-      p?.skills?.some(s => s?.name?.toLowerCase().includes(searchText.toLowerCase()))
-    );
-  }, [providers, searchText]);
-
-  // ── Category Item ─────────────────────────────────────────────────────
-  const CategoryItem = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.catItem, selectedCat === item._id && styles.catItemActive]}
-      onPress={() => handleCategoryPress(item)}
-      activeOpacity={0.8}
-    >
-      <View style={[styles.catIconBox, selectedCat === item._id && styles.catIconBoxActive]}>
-        <Text style={styles.catEmoji}>{CATEGORY_ICONS[item.name] || '🔨'}</Text>
-      </View>
-      <Text style={[styles.catName, selectedCat === item._id && styles.catNameActive]}>
-        {item.name}
-      </Text>
-      <Text style={styles.catPrice}>From ₹{item.basePrice || 199}</Text>
-    </TouchableOpacity>
-  );
-
-  // ── Provider Card ──────────────────────────────────────────────────────
-  const ProviderCard = ({ item }) => {
-    const name   = item?.userId?.name || 'Provider';
-    const skills = Array.isArray(item?.skills)
-      ? item.skills.map(s => s?.name).filter(Boolean).join(' • ')
-      : 'General Services';
-    const rating = Number(item?.rating?.average || 0).toFixed(1);
-    const reviews= item?.rating?.count || 0;
-
+  const renderCategory = ({ item }) => {
+    const icon = CATEGORY_ICONS[item.name] || '🔧';
     return (
-      <TouchableOpacity
-        style={styles.provCard}
-        onPress={() => navigation.navigate('ProviderDetail', {
-          providerId: item?._id,
-          categoryId: selectedCat || null,
-        })}
-        activeOpacity={0.9}
+      <TouchableOpacity 
+        style={styles.catCard} 
+        activeOpacity={0.8}
+        onPress={() => navigation.navigate('ServiceOptions', { category: item })}
       >
-        {/* Avatar */}
-        <View style={styles.provAvatarBox}>
-          <Text style={styles.provAvatarText}>{name[0]?.toUpperCase()}</Text>
-          <View style={[styles.onlineDot, { backgroundColor: item?.isOnline ? COLORS.success : COLORS.textTertiary }]} />
+        <View style={styles.catIconBox}>
+          <Text style={styles.catIconText}>{icon}</Text>
         </View>
-
-        {/* Info */}
-        <View style={styles.provInfo}>
-          <Text style={styles.provName}>{name}</Text>
-          <Text style={styles.provSkills} numberOfLines={1}>{skills}</Text>
-          <View style={styles.provRatingRow}>
-            <Text style={styles.star}>★</Text>
-            <Text style={styles.ratingText}>{rating}</Text>
-            <Text style={styles.reviewText}>({reviews} reviews)</Text>
-          </View>
-        </View>
-
-        {/* Right */}
-        <View style={styles.provRight}>
-          <Text style={styles.provExp}>{item?.experience || 0}</Text>
-          <Text style={styles.provExpLabel}>yrs exp</Text>
-          <View style={styles.bookNowBtn}>
-            <Text style={styles.bookNowText}>View</Text>
-          </View>
-        </View>
+        <Text style={styles.catName} numberOfLines={2}>{item.name}</Text>
       </TouchableOpacity>
     );
   };
 
+  const renderProvider = ({ item }) => {
+    const pName = item.userId?.name || 'Unknown';
+    const rating = item.aggregateRating ? Number(item.aggregateRating).toFixed(1) : 'New';
+    const jobs = item.completedJobs || 0;
+
+    return (
+      <TouchableOpacity 
+        style={styles.providerCard}
+        activeOpacity={0.9}
+        onPress={() => navigation.navigate('ProviderDetail', { providerId: item._id })}
+      >
+        <View style={styles.provHeader}>
+          <View style={styles.provAvatarPlaceholder}>
+            <Text style={{ fontSize: 24 }}>🧑‍🔧</Text>
+          </View>
+          <View style={{ flex: 1, marginLeft: 12 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <Text style={styles.provName}>{pName}</Text>
+              {item.isVerified && <Text style={{ fontSize: 12, marginLeft: 4 }}>✅</Text>}
+            </View>
+            <Text style={styles.provExperience}>{item.experience || 1} yrs exp</Text>
+          </View>
+        </View>
+        
+        <View style={styles.provMetrics}>
+          <View style={styles.metric}>
+            <Text style={styles.metricVal}>⭐ {rating}</Text>
+            <Text style={styles.metricLabel}>Rating</Text>
+          </View>
+          <View style={styles.metricDivider} />
+          <View style={styles.metric}>
+            <Text style={styles.metricVal}>💼 {jobs}</Text>
+            <Text style={styles.metricLabel}>Jobs</Text>
+          </View>
+          <View style={styles.metricDivider} />
+          <View style={styles.metric}>
+            <Text style={styles.metricVal}>{item.isOnline ? '🟢' : '⚪'}</Text>
+            <Text style={styles.metricLabel}>{item.isOnline ? 'Online' : 'Offline'}</Text>
+          </View>
+        </View>
+
+        <TouchableOpacity 
+          style={styles.viewProfileBtn}
+          onPress={() => navigation.navigate('ProviderDetail', { providerId: item._id })}
+        >
+          <Text style={styles.viewProfileTxt}>View Profile</Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+    );
+  };
+
+  const renderPromo = ({ item }) => (
+    <View style={[styles.promoCard, { backgroundColor: item.color }]}>
+      <Text style={styles.promoTitle}>{item.title}</Text>
+      <Text style={styles.promoSubtitle}>{item.subtitle}</Text>
+      <View style={styles.promoCodeBox}>
+        <Text style={styles.promoCodeText}>Use code: {item.code}</Text>
+      </View>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <View style={styles.loader}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
+        <Text style={{ marginTop: 12, color: COLORS.textSecondary }}>Finding services near you...</Text>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Hi, {user?.name?.split(' ')[0] || 'there'} 👋</Text>
-          <Text style={styles.subGreeting}>What do you need help with?</Text>
-        </View>
-        <TouchableOpacity
-          style={styles.profileAvatar}
-          onPress={() => navigation.navigate('Profile')}
-        >
-          <Text style={styles.profileInitial}>{user?.name?.[0]?.toUpperCase() || 'U'}</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Search bar */}
-      <View style={styles.searchBox}>
-        <Text style={styles.searchIcon}>🔍</Text>
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search providers, services..."
-          placeholderTextColor={COLORS.textTertiary}
-          value={searchText}
-          onChangeText={setSearchText}
-        />
-        {searchText.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchText('')}>
-            <Text style={styles.clearSearch}>✕</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <FlatList
-        data={filteredProviders}
-        keyExtractor={item => item._id}
-        renderItem={({ item }) => <ProviderCard item={item} />}
-        onEndReached={() => !provLoading && hasNextPage && coords &&
-          fetchProviders(coords.latitude, coords.longitude, page + 1, selectedCat)
-        }
-        onEndReachedThreshold={0.4}
+      <ScrollView 
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.list}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />
-        }
-        ListFooterComponent={
-          provLoading && providers.length > 0
-            ? <ActivityIndicator color={COLORS.primary} style={{ padding: SPACING.xl }} />
-            : null
-        }
-        ListEmptyComponent={
-          !provLoading
-            ? <View style={styles.empty}>
-                <Text style={styles.emptyIcon}>😕</Text>
-                <Text style={styles.emptyText}>No providers found nearby</Text>
-                <Text style={styles.emptySub}>Try a different category or pull to refresh</Text>
-              </View>
-            : <ActivityIndicator color={COLORS.primary} style={{ marginTop: 60 }} />
-        }
-        ListHeaderComponent={
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
+      >
+        {/* HEADER */}
+        <View style={styles.header}>
           <View>
-            {/* Categories */}
-            <Text style={styles.sectionTitle}>Our Services</Text>
-            {catLoading
-              ? <ActivityIndicator color={COLORS.primary} style={{ margin: SPACING.xl }} />
-              : <FlatList
-                  horizontal
-                  data={categories}
-                  keyExtractor={item => item._id}
-                  renderItem={({ item }) => <CategoryItem item={item} />}
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.catList}
-                />
-            }
-
-            {/* Provider section header */}
-            <View style={styles.provSectionHeader}>
-              <Text style={styles.sectionTitle}>
-                {selectedCat
-                  ? `${categories.find(c => c._id === selectedCat)?.name || ''} Providers`
-                  : 'Nearby Providers'}
-              </Text>
-              {selectedCat && (
-                <TouchableOpacity onPress={handleClearFilter} style={styles.clearFilterBtn}>
-                  <Text style={styles.clearFilterText}>✕ Clear</Text>
-                </TouchableOpacity>
-              )}
-            </View>
+            <Text style={styles.greeting}>Hi, {user?.name?.split(' ')[0] || 'User'} 👋</Text>
+            <Text style={styles.locationTxt}>📍 {coords ? 'Surat, Gujarat' : 'Fetching location...'}</Text>
           </View>
-        }
-      />
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+            <View style={styles.profileAvatar}>
+              <Text style={{ fontSize: 20 }}>👤</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* SEARCH BAR */}
+        <View style={styles.searchContainer}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search for services (e.g. AC Repair)"
+            placeholderTextColor="#9CA3AF"
+            onFocus={() => navigation.navigate('AllProviders')} // or a dedicated search screen
+          />
+        </View>
+
+        {/* PROMO SLIDER */}
+        <View style={styles.section}>
+          <FlatList
+            horizontal
+            data={PROMO_BANNERS}
+            keyExtractor={item => item.id}
+            renderItem={renderPromo}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: SPACING.lg }}
+          />
+        </View>
+
+        {/* CATEGORIES */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>What do you need help with?</Text>
+          <FlatList
+            horizontal
+            data={categories}
+            keyExtractor={item => item._id}
+            renderItem={renderCategory}
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: SPACING.lg }}
+          />
+        </View>
+
+        {/* NEARBY PROVIDERS */}
+        <View style={styles.section}>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>Top Providers Near You</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('AllProviders')}>
+              <Text style={styles.seeAllTxt}>See All</Text>
+            </TouchableOpacity>
+          </View>
+          {providers.length > 0 ? (
+            <FlatList
+              horizontal
+              data={providers}
+              keyExtractor={item => item._id}
+              renderItem={renderProvider}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: SPACING.lg }}
+              snapToInterval={280 + SPACING.md}
+              decelerationRate="fast"
+            />
+          ) : (
+            <Text style={styles.noDataTxt}>No providers found nearby.</Text>
+          )}
+        </View>
+        
+        <View style={{ height: 40 }} />
+      </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.background },
-
+  container: { flex: 1, backgroundColor: '#FFFFFF' },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  
   header: {
-    flexDirection:     'row',
-    justifyContent:    'space-between',
-    alignItems:        'center',
-    paddingHorizontal: SPACING.xl,
-    paddingTop:        SPACING.xl + SPACING.lg,
-    paddingBottom:     SPACING.lg,
-    backgroundColor:   COLORS.white,
-    ...SHADOWS.sm,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: SPACING.lg, paddingTop: Platform.OS === 'ios' ? 60 : SPACING.xxl,
+    paddingBottom: SPACING.md,
   },
-  greeting:      { fontSize: FONT_SIZES.xl, fontWeight: '700', color: COLORS.textPrimary },
-  subGreeting:   { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
-  profileAvatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: COLORS.primary, alignItems: 'center', justifyContent: 'center' },
-  profileInitial:{ color: COLORS.white, fontWeight: '700', fontSize: FONT_SIZES.lg },
+  greeting: { fontSize: 22, fontWeight: '800', color: '#111827' },
+  locationTxt: { fontSize: 13, color: '#6B7280', marginTop: 4, fontWeight: '500' },
+  profileAvatar: { width: 44, height: 44, borderRadius: 22, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
 
-  searchBox: {
-    flexDirection:   'row',
-    alignItems:      'center',
-    backgroundColor: COLORS.white,
-    marginHorizontal: SPACING.xl,
-    marginTop:       SPACING.lg,
-    marginBottom:    SPACING.sm,
-    borderRadius:    BORDER_RADIUS.lg,
-    paddingHorizontal: SPACING.lg,
-    borderWidth:     1,
-    borderColor:     COLORS.border,
-    ...SHADOWS.sm,
-  },
-  searchIcon:  { fontSize: 16, marginRight: SPACING.sm },
-  searchInput: { flex: 1, paddingVertical: SPACING.md, fontSize: FONT_SIZES.md, color: COLORS.textPrimary },
-  clearSearch: { fontSize: 14, color: COLORS.textTertiary, padding: 4 },
-
-  list:         { paddingBottom: SPACING.xxxl },
-  sectionTitle: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary, paddingHorizontal: SPACING.xl, marginTop: SPACING.lg, marginBottom: SPACING.md },
-
-  catList: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.md, gap: SPACING.sm },
-  catItem: {
-    width: 90, alignItems: 'center', padding: SPACING.md,
-    backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg,
-    borderWidth: 1.5, borderColor: COLORS.border, ...SHADOWS.sm,
-  },
-  catItemActive:    { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
-  catIconBox:       { width: 52, height: 52, borderRadius: 26, backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.sm },
-  catIconBoxActive: { backgroundColor: COLORS.white },
-  catEmoji:         { fontSize: 26 },
-  catName:          { fontSize: FONT_SIZES.xs, fontWeight: '600', color: COLORS.textPrimary, textAlign: 'center' },
-  catNameActive:    { color: COLORS.primary },
-  catPrice:         { fontSize: 10, color: COLORS.textTertiary, marginTop: 2 },
-
-  provSectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingRight: SPACING.xl },
-  clearFilterBtn:    { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primaryLight, paddingHorizontal: SPACING.md, paddingVertical: 4, borderRadius: BORDER_RADIUS.round },
-  clearFilterText:   { fontSize: FONT_SIZES.xs, color: COLORS.primary, fontWeight: '600' },
-
-  provCard: {
+  searchContainer: {
     flexDirection: 'row', alignItems: 'center',
-    backgroundColor: COLORS.white,
-    marginHorizontal: SPACING.xl, marginBottom: SPACING.md,
-    borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg,
-    ...SHADOWS.sm,
+    backgroundColor: '#F3F4F6', borderRadius: 12,
+    marginHorizontal: SPACING.lg, paddingHorizontal: 16, paddingVertical: 12,
+    marginBottom: SPACING.lg,
   },
-  provAvatarBox:  { position: 'relative', marginRight: SPACING.md },
-  provAvatarText: { fontSize: FONT_SIZES.xl, fontWeight: '700', color: COLORS.primary },
-  onlineDot:      { position: 'absolute', bottom: -2, right: -2, width: 12, height: 12, borderRadius: 6, borderWidth: 2, borderColor: COLORS.white },
-  provInfo:       { flex: 1 },
-  provName:       { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary },
-  provSkills:     { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2 },
-  provRatingRow:  { flexDirection: 'row', alignItems: 'center', marginTop: 4 },
-  star:           { color: '#F39C12', fontSize: FONT_SIZES.sm },
-  ratingText:     { fontSize: FONT_SIZES.sm, fontWeight: '700', color: COLORS.textPrimary, marginLeft: 3 },
-  reviewText:     { fontSize: FONT_SIZES.xs, color: COLORS.textTertiary, marginLeft: 3 },
+  searchIcon: { fontSize: 18, marginRight: 8 },
+  searchInput: { flex: 1, fontSize: 15, color: '#111827' },
 
-  provRight:     { alignItems: 'center', gap: 2 },
-  provExp:       { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.primary },
-  provExpLabel:  { fontSize: 10, color: COLORS.textTertiary },
-  bookNowBtn:    { backgroundColor: COLORS.primaryLight, paddingHorizontal: SPACING.sm, paddingVertical: 3, borderRadius: BORDER_RADIUS.sm, marginTop: 4 },
-  bookNowText:   { fontSize: 10, color: COLORS.primary, fontWeight: '700' },
+  section: { marginBottom: SPACING.xxl },
+  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.lg, marginBottom: SPACING.md },
+  sectionTitle: { fontSize: 18, fontWeight: '700', color: '#111827', paddingHorizontal: SPACING.lg, marginBottom: SPACING.md },
+  seeAllTxt: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
 
-  empty:    { alignItems: 'center', paddingTop: 60, paddingHorizontal: SPACING.xl },
-  emptyIcon:{ fontSize: 52, marginBottom: SPACING.lg },
-  emptyText:{ fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary },
-  emptySub: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.sm, textAlign: 'center' },
+  promoCard: {
+    width: 280, padding: SPACING.lg, borderRadius: 16, marginRight: SPACING.md,
+    justifyContent: 'space-between', minHeight: 140,
+  },
+  promoTitle: { fontSize: 20, fontWeight: '800', color: '#FFF' },
+  promoSubtitle: { fontSize: 14, color: '#E0E7FF', marginTop: 4 },
+  promoCodeBox: { backgroundColor: 'rgba(255,255,255,0.2)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 8, alignSelf: 'flex-start', marginTop: 16 },
+  promoCodeText: { color: '#FFF', fontWeight: '700', fontSize: 13 },
+
+  catCard: { alignItems: 'center', width: 80, marginRight: SPACING.md },
+  catIconBox: { width: 64, height: 64, borderRadius: 24, backgroundColor: '#EFF6FF', alignItems: 'center', justifyContent: 'center', marginBottom: 8 },
+  catIconText: { fontSize: 32 },
+  catName: { fontSize: 12, fontWeight: '600', color: '#374151', textAlign: 'center' },
+
+  providerCard: {
+    width: 280, backgroundColor: '#FFFFFF', borderRadius: 16, padding: SPACING.lg,
+    marginRight: SPACING.md, borderWidth: 1, borderColor: '#F3F4F6', ...SHADOWS.sm, elevation: 3,
+    marginBottom: 4
+  },
+  provHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
+  provAvatarPlaceholder: { width: 50, height: 50, borderRadius: 25, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
+  provName: { fontSize: 16, fontWeight: '700', color: '#111827' },
+  provExperience: { fontSize: 13, color: '#6B7280', marginTop: 2 },
+
+  provMetrics: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: '#F9FAFB', borderRadius: 12, padding: 12, marginBottom: 16 },
+  metric: { alignItems: 'center', flex: 1 },
+  metricVal: { fontSize: 14, fontWeight: '700', color: '#111827' },
+  metricLabel: { fontSize: 11, color: '#6B7280', marginTop: 2 },
+  metricDivider: { width: 1, height: 24, backgroundColor: '#E5E7EB' },
+
+  viewProfileBtn: { backgroundColor: '#EEF2FF', paddingVertical: 10, borderRadius: 8, alignItems: 'center' },
+  viewProfileTxt: { color: COLORS.primary, fontWeight: '700', fontSize: 14 },
+
+  noDataTxt: { paddingHorizontal: SPACING.lg, color: '#6B7280', fontSize: 14 }
 });
 
 export default HomeScreen;

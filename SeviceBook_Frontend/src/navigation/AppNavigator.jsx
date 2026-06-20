@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
@@ -21,6 +21,14 @@ import MyBookingsScreen    from '../screens/customer/MyBookingsScreen';
 import ProfileScreen       from '../screens/customer/ProfileScreen';
 import NotificationsScreen from '../screens/customer/NotificationsScreen';
 import PaymentScreen       from '../screens/customer/PaymentScreen';
+import ServiceOptionsScreen from '../screens/customer/ServiceOptionsScreen';
+import BookingSummaryScreen from '../screens/customer/BookingSummaryScreen';
+
+import { socketService } from '../services/socket.service';
+import { notificationService } from '../services/notification.service';
+import ChatScreen from '../screens/customer/ChatScreen';
+import AllProvidersScreen from '../screens/customer/AllProvidersScreen';
+import NotificationScreen from '../screens/common/NotificationScreen';
 
 // Provider screens
 import DashboardScreen       from '../screens/provider/DashboardScreen';
@@ -28,6 +36,7 @@ import ProviderProfileScreen from '../screens/provider/ProviderProfileScreen';
 import RequestScreen         from '../screens/provider/RequestsScreen';
 import EarningsScreen        from '../screens/provider/EarningsScreen';
 import ProviderBookingsScreen      from '../screens/provider/ProviderBookingDetailScreen';
+import EditProviderProfileScreen from '../screens/provider/EditProviderProfileScreen';
 
 // Placeholder for unbuilt screens
 const PlaceholderScreen = ({ route }) => (
@@ -97,7 +106,25 @@ const ProviderTabs = () => (
 
 // ── Root Navigator — watches Redux state automatically ────────────────────
 const AppNavigator = () => {
-  const { isLoggedIn, user, isInitialized } = useSelector(s => s.auth);
+  const { isLoggedIn, user, isInitialized, accessToken } = useSelector(s => s.auth);
+
+  useEffect(() => {
+    if (isLoggedIn && accessToken) {
+      socketService.connect(accessToken);
+      
+      // Initialize Firebase notifications
+      notificationService.requestUserPermission().then(granted => {
+        if (granted) notificationService.setupListeners();
+      });
+    } else {
+      socketService.disconnect();
+      notificationService.removeListeners();
+    }
+    return () => {
+      socketService.disconnect();
+      notificationService.removeListeners();
+    };
+  }, [isLoggedIn, accessToken]);
 
   // ── Step 1: Show splash while checking AsyncStorage ──────────────────
   // isInitialized becomes true after loadStoredAuth completes in SplashScreen
@@ -132,6 +159,9 @@ const AppNavigator = () => {
       >
         <Stack.Screen name="ProviderTabs"  component={ProviderTabs} />
         <Stack.Screen name="BookingDetail" component={ProviderBookingsScreen } />
+        <Stack.Screen name="EditProviderProfile" component={EditProviderProfileScreen} />
+        <Stack.Screen name="Chat" component={ChatScreen} />
+        <Stack.Screen name="Notifications" component={NotificationScreen} />
       </Stack.Navigator>
     );
   }
@@ -142,12 +172,17 @@ const AppNavigator = () => {
       screenOptions={{ headerShown: false, animation: 'fade' }}
     >
       <Stack.Screen name="CustomerTabs"   component={CustomerTabs} />
+      <Stack.Screen name="AllProviders"   component={AllProvidersScreen} />
       <Stack.Screen name="ProviderDetail" component={ProviderDetailScreen} />
       <Stack.Screen name="BookingDetail"  component={BookingDetailScreen} />
       <Stack.Screen name="BookingTrack"   component={BookingTrackScreen} />
       <Stack.Screen name="Review"         component={ReviewScreen} />
       <Stack.Screen name="CreateBooking"  component={CreateBookingScreen} />
       <Stack.Screen name="Payment"        component={PaymentScreen} />
+      <Stack.Screen name="ServiceOptions" component={ServiceOptionsScreen} />
+      <Stack.Screen name="BookingSummary" component={BookingSummaryScreen} />
+      <Stack.Screen name="Chat"           component={ChatScreen} />
+      <Stack.Screen name="Notifications"  component={NotificationScreen} />
     </Stack.Navigator>
   );
 };

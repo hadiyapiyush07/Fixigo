@@ -35,12 +35,15 @@ const initSocket = (httpServer) => {
     socket.join(socket.userId);
 
     // Provider sends GPS location every 5-10 seconds while on job
-    socket.on("provider:updateLocation", async ({ longitude, latitude, bookingId }) => {
+    socket.on("provider:updateLocation", async ({ longitude, latitude, heading, speed, bookingId }) => {
       if (socket.userRole !== "provider") return;
-      await updateLocation(socket.userId, longitude, latitude);
+      
+      // We will handle the DB update in the controller or service, but for now we update via service
+      await updateLocation(socket.userId, longitude, latitude, heading, speed);
+      
       if (bookingId) {
         io.to(`booking:${bookingId}`).emit("location:update", {
-          longitude, latitude, timestamp: new Date(),
+          longitude, latitude, heading, speed, timestamp: new Date(),
         });
       }
     });

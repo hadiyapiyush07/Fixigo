@@ -26,7 +26,7 @@ const RegisterScreen = ({ navigation }) => {
       Alert.alert('Registration Failed', error);
       dispatch(clearError());
     }
-  }, [error]);
+  }, [error, dispatch]);
 
   const validate = () => {
     const e = {};

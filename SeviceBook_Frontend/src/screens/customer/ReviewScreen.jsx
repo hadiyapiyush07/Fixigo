@@ -68,7 +68,7 @@ const ReviewScreen = ({ route, navigation }) => {
       Alert.alert(
         '🎉 Thank You!',
         'Your review has been submitted successfully.',
-        [{ text: 'Done', onPress: () => navigation.navigate('MyBookings') }]
+        [{ text: 'Done', onPress: () => navigation.navigate('CustomerTabs', { screen: 'MyBookings' }) }]
       );
     } catch (e) {
       console.log('Review error:', e);
@@ -76,7 +76,7 @@ const ReviewScreen = ({ route, navigation }) => {
       Alert.alert(
         '✅ Review Noted',
         'Thank you for your feedback!',
-        [{ text: 'Done', onPress: () => navigation.navigate('MyBookings') }]
+        [{ text: 'Done', onPress: () => navigation.navigate('CustomerTabs', { screen: 'MyBookings' }) }]
       );
     } finally {
       setLoading(false);
@@ -167,11 +167,11 @@ const ReviewScreen = ({ route, navigation }) => {
           }
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.skipBtn}
-          onPress={() => navigation.navigate('MyBookings')}
-        >
-          <Text style={styles.skipBtnText}>Skip for now</Text>
+        <TouchableOpacity 
+          style={styles.skipBtn} 
+          onPress={() => navigation.navigate('CustomerTabs', { screen: 'MyBookings' })}
+          disabled={loading}
+        >  <Text style={styles.skipBtnText}>Skip for now</Text>
         </TouchableOpacity>
 
         <View style={{ height: SPACING.xxxl }} />

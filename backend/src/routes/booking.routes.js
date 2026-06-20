@@ -4,6 +4,7 @@ const {
   createBooking, getMyBookings, getProviderBookings,
   getBookingById, acceptBooking, rejectBooking,
   updateBookingStatus, cancelBooking,
+  providerCancelBooking, requestRescheduleBooking, respondRescheduleBooking,
 } = require("../controllers/booking.controller");
 const { verifyToken } = require("../middleware/auth.middleware");
 const { requireRole } = require("../middleware/role.middleware");
@@ -14,15 +15,21 @@ router.use(verifyToken); // all booking routes need login
 router.post("/",           requireRole("customer"), createBooking);
 router.get( "/my",         requireRole("customer"), getMyBookings);
 router.put( "/:id/cancel", requireRole("customer"), cancelBooking);
+router.put( "/:id/respond-reschedule", requireRole("customer"), respondRescheduleBooking);
 
 // Provider routes
 router.get( "/provider",    requireRole("provider"), getProviderBookings);
 router.put( "/:id/accept",  requireRole("provider"), acceptBooking);
 router.put( "/:id/reject",  requireRole("provider"), rejectBooking);
 router.put( "/:id/status",  requireRole("provider"), updateBookingStatus);
+router.post("/:id/verify-otp", requireRole("provider"), require("../controllers/booking.controller").verifyOtp);
+router.put( "/:id/provider-cancel", requireRole("provider"), providerCancelBooking);
+router.put( "/:id/request-reschedule", verifyToken, requestRescheduleBooking);
 
-// Both customer and provider
+// Common detail route
 router.get("/:id", getBookingById);
+router.get("/:id/live-location", require("../controllers/booking.controller").getLiveLocation);
+router.post("/:id/review", requireRole("customer"), require("../controllers/booking.controller").submitReview);
 
 module.exports = router;
 

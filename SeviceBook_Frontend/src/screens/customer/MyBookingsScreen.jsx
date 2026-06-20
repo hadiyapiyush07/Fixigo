@@ -32,11 +32,7 @@ const MyBookingsScreen = ({ navigation }) => {
   const [hasNextPage, setHasNextPage] = useState(true);
   const [activeTab,   setActiveTab]   = useState('all');
 
-  useEffect(() => {
-    loadBookings(1, activeTab, true);
-  }, [activeTab]);
-
-  const loadBookings = async (pageNum = 1, status = 'all', reset = false) => {
+  const loadBookings = useCallback(async (pageNum = 1, status = 'all', reset = false) => {
     if (loading && !reset) return;
     if (!reset && !hasNextPage) return;
 
@@ -60,13 +56,17 @@ const MyBookingsScreen = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [loading, hasNextPage]);
+
+  useEffect(() => {
+    loadBookings(1, activeTab, true);
+  }, [activeTab, loadBookings]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadBookings(1, activeTab, true);
     setRefreshing(false);
-  }, [activeTab]);
+  }, [activeTab, loadBookings]);
 
   const handleLoadMore = () => {
     if (!loading && hasNextPage) loadBookings(page + 1, activeTab);

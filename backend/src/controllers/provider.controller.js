@@ -28,7 +28,10 @@ const getProviderById = asyncHandler(async (req, res) => {
 
 // PUT /api/providers/profile
 const updateProviderProfile = asyncHandler(async (req, res) => {
-  const allowed = ["bio", "experience", "skills", "serviceArea"];
+  const allowed = [
+    "name", "profilePhoto", "bio", "experience", "skills", "serviceArea", "aadhaar", "pan", "selfie",
+    "workingRadius", "emergencyContact", "bankDetails", "status", "idProof", "address"
+  ];
   const updateData = {};
   allowed.forEach((key) => {
     if (req.body[key] !== undefined) updateData[key] = req.body[key];
@@ -66,7 +69,21 @@ const updateAvailability = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, result, "Availability updated."));
 });
 
+// GET /api/providers/my-stats
+// Returns live MongoDB stats: total, completed, todayJobs, earnings
+const getMyStats = asyncHandler(async (req, res) => {
+  const stats = await providerService.getProviderStats(req.user._id);
+  res.status(200).json(new ApiResponse(200, stats, "Provider stats fetched."));
+});
+
+// GET /api/providers/my-earnings
+const getMyEarnings = asyncHandler(async (req, res) => {
+  const { timeframe } = req.query; // 'this_week', 'this_month', 'all_time'
+  const earnings = await providerService.getProviderEarnings(req.user._id, timeframe);
+  res.status(200).json(new ApiResponse(200, earnings, "Provider earnings fetched."));
+});
+
 module.exports = {
   getNearbyProviders, getMyProviderProfile, getProviderById,
-  updateProviderProfile, toggleOnlineStatus, updateAvailability,
+  updateProviderProfile, toggleOnlineStatus, updateAvailability, getMyStats, getMyEarnings
 };

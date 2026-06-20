@@ -1,273 +1,230 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Alert, ActivityIndicator,
+  View, Text, StyleSheet, ScrollView, Alert,
+  Linking, ActivityIndicator
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { bookingAPI } from '../../api/booking.api';
-import { StatusBadge } from '../../components/common/StatusBadge';
-import { COLORS, FONT_SIZES, SPACING } from '../../theme/typography';
+import { socketService } from '../../services/socket.service';
 
-const STATUS_FLOW = {
-  confirmed:           { next: 'provider_on_the_way', label: '🚗 I am On The Way',   color: '#3B82F6' },
-  provider_on_the_way: { next: 'in_progress',         label: '🔧 Start Service',      color: '#F59E0B' },
-  in_progress:         { next: 'completed',           label: '✅ Mark as Completed',  color: '#22C55E' },
-};
-
-const Section = ({ title, children }) => (
-  <View style={styles.section}>
-    <Text style={styles.sectionTitle}>{title}</Text>
-    <View style={styles.sectionCard}>{children}</View>
-  </View>
-);
-
-const Row = ({ icon, label, value }) => (
-  <View style={styles.row}>
-    <Text style={styles.rowIcon}>{icon}</Text>
-    <View style={{ flex: 1 }}>
-      <Text style={styles.rowLabel}>{label}</Text>
-      <Text style={styles.rowValue}>{value}</Text>
-    </View>
-  </View>
-);
+import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../../theme/typography';
+import { Card } from '../../components/ui/Card';
+import { PrimaryButton } from '../../components/ui/PrimaryButton';
+import { StatusBadge } from '../../components/ui/StatusBadge';
+import { SectionHeader } from '../../components/ui/SectionHeader';
+import { Avatar } from '../../components/ui/Avatar';
 
 const ProviderBookingDetailScreen = ({ route, navigation }) => {
-  const { booking: initialBooking } = route.params || {};
-  const [booking, setBooking]       = useState(initialBooking);
-  const [loading, setLoading]       = useState(false);
+  const { bookingId } = route.params;
+  const [booking, setBooking] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(false);
 
-  if (!booking) {
+  useFocusEffect(
+    useCallback(() => {
+      const interval = setInterval(() => {
+        fetchBooking(false);
+      }, 5000); // 5s polling for MVP fallback
+
+      return () => clearInterval(interval);
+    }, [bookingId])
+  );
+
+  useEffect(() => {
+    fetchBooking();
+
+    socketService.joinBookingRoom(bookingId);
+    socketService.on('booking:status_update', handleSocketUpdate);
+
+    return () => {
+      socketService.leaveBookingRoom(bookingId);
+      socketService.off('booking:status_update', handleSocketUpdate);
+    };
+  }, [bookingId]);
+
+  const handleSocketUpdate = () => fetchBooking(false);
+
+  const fetchBooking = async (showLoad = true) => {
+    if (showLoad) setLoading(true);
+    try {
+      const res = await bookingAPI.getById(bookingId);
+      setBooking(res.data.data);
+    } catch (error) {
+      console.log('Error fetching booking detail:', error);
+    } finally {
+      if (showLoad) setLoading(false);
+    }
+  };
+
+  const updateStatus = async (newStatus) => {
+    setActionLoading(true);
+    try {
+      await bookingAPI.updateStatus(bookingId, newStatus);
+      await fetchBooking(false);
+    } catch (e) {
+      Alert.alert('Error', e.response?.data?.message || 'Failed to update status');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAction = () => {
+    if (!booking) return;
+    if (booking.status === 'confirmed') updateStatus('provider_on_the_way');
+    else if (booking.status === 'provider_on_the_way') updateStatus('arrived');
+    else if (booking.status === 'arrived') updateStatus('otp_verification'); // Assuming OTP logic happens
+    else if (booking.status === 'otp_verification') updateStatus('in_progress');
+    else if (booking.status === 'in_progress') updateStatus('completed');
+  };
+
+  const getActionText = () => {
+    if (booking.status === 'confirmed') return 'Start Trip';
+    if (booking.status === 'provider_on_the_way') return 'Mark as Arrived';
+    if (booking.status === 'arrived') return 'Enter OTP';
+    if (booking.status === 'otp_verification') return 'Start Service';
+    if (booking.status === 'in_progress') return 'Complete Service';
+    return null;
+  };
+
+  const handleCall = () => {
+    if (booking?.customerId?.phone) Linking.openURL(`tel:${booking.customerId.phone}`);
+  };
+
+  const handleNavigate = () => {
+    if (booking?.location?.coordinates) {
+      const [lng, lat] = booking.location.coordinates;
+      Linking.openURL(`google.navigation:q=${lat},${lng}`);
+    }
+  };
+
+  if (loading) {
     return (
-      <View style={styles.center}>
-        <Text style={styles.emptyText}>Booking not found</Text>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>Go Back</Text>
-        </TouchableOpacity>
+      <View style={[styles.safe, { justifyContent: 'center', alignItems: 'center' }]}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </View>
     );
   }
 
-  const flow = STATUS_FLOW[booking.status];
+  if (!booking) {
+    return (
+      <View style={[styles.safe, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ fontSize: FONT_SIZES.lg, color: COLORS.textSecondary }}>Booking not found</Text>
+      </View>
+    );
+  }
 
-  const handleAccept = async () => {
-    try {
-      setLoading(true);
-      await bookingAPI.accept(booking._id);
-      setBooking(prev => ({ ...prev, status: 'confirmed' }));
-      Alert.alert('✅ Accepted', 'Booking confirmed! Customer has been notified.');
-    } catch (e) {
-      Alert.alert('Error', e.response?.data?.message || 'Could not accept');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleReject = () => {
-    Alert.alert('Reject Booking', 'Are you sure?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Reject', style: 'destructive',
-        onPress: async () => {
-          try {
-            setLoading(true);
-            await bookingAPI.reject(booking._id, 'Not available');
-            setBooking(prev => ({ ...prev, status: 'cancelled' }));
-          } catch (e) {
-            Alert.alert('Error', e.response?.data?.message || 'Could not reject');
-          } finally {
-            setLoading(false);
-          }
-        },
-      },
-    ]);
-  };
-
-  const handleUpdateStatus = () => {
-    if (!flow) return;
-    Alert.alert('Update Status', `Move to "${flow.label.replace(/^[^\w]+/, '')}"?`, [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Confirm',
-        onPress: async () => {
-          try {
-            setLoading(true);
-            await bookingAPI.updateStatus(booking._id, flow.next);
-            setBooking(prev => ({ ...prev, status: flow.next }));
-          } catch (e) {
-            Alert.alert('Error', e.response?.data?.message || 'Could not update');
-          } finally {
-            setLoading(false);
-          }
-        },
-      },
-    ]);
-  };
+  const customerName = booking.customerId?.name || 'Customer';
+  const cPhone = booking.customerId?.phone || '';
+  const serviceName = booking.serviceId?.name || 'Service';
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backIcon}>
-          <Text style={{ fontSize: 22 }}>‹</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Booking Details</Text>
-        <StatusBadge status={booking.status} />
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 100 }}>
-        {/* Service & Amount */}
-        <View style={styles.heroCard}>
-          <Text style={styles.heroService}>{booking.categoryId?.name || 'Service'}</Text>
-          {booking.subService?.name && (
-            <Text style={styles.heroSub}>→ {booking.subService.name}</Text>
-          )}
-          <Text style={styles.heroAmount}>₹{booking.pricing?.totalAmount || 0}</Text>
+    <View style={styles.safe}>
+      <ScrollView contentContainerStyle={styles.scroll}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View>
+            <Text style={styles.bookingId}>ID: {booking._id.slice(-6).toUpperCase()}</Text>
+            <Text style={styles.serviceName}>{serviceName}</Text>
+          </View>
+          <StatusBadge status={booking.status} />
         </View>
 
-        <Section title="📅 Schedule">
-          <Row icon="📅" label="Date"
-            value={new Date(booking.scheduledDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} />
-          <View style={styles.rowDivider} />
-          <Row icon="⏰" label="Time" value={booking.scheduledTime} />
-        </Section>
+        {/* Action Timeline (Simplified for MVP) */}
+        <Card style={styles.timelineCard}>
+          <Text style={styles.timelineTxt}>Service Status: <Text style={{fontWeight: 'bold', color: COLORS.primary}}>{booking.status.replace(/_/g, ' ').toUpperCase()}</Text></Text>
+        </Card>
 
-        <Section title="👤 Customer">
-          <Row icon="👤" label="Name"  value={booking.customerId?.name  || '—'} />
-          <View style={styles.rowDivider} />
-          <Row icon="📱" label="Phone" value={booking.customerId?.phone || '—'} />
-        </Section>
+        {/* Customer Info */}
+        <SectionHeader title="Customer Details" />
+        <Card>
+          <View style={styles.customerRow}>
+            <Avatar name={customerName} size={50} />
+            <View style={styles.customerInfo}>
+              <Text style={styles.customerName}>{customerName}</Text>
+              {cPhone ? <Text style={styles.customerPhone}>{cPhone}</Text> : null}
+            </View>
+          </View>
+          <View style={styles.actionRow}>
+            <PrimaryButton title="Call" variant="secondary" style={styles.actionBtn} onPress={handleCall} />
+            <PrimaryButton title="Navigate" variant="primary" style={styles.actionBtn} onPress={handleNavigate} />
+          </View>
+        </Card>
 
-        <Section title="📍 Location">
-          <Row icon="🏠" label="Address" value={booking.address?.addressLine || '—'} />
-          <View style={styles.rowDivider} />
-          <Row icon="🏙️" label="City"    value={`${booking.address?.city || '—'} - ${booking.address?.pincode || ''}`} />
-        </Section>
+        {/* Address Card */}
+        <SectionHeader title="Service Location" />
+        <Card>
+          <Text style={styles.addressTxt}>{booking.address?.addressLine || 'Address not provided'}</Text>
+          {booking.address?.landmark && <Text style={styles.landmark}>Landmark: {booking.address.landmark}</Text>}
+        </Card>
 
-        {booking.description ? (
-          <Section title="📝 Notes">
-            <Text style={styles.notesText}>{booking.description}</Text>
-          </Section>
-        ) : null}
+        {/* Payment Summary */}
+        <SectionHeader title="Payment Details" />
+        <Card>
+          <View style={styles.payRow}>
+            <Text style={styles.payLabel}>Total Amount</Text>
+            <Text style={styles.payVal}>₹ {booking.totalAmount}</Text>
+          </View>
+          <View style={styles.payRow}>
+            <Text style={styles.payLabel}>Payment Method</Text>
+            <Text style={styles.payVal}>{booking.paymentMethod?.toUpperCase() || 'COD'}</Text>
+          </View>
+          <View style={styles.payRow}>
+            <Text style={styles.payLabel}>Payment Status</Text>
+            <Text style={styles.payVal}>{booking.paymentStatus?.toUpperCase() || 'PENDING'}</Text>
+          </View>
+        </Card>
 
-        <Section title="💰 Payment">
-          <Row icon="💵" label="Base Price"    value={`₹${booking.pricing?.basePrice || 0}`} />
-          <View style={styles.rowDivider} />
-          <Row icon="🏷️" label="Platform Fee"  value={`₹${booking.pricing?.platformFee || 0}`} />
-          <View style={styles.rowDivider} />
-          <Row icon="💳" label="Total Amount"  value={`₹${booking.pricing?.totalAmount || 0}`} />
-        </Section>
+        <View style={{ height: 100 }} />
       </ScrollView>
 
-      {/* Bottom Action */}
-      <View style={styles.bottomBar}>
-        {booking.status === 'pending' && (
-          <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={[styles.rejectBtn, loading && { opacity: 0.6 }]}
-              onPress={handleReject}
-              disabled={loading}
-            >
-              <Text style={styles.rejectText}>✗  Reject</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.acceptBtn, loading && { opacity: 0.6 }]}
-              onPress={handleAccept}
-              disabled={loading}
-            >
-              {loading
-                ? <ActivityIndicator color="#FFF" size="small" />
-                : <Text style={styles.acceptText}>✓  Accept</Text>}
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {flow && (
-          <TouchableOpacity
-            style={[styles.updateBtn, { backgroundColor: flow.color }, loading && { opacity: 0.6 }]}
-            onPress={handleUpdateStatus}
-            disabled={loading}
-          >
-            {loading
-              ? <ActivityIndicator color="#FFF" size="small" />
-              : <Text style={styles.updateText}>{flow.label}</Text>}
-          </TouchableOpacity>
-        )}
-
-        {(booking.status === 'completed' || booking.status === 'cancelled') && (
-          <TouchableOpacity style={styles.doneBtn} onPress={() => navigation.goBack()}>
-            <Text style={styles.doneBtnText}>← Back to Requests</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      {/* Floating Action Button */}
+      {getActionText() && (
+        <View style={styles.bottomBar}>
+          <PrimaryButton 
+            title={getActionText()} 
+            onPress={handleAction} 
+            loading={actionLoading} 
+          />
+        </View>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
-  center:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  safe: { flex: 1, backgroundColor: COLORS.background },
+  scroll: { padding: SPACING.lg },
+  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SPACING.xl },
+  bookingId: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, fontWeight: '600' },
+  serviceName: { fontSize: FONT_SIZES.xxl, fontWeight: '800', color: COLORS.textPrimary, marginTop: 4 },
+  
+  timelineCard: { backgroundColor: COLORS.primaryLight, borderColor: COLORS.primaryLight, padding: SPACING.lg },
+  timelineTxt: { fontSize: FONT_SIZES.md, color: COLORS.textPrimary },
 
-  header: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    paddingHorizontal: SPACING.xl,
-    paddingTop:        SPACING.xl + SPACING.lg,
-    paddingBottom:     SPACING.md,
-    backgroundColor:   '#FFFFFF',
-    gap:               SPACING.md,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 4,
-  },
-  backIcon:    { padding: 4 },
-  headerTitle: { flex: 1, fontSize: FONT_SIZES.xl, fontWeight: '800', color: '#111827' },
+  customerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.lg },
+  customerInfo: { marginLeft: SPACING.md, flex: 1 },
+  customerName: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary },
+  customerPhone: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, marginTop: 4 },
+  
+  actionRow: { flexDirection: 'row', gap: SPACING.md },
+  actionBtn: { flex: 1, paddingVertical: SPACING.sm },
 
-  heroCard: {
-    backgroundColor:  COLORS.primary,
-    margin:           SPACING.xl,
-    borderRadius:     18,
-    padding:          SPACING.xl,
-    alignItems:       'center',
-    shadowColor: COLORS.primary, shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.3, shadowRadius: 16, elevation: 8,
-  },
-  heroService: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: '#FFFFFF' },
-  heroSub:     { fontSize: FONT_SIZES.sm, color: 'rgba(255,255,255,0.8)', marginTop: 4 },
-  heroAmount:  { fontSize: 36, fontWeight: '800', color: '#FFFFFF', marginTop: 10 },
+  addressTxt: { fontSize: FONT_SIZES.md, color: COLORS.textPrimary, lineHeight: 22 },
+  landmark: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.xs },
 
-  section:      { paddingHorizontal: SPACING.xl, marginBottom: SPACING.lg },
-  sectionTitle: { fontSize: FONT_SIZES.sm, fontWeight: '700', color: '#9CA3AF', letterSpacing: 0.5, marginBottom: 8, textTransform: 'uppercase' },
-  sectionCard:  { backgroundColor: '#FFFFFF', borderRadius: 14, padding: SPACING.lg, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 2 },
-
-  row:        { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.md },
-  rowIcon:    { fontSize: 18, marginTop: 2 },
-  rowLabel:   { fontSize: FONT_SIZES.xs, color: '#9CA3AF', fontWeight: '500' },
-  rowValue:   { fontSize: FONT_SIZES.md, color: '#111827', fontWeight: '600', marginTop: 2 },
-  rowDivider: { height: 1, backgroundColor: '#F9FAFB', marginVertical: SPACING.sm },
-  notesText:  { fontSize: FONT_SIZES.md, color: '#374151' },
+  payRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.sm },
+  payLabel: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary },
+  payVal: { fontSize: FONT_SIZES.md, color: COLORS.textPrimary, fontWeight: '700' },
 
   bottomBar: {
-    position:          'absolute',
-    bottom:            0, left: 0, right: 0,
-    backgroundColor:   '#FFFFFF',
-    padding:           SPACING.xl,
-    paddingBottom:     SPACING.xl + 4,
-    borderTopWidth:    1,
-    borderTopColor:    '#E5E7EB',
-    shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 6,
-  },
-  actionRow:  { flexDirection: 'row', gap: SPACING.md },
-  acceptBtn:  { flex: 1, backgroundColor: '#22C55E', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  acceptText: { color: '#FFFFFF', fontWeight: '700', fontSize: FONT_SIZES.md },
-  rejectBtn:  { flex: 1, backgroundColor: '#FEE2E2', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  rejectText: { color: '#EF4444', fontWeight: '700', fontSize: FONT_SIZES.md },
-  updateBtn:  { paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  updateText: { color: '#FFFFFF', fontWeight: '700', fontSize: FONT_SIZES.md },
-  doneBtn:    { backgroundColor: '#F3F4F6', paddingVertical: 14, borderRadius: 12, alignItems: 'center' },
-  doneBtnText:{ color: '#6B7280', fontWeight: '600', fontSize: FONT_SIZES.md },
-
-  emptyText: { fontSize: FONT_SIZES.xl, fontWeight: '700', color: '#111827' },
-  backBtn:   { marginTop: 16, backgroundColor: COLORS.primary, paddingHorizontal: 24, paddingVertical: 12, borderRadius: 12 },
-  backBtnText: { color: '#FFFFFF', fontWeight: '700' },
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    backgroundColor: COLORS.surface,
+    padding: SPACING.lg,
+    borderTopWidth: 1,
+    borderColor: COLORS.border,
+    elevation: 10,
+  }
 });
 
 export default ProviderBookingDetailScreen;
