@@ -50,6 +50,8 @@ const ServiceOptionsScreen = ({ navigation, route }) => {
     const totalBasePrice = selectedOptions.reduce((sum, opt) => sum + opt.price, 0);
     const totalDuration = selectedOptions.reduce((sum, opt) => sum + (opt.duration || 60), 0);
 
+    const convenienceFee = totalBasePrice < 200 ? 29 : 49;
+
     navigation.navigate('CreateBooking', {
       categoryId: category._id,
       categoryName: category.name,
@@ -57,8 +59,8 @@ const ServiceOptionsScreen = ({ navigation, route }) => {
       basePrice: totalBasePrice,
       duration: totalDuration,
       // Default calculations
-      convenienceFee: 50,
-      totalAmount: totalBasePrice + 50
+      convenienceFee,
+      totalAmount: totalBasePrice + convenienceFee
     });
   };
 

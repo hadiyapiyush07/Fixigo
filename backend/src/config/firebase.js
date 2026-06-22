@@ -39,7 +39,19 @@ const sendPushNotification = async (fcmToken, title, body, data = {}) => {
       data: Object.fromEntries(
         Object.entries(data).map(([k, v]) => [k, String(v)])
       ),
-      android: { priority: "high" },
+      android: { 
+        priority: "high",
+        notification: {
+          sound: "default"
+        }
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: "default"
+          }
+        }
+      }
     });
   } catch (error) {
     if (
@@ -65,6 +77,18 @@ const sendMulticast = async (tokens, title, body, data = {}) => {
       data: Object.fromEntries(
         Object.entries(data).map(([k, v]) => [k, String(v)])
       ),
+      android: { 
+        notification: {
+          sound: "default"
+        }
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: "default"
+          }
+        }
+      }
     });
   } catch (error) {
     console.error(`❌ Multicast push failed: ${error.message}`);

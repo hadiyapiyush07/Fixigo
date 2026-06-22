@@ -88,7 +88,11 @@ const ProviderProfileScreen = ({ navigation }) => {
           <View style={styles.divider} />
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Skills</Text>
-            <Text style={styles.infoVal}>{profile?.skills?.length ? profile.skills.join(', ') : 'No skills listed.'}</Text>
+            <Text style={styles.infoVal}>
+              {profile?.skills?.length
+                ? profile.skills.map(s => typeof s === 'object' && s !== null ? (s.name || '') : s).filter(Boolean).join(', ')
+                : 'No skills listed.'}
+            </Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.infoRow}>

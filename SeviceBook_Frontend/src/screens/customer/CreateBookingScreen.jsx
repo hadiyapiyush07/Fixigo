@@ -126,7 +126,7 @@ const CreateBookingScreen = ({ navigation, route }) => {
     }
 
     // Compute prices (No GST)
-    const convenienceFee = 50;
+    const convenienceFee = basePrice < 200 ? 29 : 49;
     const totalAmount = Math.max(0, basePrice + convenienceFee - discount);
 
     navigation.navigate('BookingSummary', {

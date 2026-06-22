@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Alert,
-  Linking, ActivityIndicator
+  Linking, ActivityIndicator, Modal, TextInput
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { bookingAPI } from '../../api/booking.api';
@@ -19,6 +19,22 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [otpModalVisible, setOtpModalVisible] = useState(false);
+  const [otpInput, setOtpInput] = useState('');
+
+  const fetchBooking = useCallback(async (showLoad = true) => {
+    if (showLoad) setLoading(true);
+    try {
+      const res = await bookingAPI.getById(bookingId);
+      setBooking(res.data.data);
+    } catch (error) {
+      console.log('Error fetching booking detail:', error);
+    } finally {
+      if (showLoad) setLoading(false);
+    }
+  }, [bookingId]);
+
+  const handleSocketUpdate = useCallback(() => fetchBooking(false), [fetchBooking]);
 
   useFocusEffect(
     useCallback(() => {
@@ -27,7 +43,7 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
       }, 5000); // 5s polling for MVP fallback
 
       return () => clearInterval(interval);
-    }, [bookingId])
+    }, [fetchBooking])
   );
 
   useEffect(() => {
@@ -40,21 +56,7 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
       socketService.leaveBookingRoom(bookingId);
       socketService.off('booking:status_update', handleSocketUpdate);
     };
-  }, [bookingId]);
-
-  const handleSocketUpdate = () => fetchBooking(false);
-
-  const fetchBooking = async (showLoad = true) => {
-    if (showLoad) setLoading(true);
-    try {
-      const res = await bookingAPI.getById(bookingId);
-      setBooking(res.data.data);
-    } catch (error) {
-      console.log('Error fetching booking detail:', error);
-    } finally {
-      if (showLoad) setLoading(false);
-    }
-  };
+  }, [bookingId, fetchBooking, handleSocketUpdate]);
 
   const updateStatus = async (newStatus) => {
     setActionLoading(true);
@@ -72,9 +74,28 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
     if (!booking) return;
     if (booking.status === 'confirmed') updateStatus('provider_on_the_way');
     else if (booking.status === 'provider_on_the_way') updateStatus('arrived');
-    else if (booking.status === 'arrived') updateStatus('otp_verification'); // Assuming OTP logic happens
-    else if (booking.status === 'otp_verification') updateStatus('in_progress');
-    else if (booking.status === 'in_progress') updateStatus('completed');
+    else if (booking.status === 'arrived') updateStatus('otp_verification');
+    else if (booking.status === 'otp_verification') setOtpModalVisible(true);
+    else if (booking.status === 'in_progress') updateStatus('payment_pending');
+    else if (booking.status === 'payment_pending') updateStatus('completed');
+  };
+
+  const submitOtp = async () => {
+    if (otpInput.length !== 4) {
+      Alert.alert('Error', 'Please enter a valid 4-digit OTP');
+      return;
+    }
+    setActionLoading(true);
+    try {
+      await bookingAPI.updateStatus(bookingId, 'in_progress', otpInput);
+      setOtpModalVisible(false);
+      setOtpInput('');
+      await fetchBooking(false);
+    } catch (e) {
+      Alert.alert('Error', e.response?.data?.message || 'Invalid OTP');
+    } finally {
+      setActionLoading(false);
+    }
   };
 
   const getActionText = () => {
@@ -82,7 +103,8 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
     if (booking.status === 'provider_on_the_way') return 'Mark as Arrived';
     if (booking.status === 'arrived') return 'Enter OTP';
     if (booking.status === 'otp_verification') return 'Start Service';
-    if (booking.status === 'in_progress') return 'Complete Service';
+    if (booking.status === 'in_progress') return 'Finish & Request Payment';
+    if (booking.status === 'payment_pending') return 'Confirm Payment & Complete Job';
     return null;
   };
 
@@ -91,9 +113,13 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
   };
 
   const handleNavigate = () => {
-    if (booking?.location?.coordinates) {
+    if (booking?.location?.coordinates && booking.location.coordinates.length === 2) {
       const [lng, lat] = booking.location.coordinates;
       Linking.openURL(`google.navigation:q=${lat},${lng}`);
+    } else if (booking?.address?.addressLine) {
+      Linking.openURL(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(booking.address.addressLine)}`);
+    } else {
+      Alert.alert('Error', 'Location not available');
     }
   };
 
@@ -162,7 +188,7 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
         <Card>
           <View style={styles.payRow}>
             <Text style={styles.payLabel}>Total Amount</Text>
-            <Text style={styles.payVal}>₹ {booking.totalAmount}</Text>
+            <Text style={styles.payVal}>₹ {booking.pricing?.totalAmount || booking.totalAmount || 0}</Text>
           </View>
           <View style={styles.payRow}>
             <Text style={styles.payLabel}>Payment Method</Text>
@@ -187,6 +213,27 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
           />
         </View>
       )}
+
+      <Modal visible={otpModalVisible} transparent animationType="fade">
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Enter OTP</Text>
+            <Text style={styles.modalSub}>Ask the customer for the 4-digit OTP to start the service.</Text>
+            <TextInput
+              style={styles.otpInput}
+              keyboardType="number-pad"
+              maxLength={4}
+              value={otpInput}
+              onChangeText={setOtpInput}
+              placeholder="0000"
+            />
+            <View style={styles.modalActions}>
+              <PrimaryButton title="Cancel" variant="outline" onPress={() => setOtpModalVisible(false)} style={{ flex: 1, marginRight: SPACING.sm }} />
+              <PrimaryButton title="Verify" onPress={submitOtp} loading={actionLoading} style={{ flex: 1 }} />
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -224,7 +271,13 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderColor: COLORS.border,
     elevation: 10,
-  }
+  },
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: SPACING.lg },
+  modalContent: { backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg, padding: SPACING.xl, width: '100%', maxWidth: 400 },
+  modalTitle: { fontSize: FONT_SIZES.xl, fontWeight: '700', color: COLORS.textPrimary, marginBottom: SPACING.xs },
+  modalSub: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginBottom: SPACING.lg },
+  otpInput: { borderWidth: 1, borderColor: COLORS.border, borderRadius: BORDER_RADIUS.md, padding: SPACING.lg, fontSize: 24, textAlign: 'center', letterSpacing: 8, marginBottom: SPACING.lg },
+  modalActions: { flexDirection: 'row' }
 });
 
 export default ProviderBookingDetailScreen;

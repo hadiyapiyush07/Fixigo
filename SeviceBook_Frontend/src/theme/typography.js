@@ -77,24 +77,24 @@ export const BORDER_RADIUS = {
 
 export const SHADOWS = {
   sm: {
-    shadowColor: COLORS.shadow,
+    shadowColor: 'rgba(29, 38, 59, 0.04)',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOpacity: 1,
+    shadowRadius: 6,
     elevation: 2,
   },
   md: {
-    shadowColor: COLORS.shadow,
+    shadowColor: 'rgba(29, 38, 59, 0.06)',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
+    shadowOpacity: 1,
+    shadowRadius: 12,
     elevation: 4,
   },
   lg: {
-    shadowColor: COLORS.shadow,
+    shadowColor: 'rgba(29, 38, 59, 0.08)',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
+    shadowOpacity: 1,
+    shadowRadius: 20,
     elevation: 8,
   },
 };

@@ -1,8 +1,8 @@
-import React from 'react';
-import { TouchableOpacity, Text, ActivityIndicator, StyleSheet } from 'react-native';
+import React, { useRef } from 'react';
+import { TouchableWithoutFeedback, Animated, Text, ActivityIndicator, StyleSheet } from 'react-native';
 import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES } from '../../theme/typography';
 
-export const PrimaryButton = ({ 
+export const PrimaryButton = React.memo(({ 
   title, 
   onPress, 
   loading = false, 
@@ -11,6 +11,26 @@ export const PrimaryButton = ({
   textStyle,
   variant = 'primary' // primary, secondary, outline, danger
 }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    if (disabled || loading) return;
+    Animated.spring(scale, {
+      toValue: 0.95,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    if (disabled || loading) return;
+    Animated.spring(scale, {
+      toValue: 1,
+      friction: 4,
+      tension: 120,
+      useNativeDriver: true,
+    }).start();
+  };
+
   const getBgColor = () => {
     if (disabled) return COLORS.textDisabled;
     if (variant === 'secondary') return COLORS.secondary;
@@ -30,27 +50,32 @@ export const PrimaryButton = ({
   };
 
   return (
-    <TouchableOpacity
-      style={[
-        styles.btn, 
-        { backgroundColor: getBgColor() }, 
-        getBorder(),
-        style
-      ]}
+    <TouchableWithoutFeedback
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       onPress={onPress}
       disabled={disabled || loading}
-      activeOpacity={0.8}
     >
-      {loading ? (
-        <ActivityIndicator color={getTextColor()} />
-      ) : (
-        <Text style={[styles.txt, { color: getTextColor() }, textStyle]}>
-          {title}
-        </Text>
-      )}
-    </TouchableOpacity>
+      <Animated.View
+        style={[
+          styles.btn, 
+          { backgroundColor: getBgColor() }, 
+          getBorder(),
+          style,
+          { transform: [{ scale }] }
+        ]}
+      >
+        {loading ? (
+          <ActivityIndicator color={getTextColor()} />
+        ) : (
+          <Text style={[styles.txt, { color: getTextColor() }, textStyle]}>
+            {title}
+          </Text>
+        )}
+      </Animated.View>
+    </TouchableWithoutFeedback>
   );
-};
+});
 
 const styles = StyleSheet.create({
   btn: {

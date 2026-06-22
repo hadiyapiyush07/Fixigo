@@ -89,6 +89,9 @@ const notifyNextProvider = async (booking) => {
   });
 
   if (selectedProvider.userId) {
+    const { emitToUser } = require("../socket/socket");
+    emitToUser(selectedProvider.userId._id, "booking:new", { bookingId: String(booking._id) });
+
     await notificationService.sendNotification({
       userId: selectedProvider.userId._id,
       fcmToken: selectedProvider.userId.fcmToken,

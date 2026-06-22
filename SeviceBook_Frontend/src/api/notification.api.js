@@ -1,4 +1,4 @@
-import api from './api';
+import api from './axiosInstance';
 
 export const notificationAPI = {
   getMine: () => api.get('/notifications'),

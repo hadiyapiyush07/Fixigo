@@ -3,11 +3,11 @@ import React from 'react';
 import { View, StyleSheet } from 'react-native';
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 
-export const Card = ({ children, style, shadow = 'sm' }) => (
+export const Card = React.memo(({ children, style, shadow = 'sm' }) => (
   <View style={[styles.card, SHADOWS[shadow], style]}>
     {children}
   </View>
-);
+));
 
 const styles = StyleSheet.create({
   card: {

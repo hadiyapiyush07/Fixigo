@@ -5,9 +5,9 @@ const Notification = require("../models/Notification.model");
 const sendNotification = async ({ userId, fcmToken, title, body, type, data = {} }) => {
   // Always log in MongoDB as a fallback / permanent record
   const notification = await Notification.create({
-    userId,
+    receiver: userId,
     title,
-    body,
+    message: body,
     type,
     data,
   });
@@ -25,6 +25,18 @@ const sendNotification = async ({ userId, fcmToken, title, body, type, data = {}
         click_action: "FLUTTER_NOTIFICATION_CLICK", // for Flutter/RN handling
       },
       token: fcmToken,
+      android: {
+        notification: {
+          sound: "default"
+        }
+      },
+      apns: {
+        payload: {
+          aps: {
+            sound: "default"
+          }
+        }
+      }
     };
 
     const response = await admin.messaging().send(payload);

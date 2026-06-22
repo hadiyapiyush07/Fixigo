@@ -17,6 +17,7 @@ import { Provider } from 'react-redux';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import store from './src/store/index';
 import AppNavigator from './src/navigation/AppNavigator';
+import ErrorBoundary from './src/components/common/ErrorBoundary';
 
 const App = () => {
   return (
@@ -39,7 +40,9 @@ const App = () => {
 
           {/* NavigationContainer — required root for all navigation */}
           <NavigationContainer ref={navigationRef}>
-            <AppNavigator />
+            <ErrorBoundary>
+              <AppNavigator />
+            </ErrorBoundary>
           </NavigationContainer>
 
         </SafeAreaProvider>

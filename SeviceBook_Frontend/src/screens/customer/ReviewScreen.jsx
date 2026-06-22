@@ -58,17 +58,15 @@ const ReviewScreen = ({ route, navigation }) => {
       setLoading(true);
 
       // Submit review to backend
-      await api.post('/reviews', {
-        bookingId,
-        providerId,
+      await api.post(`/bookings/${bookingId}/review`, {
         rating,
-        comment: finalComment || `Rated ${rating} stars`,
+        reviewText: finalComment || `Rated ${rating} stars`,
       });
 
       Alert.alert(
         '🎉 Thank You!',
         'Your review has been submitted successfully.',
-        [{ text: 'Done', onPress: () => navigation.navigate('CustomerTabs', { screen: 'MyBookings' }) }]
+        [{ text: 'Done', onPress: () => navigation.goBack() }]
       );
     } catch (e) {
       console.log('Review error:', e);
@@ -76,7 +74,7 @@ const ReviewScreen = ({ route, navigation }) => {
       Alert.alert(
         '✅ Review Noted',
         'Thank you for your feedback!',
-        [{ text: 'Done', onPress: () => navigation.navigate('CustomerTabs', { screen: 'MyBookings' }) }]
+        [{ text: 'Done', onPress: () => navigation.goBack() }]
       );
     } finally {
       setLoading(false);

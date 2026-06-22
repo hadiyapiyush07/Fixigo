@@ -182,11 +182,11 @@ const BookingTrackScreen = ({ route, navigation }) => {
   };
 
   const handleChat = () => {
-    if (!booking?.providerId?._id) return;
+    if (!booking?.providerId?.userId?._id) return;
     navigation.navigate('Chat', {
       bookingId,
-      receiverId: booking.providerId._id,
-      receiverName: booking.providerId.userId?.name || 'Provider'
+      receiverId: booking.providerId.userId._id,
+      receiverName: booking.providerId.userId.name || 'Provider'
     });
   };
 
