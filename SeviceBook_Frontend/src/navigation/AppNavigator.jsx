@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, Vibration } from 'react-native';
 import { useSelector } from 'react-redux';
+import { showMessage } from 'react-native-flash-message';
 import { COLORS, FONT_SIZES } from '../theme/typography';
 
 // Auth screens
@@ -23,6 +24,8 @@ import MyBookingsScreen    from '../screens/customer/MyBookingsScreen';
 import ProfileScreen       from '../screens/customer/ProfileScreen';
 import NotificationsScreen from '../screens/customer/NotificationsScreen';
 import PaymentScreen       from '../screens/customer/PaymentScreen';
+import SavedAddressesScreen from '../screens/customer/SavedAddressesScreen';
+import EditProfileScreen    from '../screens/customer/EditProfileScreen';
 import ServiceOptionsScreen from '../screens/customer/ServiceOptionsScreen';
 import BookingSummaryScreen from '../screens/customer/BookingSummaryScreen';
 
@@ -37,7 +40,8 @@ import DashboardScreen       from '../screens/provider/DashboardScreen';
 import ProviderProfileScreen from '../screens/provider/ProviderProfileScreen';
 import RequestScreen         from '../screens/provider/RequestsScreen';
 import EarningsScreen        from '../screens/provider/EarningsScreen';
-import ProviderBookingsScreen      from '../screens/provider/ProviderBookingDetailScreen';
+import ProviderBookingDetailScreen from '../screens/provider/ProviderBookingDetailScreen';
+import ProviderBookingsHistoryScreen from '../screens/provider/ProviderBookingsHistoryScreen';
 import EditProviderProfileScreen from '../screens/provider/EditProviderProfileScreen';
 
 // Placeholder for unbuilt screens
@@ -53,11 +57,43 @@ const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
 
 // ── Customer Bottom Tabs ──────────────────────────────────────────────────
-const CustomerTabs = () => (
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      headerShown: false,
-      tabBarStyle: styles.tabBar,
+const CustomerTabs = () => {
+  useEffect(() => {
+    const handleNewMessage = (msg) => {
+      showMessage({
+        message: "New Message",
+        description: `You received a message: ${msg?.message || 'New chat message'}`,
+        type: "success",
+        icon: "success",
+        duration: 3000,
+      });
+      Vibration.vibrate(200);
+    };
+
+    const handleNewNotification = (notif) => {
+      showMessage({
+        message: notif?.title || "New Alert",
+        description: notif?.message || "You have a new notification",
+        type: "info",
+        icon: "info",
+        duration: 4000,
+      });
+      Vibration.vibrate([0, 500, 200, 500]);
+    };
+
+    socketService.on('newMessage', handleNewMessage);
+    socketService.on('notification:new', handleNewNotification);
+    return () => {
+      socketService.off('newMessage', handleNewMessage);
+      socketService.off('notification:new', handleNewNotification);
+    };
+  }, []);
+
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarStyle: styles.tabBar,
       tabBarActiveTintColor:   COLORS.primary,
       tabBarInactiveTintColor: COLORS.textTertiary,
       tabBarLabelStyle: styles.tabLabel,
@@ -77,7 +113,8 @@ const CustomerTabs = () => (
     <Tab.Screen name="Notifications" component={NotificationsScreen} options={{ tabBarLabel: 'Alerts' }} />
     <Tab.Screen name="Profile"       component={ProfileScreen}       options={{ tabBarLabel: 'Profile' }} />
   </Tab.Navigator>
-);
+  );
+};
 
 // ── Provider Bottom Tabs ──────────────────────────────────────────────────
 const ProviderTabs = () => {
@@ -101,15 +138,35 @@ const ProviderTabs = () => {
   useEffect(() => {
     const handleNewBooking = () => {
       fetchCount();
-      Alert.alert('New Request! 🔔', 'You have a new service request waiting for you!');
+      showMessage({
+        message: "New Service Request!",
+        description: "You have a new request waiting for you.",
+        type: "info",
+        icon: "info",
+        duration: 4000,
+      });
       Vibration.vibrate([0, 500, 200, 500]);
+    };
+
+    const handleNewMessage = (msg) => {
+      showMessage({
+        message: "New Message",
+        description: `You received a message: ${msg?.message || 'New chat message'}`,
+        type: "success",
+        icon: "success",
+        duration: 3000,
+      });
+      Vibration.vibrate(200);
     };
     
     socketService.on('booking:new', handleNewBooking);
     socketService.on('booking:status_update', fetchCount);
+    socketService.on('newMessage', handleNewMessage);
+
     return () => {
       socketService.off('booking:new', handleNewBooking);
       socketService.off('booking:status_update', fetchCount);
+      socketService.off('newMessage', handleNewMessage);
     };
   }, []);
 
@@ -124,6 +181,7 @@ const ProviderTabs = () => {
         tabBarIcon: ({ focused }) => {
           const icons = {
             Dashboard:       focused ? '📊' : '📈',
+            Bookings:        focused ? '📋' : '📄',
             Requests:        focused ? '📥' : '📤',
             Earnings:        focused ? '💰' : '💵',
             ProviderProfile: focused ? '👤' : '👥',
@@ -132,7 +190,8 @@ const ProviderTabs = () => {
         },
       })}
     >
-      <Tab.Screen name="Dashboard"       component={DashboardScreen}       options={{ tabBarLabel: 'Dashboard' }} />
+      <Tab.Screen name="Dashboard"       component={DashboardScreen}       options={{ tabBarLabel: 'Home' }} />
+      <Tab.Screen name="Bookings"        component={ProviderBookingsHistoryScreen} options={{ tabBarLabel: 'Jobs' }} />
       <Tab.Screen 
         name="Requests"        
         component={RequestScreen}         
@@ -201,7 +260,7 @@ const AppNavigator = () => {
         screenOptions={{ headerShown: false, animation: 'fade' }}
       >
         <Stack.Screen name="ProviderTabs"  component={ProviderTabs} />
-        <Stack.Screen name="BookingDetail" component={ProviderBookingsScreen } />
+        <Stack.Screen name="BookingDetail" component={ProviderBookingDetailScreen} />
         <Stack.Screen name="EditProviderProfile" component={EditProviderProfileScreen} />
         <Stack.Screen name="Chat" component={ChatScreen} />
         <Stack.Screen name="Notifications" component={NotificationScreen} />
@@ -222,6 +281,8 @@ const AppNavigator = () => {
       <Stack.Screen name="Review"         component={ReviewScreen} />
       <Stack.Screen name="CreateBooking"  component={CreateBookingScreen} />
       <Stack.Screen name="Payment"        component={PaymentScreen} />
+      <Stack.Screen name="SavedAddresses" component={SavedAddressesScreen} />
+      <Stack.Screen name="EditProfile"    component={EditProfileScreen} />
       <Stack.Screen name="ServiceOptions" component={ServiceOptionsScreen} />
       <Stack.Screen name="BookingSummary" component={BookingSummaryScreen} />
       <Stack.Screen name="Chat"           component={ChatScreen} />

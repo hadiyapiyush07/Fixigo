@@ -65,7 +65,7 @@ exports.markAsRead = async (req, res, next) => {
 
 exports.markAllAsRead = async (req, res, next) => {
   try {
-    await Notification.updateMany({ receiver: req.user.id, read: false }, { read: true });
+    await Notification.updateMany({ receiver: req.user.id, read: false }, { $set: { read: true } });
     res.status(200).json({ success: true, data: "All marked as read" });
   } catch (err) {
     next(err);

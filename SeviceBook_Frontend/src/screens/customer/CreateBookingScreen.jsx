@@ -7,7 +7,9 @@ import {
 import Animated, { FadeInUp } from 'react-native-reanimated';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useSelector } from 'react-redux';
+import { useFocusEffect } from '@react-navigation/native';
 import axios from 'axios';
+import { addressAPI } from '../../api/address.api';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 
 const API_URL = 'http://10.87.158.85:5000/api';
@@ -38,6 +40,31 @@ const CreateBookingScreen = ({ navigation, route }) => {
   const [images, setImages] = useState([]); // array of base64/uri
   const [imageUris, setImageUris] = useState([]); // for preview
   const [errors, setErrors] = useState({});
+  const [savedAddresses, setSavedAddresses] = useState([]);
+
+  // Fetch saved addresses
+  const fetchSavedAddresses = React.useCallback(async () => {
+    try {
+      const res = await addressAPI.getAll();
+      if (res.data) {
+        setSavedAddresses(res.data);
+        const def = res.data.find(a => a.isDefault);
+        if (def && !addressLine && !city && !pincode) {
+          setAddressLine(def.addressLine || '');
+          setCity(def.city || 'Surat');
+          setPincode(def.pincode || '');
+        }
+      }
+    } catch (e) {
+      console.log('Error fetching saved addresses:', e);
+    }
+  }, [addressLine, city, pincode]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchSavedAddresses();
+    }, [fetchSavedAddresses])
+  );
 
   const handlePickImage = () => {
     if (imageUris.length >= 3) {
@@ -186,6 +213,29 @@ const CreateBookingScreen = ({ navigation, route }) => {
         {/* Address */}
         <Animated.View entering={FadeInUp.delay(200).springify()} style={styles.section}>
           <Text style={styles.sectionTitle}>📍 Service Address</Text>
+
+          {savedAddresses.length > 0 && (
+            <View style={{ marginBottom: SPACING.lg }}>
+              <Text style={{ fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginBottom: SPACING.sm }}>Use Saved Address</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: SPACING.md }}>
+                {savedAddresses.map(addr => (
+                  <TouchableOpacity
+                    key={addr._id}
+                    style={styles.addressChip}
+                    onPress={() => {
+                      setAddressLine(addr.addressLine || '');
+                      setCity(addr.city || 'Surat');
+                      setPincode(addr.pincode || '');
+                      setErrors(p => ({ ...p, address: null, city: null, pincode: null }));
+                    }}
+                  >
+                    <Text style={{ fontSize: 16 }}>{addr.type === 'Home' ? '🏠' : addr.type === 'Work' ? '🏢' : '📍'}</Text>
+                    <Text style={styles.addressChipText}>{addr.type}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          )}
 
           <Text style={styles.label}>House / Flat / Street *</Text>
           <TextInput
@@ -343,6 +393,9 @@ const styles = StyleSheet.create({
   timeChipActive:     { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
   timeChipText:       { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
   timeChipTextActive: { color: COLORS.primary, fontWeight: '700' },
+
+  addressChip: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#F3F4F6', paddingHorizontal: SPACING.md, paddingVertical: SPACING.sm, borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: '#E5E7EB', gap: 6 },
+  addressChipText: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: '#374151' },
 
   label:      { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textSecondary, marginBottom: 8, marginTop: SPACING.md },
   input:      { backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#EEEEEE', borderRadius: 12, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, fontSize: FONT_SIZES.md, color: COLORS.textPrimary },

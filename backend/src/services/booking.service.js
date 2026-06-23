@@ -301,10 +301,10 @@ const updateBookingStatus = async (bookingId, status, userId, otp) => {
 
   // Inject Notifications based on status
   const notifyMap = {
-    provider_on_the_way: { title: "Provider On The Way", body: "Your provider has started the journey.", type: "provider_on_the_way" },
-    arrived:             { title: "Provider Arrived", body: "Your provider has arrived at your location.", type: "provider_arrived" },
-    in_progress:         { title: "Service Started", body: "Your provider has started working.", type: "service_started" },
-    payment_pending:     { title: "Payment Pending", body: "Service is complete. Please complete the payment.", type: "payment_pending" },
+    // provider_on_the_way: { title: "Provider On The Way", body: "Your provider has started the journey.", type: "provider_on_the_way" },
+    // arrived:             { title: "Provider Arrived", body: "Your provider has arrived at your location.", type: "provider_arrived" },
+    // in_progress:         { title: "Service Started", body: "Your provider has started working.", type: "service_started" },
+    // payment_pending:     { title: "Payment Pending", body: "Service is complete. Please complete the payment.", type: "payment_pending" },
     completed:           { title: "Service Complete", body: "Thank you for using Fixigo!", type: "booking_completed" },
   };
 
@@ -604,14 +604,14 @@ const verifyOtp = async (bookingId, providerUserId, otp) => {
   await Provider.findByIdAndUpdate(provider._id, { status: "busy" });
 
   if (booking.customerId?.fcmToken) {
-    await notificationService.sendNotification({
-      userId: booking.customerId._id,
-      fcmToken: booking.customerId.fcmToken,
-      title: "Service Started!",
-      body: "OTP verified successfully. Your service is now in progress.",
-      type: "service_started",
-      data: { bookingId: String(bookingId), screen: "BookingTrack" }
-    });
+    // await notificationService.sendNotification({
+    //   userId: booking.customerId._id,
+    //   fcmToken: booking.customerId.fcmToken,
+    //   title: "Service Started!",
+    //   body: "OTP verified successfully. Your service is now in progress.",
+    //   type: "service_started",
+    //   data: { bookingId: String(bookingId), screen: "BookingTrack" }
+    // });
   }
 
   // Real-time Socket Emitting

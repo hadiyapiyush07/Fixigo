@@ -39,7 +39,7 @@ const ProviderDetailScreen = ({ navigation, route }) => {
     Alert.alert(
       'Instant Booking',
       'Please select a service category from the Home Screen to book an instant service. Providers are assigned automatically based on proximity!',
-      [{ text: 'Go Home', onPress: () => navigation.navigate('Home') }]
+      [{ text: 'Go Home', onPress: () => navigation.navigate('CustomerTabs', { screen: 'Home' }) }]
     );
   };
 
@@ -60,9 +60,9 @@ const ProviderDetailScreen = ({ navigation, route }) => {
   }
 
   const pName = provider.userId?.name || 'Professional';
-  const rating = provider.aggregateRating ? Number(provider.aggregateRating).toFixed(1) : 'New';
-  const reviewsCount = provider.totalReviews || 0;
-  const jobs = provider.completedJobs || 0;
+  const rating = provider.rating?.average ? Number(provider.rating.average).toFixed(1) : 'New';
+  const reviewsCount = provider.rating?.count || 0;
+  const jobs = provider.completedBookings || 0;
   const skills = Array.isArray(provider.skills) ? provider.skills : [];
 
   return (

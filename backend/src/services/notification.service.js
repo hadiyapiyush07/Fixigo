@@ -12,6 +12,9 @@ const sendNotification = async ({ userId, fcmToken, title, body, type, data = {}
     data,
   });
 
+  const { emitToUser } = require("../socket/socket");
+  emitToUser(userId, 'notification:new', notification);
+
   if (!fcmToken) {
     console.log(`[Notification] No FCM token for user ${userId}. Saved to DB only. Title: "${title}"`);
     return notification;

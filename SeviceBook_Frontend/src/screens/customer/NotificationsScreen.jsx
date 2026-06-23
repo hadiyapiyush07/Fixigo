@@ -2,8 +2,10 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
-  TouchableOpacity,
+  TouchableOpacity, Animated as RNAnimated
 } from 'react-native';
+import Reanimated, { FadeInUp, FadeIn, Layout, SlideOutRight } from 'react-native-reanimated';
+import { Swipeable } from 'react-native-gesture-handler';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 
 const DUMMY_NOTIFICATIONS = [
@@ -13,13 +15,13 @@ const DUMMY_NOTIFICATIONS = [
   { _id: '4', title: 'Booking Cancelled', body: 'Your booking has been cancelled.', type: 'booking_cancelled', isRead: true, createdAt: new Date(Date.now() - 172800000).toISOString() },
 ];
 
-const NOTIF_ICONS = {
-  booking_confirmed:  '✅',
-  booking_completed:  '🎉',
-  booking_cancelled:  '❌',
-  payment_success:    '💳',
-  booking_request:    '📋',
-  system:             '📢',
+const getIconForType = (type) => {
+  if (type === 'booking_confirmed') return { icon: '✅', color: '#10B981', bg: '#D1FAE5' };
+  if (type === 'booking_completed') return { icon: '🎉', color: '#8B5CF6', bg: '#EDE9FE' };
+  if (type === 'booking_cancelled') return { icon: '❌', color: '#EF4444', bg: '#FEE2E2' };
+  if (type === 'payment_success') return { icon: '💳', color: '#3B82F6', bg: '#EFF6FF' };
+  if (type === 'booking_request') return { icon: '📋', color: '#F59E0B', bg: '#FEF3C7' };
+  return { icon: '🔔', color: '#6366F1', bg: '#E0E7FF' };
 };
 
 const getTimeAgo = (dateStr) => {
@@ -32,38 +34,154 @@ const getTimeAgo = (dateStr) => {
   return `${days}d ago`;
 };
 
-const NotificationsScreen = () => {
-  const [notifications, setNotifications] = useState(DUMMY_NOTIFICATIONS);
+import { notificationAPI } from '../../api/notification.api';
+import { socketService } from '../../services/socket.service';
+import { useFocusEffect } from '@react-navigation/native';
 
-  const markAllRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+const NotificationsScreen = () => {
+  const [notifications, setNotifications] = useState([]);
+  const [isLoaded, setIsLoaded] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await notificationAPI.getMine();
+      setNotifications(res.data.data || []);
+    } catch (e) {
+      console.log('Error fetching notifications', e);
+    } finally {
+      setIsLoaded(true);
+      setRefreshing(false);
+    }
   };
 
-  const unreadCount = notifications.filter(n => !n.isRead).length;
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchNotifications();
+      
+      socketService.on('notification:new', fetchNotifications);
+      socketService.on('booking:status_update', fetchNotifications);
 
-  const NotifItem = ({ item }) => (
-    <TouchableOpacity
-      style={[styles.card, !item.isRead && styles.cardUnread]}
-      onPress={() => {
-        setNotifications(prev =>
-          prev.map(n => n._id === item._id ? { ...n, isRead: true } : n)
-        );
-      }}
-      activeOpacity={0.8}
-    >
-      <View style={styles.iconBox}>
-        <Text style={styles.icon}>{NOTIF_ICONS[item.type] || '🔔'}</Text>
-      </View>
-      <View style={styles.content}>
-        <Text style={[styles.title, !item.isRead && styles.titleUnread]}>
-          {item.title}
-        </Text>
-        <Text style={styles.body} numberOfLines={2}>{item.body}</Text>
-        <Text style={styles.time}>{getTimeAgo(item.createdAt)}</Text>
-      </View>
-      {!item.isRead && <View style={styles.dot} />}
-    </TouchableOpacity>
+      return () => {
+        socketService.off('notification:new', fetchNotifications);
+        socketService.off('booking:status_update', fetchNotifications);
+      };
+    }, [])
   );
+
+  const markAllRead = async () => {
+    try {
+      await notificationAPI.markAllRead();
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    } catch (e) {
+      console.log('Error marking all read', e);
+    }
+  };
+
+  const deleteNotification = async (id) => {
+    try {
+      await notificationAPI.delete(id);
+      setNotifications(prev => prev.filter(n => n._id !== id));
+    } catch (e) {
+      console.log('Error deleting notification', e);
+    }
+  };
+
+  const unreadCount = notifications.filter(n => !n.read).length;
+
+  const rowRefs = new Map();
+
+  const renderRightActions = (progress, dragX, id) => {
+    const scale = dragX.interpolate({
+      inputRange: [-80, 0],
+      outputRange: [1, 0.5],
+      extrapolate: 'clamp',
+    });
+    return (
+      <TouchableOpacity 
+        style={styles.deleteAction}
+        onPress={() => deleteNotification(id)}
+      >
+        <RNAnimated.Text style={[styles.deleteActionText, { transform: [{ scale }] }]}>🗑️ Delete</RNAnimated.Text>
+      </TouchableOpacity>
+    );
+  };
+
+  const NotifItem = ({ item, index }) => {
+    const styleInfo = getIconForType(item.type);
+    
+    return (
+      <Reanimated.View 
+        entering={FadeInUp.delay(index * 100).springify()} 
+        layout={Layout.springify()} 
+        exiting={SlideOutRight}
+      >
+        <Swipeable
+          ref={ref => {
+            if (ref && !rowRefs.has(item._id)) {
+              rowRefs.set(item._id, ref);
+            }
+          }}
+          renderRightActions={(progress, dragX) => renderRightActions(progress, dragX, item._id)}
+          onSwipeableWillOpen={() => {
+            [...rowRefs.entries()].forEach(([key, ref]) => {
+              if (key !== item._id && ref) ref.close();
+            });
+          }}
+          friction={2}
+          rightThreshold={40}
+        >
+          <TouchableOpacity
+            style={[styles.card, !item.read && styles.cardUnread]}
+            onPress={async () => {
+              if (!item.read) {
+                try {
+                  await notificationAPI.markRead(item._id);
+                  setNotifications(prev =>
+                    prev.map(n => n._id === item._id ? { ...n, read: true } : n)
+                  );
+                } catch (e) {
+                  console.log('Error marking read', e);
+                }
+              }
+            }}
+            activeOpacity={0.9}
+          >
+            <View style={[styles.iconBox, { backgroundColor: styleInfo.bg }]}>
+              <Text style={styles.icon}>{styleInfo.icon}</Text>
+            </View>
+            <View style={styles.content}>
+              <View style={styles.cardHeader}>
+                <Text style={[styles.title, !item.read && styles.titleUnread]}>
+                  {item.title}
+                </Text>
+                <Text style={styles.time}>{getTimeAgo(item.createdAt)}</Text>
+              </View>
+              <Text style={styles.body} numberOfLines={2}>{item.message || item.body}</Text>
+            </View>
+            {!item.read && <View style={styles.unreadDot} />}
+          </TouchableOpacity>
+        </Swipeable>
+      </Reanimated.View>
+    );
+  };
+
+  if (notifications.length === 0) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Notifications</Text>
+        </View>
+        <Reanimated.View entering={FadeIn.duration(600)} style={styles.emptyContainer}>
+          <View style={styles.emptyIconBox}>
+            <Text style={styles.emptyIcon}>🔕</Text>
+          </View>
+          <Text style={styles.emptyTitle}>All Caught Up!</Text>
+          <Text style={styles.emptySubtitle}>You have no new notifications right now.</Text>
+        </Reanimated.View>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -84,47 +202,52 @@ const NotificationsScreen = () => {
       <FlatList
         data={notifications}
         keyExtractor={item => item._id}
-        renderItem={({ item }) => <NotifItem item={item} />}
+        renderItem={({ item, index }) => <NotifItem item={item} index={index} />}
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
-        ListEmptyComponent={
-          <View style={styles.empty}>
-            <Text style={styles.emptyIcon}>🔔</Text>
-            <Text style={styles.emptyText}>No notifications yet</Text>
-          </View>
-        }
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container:   { flex: 1, backgroundColor: COLORS.background },
-  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.xl, paddingTop: SPACING.xl + SPACING.lg, paddingBottom: SPACING.lg, backgroundColor: COLORS.white, ...SHADOWS.sm },
-  headerTitle: { fontSize: FONT_SIZES.xxl, fontWeight: '800', color: COLORS.textPrimary },
-  unreadText:  { fontSize: FONT_SIZES.sm, color: COLORS.primary, marginTop: 2 },
-  markAllBtn:  { backgroundColor: COLORS.primaryLight, paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs, borderRadius: BORDER_RADIUS.round },
-  markAllText: { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: '600' },
+  container:   { flex: 1, backgroundColor: '#F9FAFB' },
+  header:      { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: SPACING.xl, paddingTop: SPACING.xl + SPACING.lg, paddingBottom: SPACING.lg, backgroundColor: COLORS.white, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
+  headerTitle: { fontSize: FONT_SIZES.xxl, fontWeight: '800', color: '#111827' },
+  unreadText:  { fontSize: FONT_SIZES.sm, color: COLORS.primary, marginTop: 2, fontWeight: '600' },
+  markAllBtn:  { backgroundColor: '#F3E8FD', paddingHorizontal: SPACING.md, paddingVertical: 8, borderRadius: 20 },
+  markAllText: { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: '700' },
 
-  list:        { padding: SPACING.xl, gap: SPACING.sm, paddingBottom: SPACING.xxxl },
+  list:        { padding: SPACING.lg, gap: SPACING.md, paddingBottom: 100 },
 
-  card:        { flexDirection: 'row', backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, alignItems: 'flex-start', ...SHADOWS.sm },
-  cardUnread:  { borderLeftWidth: 3, borderLeftColor: COLORS.primary },
+  card: { 
+    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFFFFF',
+    padding: SPACING.lg, borderRadius: BORDER_RADIUS.lg,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 8, elevation: 2,
+    borderWidth: 1, borderColor: '#F3F4F6'
+  },
+  cardUnread: { backgroundColor: '#F5F3FF', borderColor: '#DDD6FE' },
 
-  iconBox:     { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md, flexShrink: 0 },
-  icon:        { fontSize: 20 },
+  iconBox: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md },
+  icon: { fontSize: 24 },
 
-  content:     { flex: 1 },
-  title:       { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, fontWeight: '500', marginBottom: 2 },
-  titleUnread: { color: COLORS.textPrimary, fontWeight: '700' },
-  body:        { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, lineHeight: 18, marginBottom: 4 },
-  time:        { fontSize: FONT_SIZES.xs, color: COLORS.textTertiary },
+  content: { flex: 1 },
+  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 },
+  title: { fontSize: FONT_SIZES.md, fontWeight: '600', color: '#374151', flex: 1, marginRight: 8 },
+  titleUnread: { fontWeight: '800', color: '#111827' },
+  time: { fontSize: 11, color: '#9CA3AF', fontWeight: '500' },
+  body: { fontSize: 13, color: '#6B7280', lineHeight: 18 },
 
-  dot:         { width: 8, height: 8, borderRadius: 4, backgroundColor: COLORS.primary, marginLeft: SPACING.sm, marginTop: 4 },
+  dot: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.primary, position: 'absolute', top: 20, right: 20 },
 
-  empty:       { alignItems: 'center', paddingTop: 80 },
-  emptyIcon:   { fontSize: 64, marginBottom: SPACING.lg },
-  emptyText:   { fontSize: FONT_SIZES.lg, color: COLORS.textSecondary },
+  deleteAction: { backgroundColor: '#EF4444', justifyContent: 'center', alignItems: 'center', width: 90, borderRadius: BORDER_RADIUS.lg, marginLeft: SPACING.sm, height: '100%' },
+  deleteActionText: { color: '#FFF', fontWeight: '800', fontSize: FONT_SIZES.sm },
+
+  emptyContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: -50 },
+  emptyIconBox: { width: 100, height: 100, borderRadius: 50, backgroundColor: '#F3E8FD', alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.xl },
+  emptyIcon: { fontSize: 48 },
+  emptyTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: '#111827', marginBottom: SPACING.sm },
+  emptySubtitle: { fontSize: FONT_SIZES.md, color: '#6B7280', textAlign: 'center', maxWidth: 250, lineHeight: 22 },
 });
 
 export default NotificationsScreen;

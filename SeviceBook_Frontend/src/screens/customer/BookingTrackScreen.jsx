@@ -12,14 +12,14 @@ import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme
 
 // ── Status display config ─────────────────────────────────────────────────
 const STATUS_INFO = {
-  pending:             { icon: '🔍', title: 'Finding Provider',    message: 'We are searching for the best provider near you...', color: '#B7770D', bg: '#FEF3D7', pulse: true  },
-  accepted:            { icon: '🤝', title: 'Job Accepted!',       message: 'A provider has accepted your booking.',              color: '#10B981', bg: '#E6FBF3', pulse: false },
+  pending:             { icon: '🔍', title: 'Finding Provider',    message: 'We are searching for the best provider near you...', color: '#3B82F6', bg: '#EFF6FF', pulse: true  },
+  accepted:            { icon: '🤝', title: 'Job Accepted!',       message: 'A provider has accepted your booking.',              color: '#3B82F6', bg: '#EFF6FF', pulse: false },
   confirmed:           { icon: '✅', title: 'Provider Confirmed!', message: 'Your provider accepted and will arrive soon.',       color: '#3B82F6', bg: '#EFF6FF', pulse: false },
-  provider_on_the_way: { icon: '🚗', title: 'Provider is Coming!', message: 'Your provider is on the way to your location.',     color: '#6C3483', bg: '#F3E8FD', pulse: false },
+  provider_on_the_way: { icon: '🚗', title: 'Provider is Coming!', message: 'Your provider is on the way to your location.',     color: '#3B82F6', bg: '#EFF6FF', pulse: false },
   arrived:             { icon: '📍', title: 'Provider Arrived',    message: 'Your provider is at your location.',                color: '#3B82F6', bg: '#EFF6FF', pulse: false },
-  otp_verification:    { icon: '🔑', title: 'Share OTP to Begin', message: 'Show the OTP below to your provider to start work.', color: '#8B5CF6', bg: '#F5F3FF', pulse: false },
-  in_progress:         { icon: '🔧', title: 'Work in Progress',   message: 'Your provider is actively working on the service.',  color: '#9A4E0A', bg: '#FEF0E0', pulse: false },
-  payment_pending:     { icon: '💳', title: 'Payment Due',        message: 'Work is complete! Please make the payment.',         color: '#D97706', bg: '#FEF3C7', pulse: false },
+  otp_verification:    { icon: '🔑', title: 'Share OTP to Begin', message: 'Show the OTP below to your provider to start work.', color: '#3B82F6', bg: '#EFF6FF', pulse: false },
+  in_progress:         { icon: '🔧', title: 'Work in Progress',   message: 'Your provider is actively working on the service.',  color: '#3B82F6', bg: '#EFF6FF', pulse: false },
+  payment_pending:     { icon: '💳', title: 'Payment Due',        message: 'Work is complete! Please make the payment.',         color: '#3B82F6', bg: '#EFF6FF', pulse: false },
   completed:           { icon: '🎉', title: 'Service Complete!',  message: 'Service done. We hope you loved the experience!',    color: '#16A34A', bg: '#DCFCE7', pulse: false },
   cancelled:           { icon: '❌', title: 'Booking Cancelled',  message: 'This booking has been cancelled.',                   color: '#EF4444', bg: '#FEF2F2', pulse: false },
   rejected:            { icon: '⚠️', title: 'No Provider Found',  message: 'No providers are available right now. Try again.',   color: '#6B7280', bg: '#F9FAFB', pulse: false },
@@ -76,15 +76,23 @@ const BookingTrackScreen = ({ route, navigation }) => {
     }
   }, [bookingId]);
 
+  const [hasNewMessage, setHasNewMessage] = useState(false);
+
   useFocusEffect(
     useCallback(() => {
-      // Polling Fallback (every 5s)
-      const pollInterval = setInterval(() => {
-        loadBooking(true);
-      }, 5000);
+      loadBooking(true);
+      const iv = setInterval(() => loadBooking(false), 20000);
+      
+      socketService.joinBookingRoom(bookingId);
+      const handleNewMessage = () => setHasNewMessage(true);
+      socketService.on('newMessage', handleNewMessage);
 
-      return () => clearInterval(pollInterval);
-    }, [loadBooking])
+      return () => {
+        clearInterval(iv);
+        socketService.leaveBookingRoom(bookingId);
+        socketService.off('newMessage', handleNewMessage);
+      };
+    }, [bookingId])
   );
 
   // ── Initial load & Socket.IO Real-time setup ─────────────────────────────
@@ -184,6 +192,7 @@ const BookingTrackScreen = ({ route, navigation }) => {
 
   const handleChat = () => {
     if (!booking?.providerId?.userId?._id) return;
+    setHasNewMessage(false);
     navigation.navigate('Chat', {
       bookingId,
       receiverId: booking.providerId.userId._id,
@@ -326,43 +335,45 @@ const BookingTrackScreen = ({ route, navigation }) => {
 
         {/* ── Quick Actions ──────────────────────────────────────────────── */}
         {provider && status !== 'cancelled' && status !== 'completed' && (
-          <View style={{ flexDirection: 'row', gap: 10, marginTop: 15 }}>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 }}>
             <TouchableOpacity 
-              style={{ flex: 1, backgroundColor: '#3B82F6', paddingVertical: 12, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
+              style={{ width: '48%', backgroundColor: '#FFFFFF', paddingVertical: 14, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', borderWidth: 1, borderColor: '#E5E7EB' }}
               onPress={() => Linking.openURL(`tel:${provider.userId?.phone || ''}`)}
             >
-              <Text style={{ fontSize: 16 }}>📞</Text>
-              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>Call</Text>
+              <Text style={{ fontSize: 16, marginRight: 6 }}>📞</Text>
+              <Text style={{ color: '#111827', fontWeight: '600', fontSize: 15 }}>Call Provider</Text>
             </TouchableOpacity>
             <TouchableOpacity 
-              style={{ flex: 1, backgroundColor: '#10B981', paddingVertical: 12, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}
+              style={{ width: '48%', backgroundColor: '#111827', paddingVertical: 14, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}
               onPress={() => handleChat(provider.userId?.phone)}
             >
-              <Text style={{ fontSize: 16 }}>💬</Text>
-              <Text style={{ color: '#fff', fontWeight: '600', fontSize: 15 }}>Chat</Text>
+              <Text style={{ fontSize: 16, marginRight: 6 }}>💬</Text>
+              <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 15 }}>Message</Text>
+              {hasNewMessage && (
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#EF4444', position: 'absolute', top: 12, right: 16 }} />
+              )}
             </TouchableOpacity>
           </View>
         )}
 
-        {/* ── Premium OTP Card ─────────────────────────────────────────────────── */}
+        {/* ── Minimalist OTP Card ─────────────────────────────────────────────────── */}
         {booking.startOtp && (status === 'arrived' || status === 'otp_verification') && (
-          <Reanimated.View entering={FadeInUp.delay(200).springify()} style={[styles.otpCard, { backgroundColor: '#F3E8FD', borderColor: '#9333EA', borderWidth: 2, padding: 28, borderRadius: 20, shadowColor: '#9333EA', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8 }]}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 16 }}>
-              <Text style={{ fontSize: 18 }}>🔑</Text>
-              <Text style={{ fontSize: 13, fontWeight: '800', color: '#6B21A8', letterSpacing: 2 }}>
-                SECRET OTP CODE
+          <Reanimated.View entering={FadeInUp.delay(200).springify()} style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', padding: 24, borderRadius: 16, marginTop: 20 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: '#6B7280', letterSpacing: 1.5, textTransform: 'uppercase' }}>
+                Service Verification OTP
               </Text>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: '#FFF', paddingVertical: 16, paddingHorizontal: 32, borderRadius: 16, borderWidth: 1, borderColor: '#E9D5FF' }}>
-              <Text style={{ fontSize: 52, fontWeight: '900', letterSpacing: 14, color: '#4C1D95' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F9FAFB', paddingVertical: 20, borderRadius: 12, borderWidth: 1, borderColor: '#F3F4F6', borderStyle: 'dashed' }}>
+              <Text style={{ fontSize: 48, fontWeight: '800', letterSpacing: 16, color: '#111827', marginLeft: 16 }}>
                 {booking.startOtp}
               </Text>
-              <TouchableOpacity onPress={handleCopyOtp} style={{ padding: 12, backgroundColor: '#F3E8FD', borderRadius: 12, marginLeft: 8 }}>
-                <Text style={{ fontSize: 24 }}>📋</Text>
+              <TouchableOpacity onPress={handleCopyOtp} style={{ padding: 10, marginLeft: 8 }}>
+                <Text style={{ fontSize: 20, opacity: 0.6 }}>📋</Text>
               </TouchableOpacity>
             </View>
-            <Text style={{ fontSize: 13, color: '#7E22CE', marginTop: 20, textAlign: 'center', fontWeight: '600', lineHeight: 20 }}>
-              Share this code with your provider to officially start the service.
+            <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 16, textAlign: 'center', fontWeight: '500', lineHeight: 18 }}>
+              Please share this code with the provider to begin the service.
             </Text>
           </Reanimated.View>
         )}

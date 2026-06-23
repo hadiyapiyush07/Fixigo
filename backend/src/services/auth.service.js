@@ -72,9 +72,16 @@ const loginUser = async ({ email, phone, password }) => {
 
 // ── Logout ────────────────────────────────────────────────────────────────
 const logoutUser = async (userId) => {
-  await User.findByIdAndUpdate(userId, {
+  const user = await User.findByIdAndUpdate(userId, {
     $unset: { refreshToken: "", fcmToken: "" },
   });
+
+  if (user && user.role === 'provider') {
+    await Provider.findOneAndUpdate(
+      { userId: userId },
+      { isOnline: false }
+    );
+  }
 };
 
 // ── Refresh access token ──────────────────────────────────────────────────

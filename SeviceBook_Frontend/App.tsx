@@ -18,6 +18,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import store from './src/store/index';
 import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/common/ErrorBoundary';
+import FlashMessage from 'react-native-flash-message';
 
 const App = () => {
   return (
@@ -44,7 +45,7 @@ const App = () => {
               <AppNavigator />
             </ErrorBoundary>
           </NavigationContainer>
-
+          <FlashMessage position="top" />
         </SafeAreaProvider>
       </Provider> 
     </GestureHandlerRootView>

@@ -30,7 +30,9 @@ const AllProvidersScreen = ({ navigation, route }) => {
       // Sort explicitly
       data.sort((a, b) => {
         if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
-        return (b.aggregateRating || 0) - (a.aggregateRating || 0);
+        const bRating = b.rating?.average || 0;
+        const aRating = a.rating?.average || 0;
+        return bRating - aRating;
       });
       setProviders(data);
     } catch (e) {
@@ -51,7 +53,7 @@ const AllProvidersScreen = ({ navigation, route }) => {
 
   const renderProvider = ({ item }) => {
     const pName = item.userId?.name || 'Unknown';
-    const rating = item.aggregateRating ? Number(item.aggregateRating).toFixed(1) : 'New';
+    const rating = item.rating?.average ? Number(item.rating.average).toFixed(1) : 'New';
     
     return (
       <TouchableOpacity 
@@ -86,7 +88,7 @@ const AllProvidersScreen = ({ navigation, route }) => {
 
         <View style={styles.metricsBox}>
           <Text style={styles.metric}>⭐ {rating} Rating</Text>
-          <Text style={styles.metric}>💼 {item.completedJobs || 0} Jobs</Text>
+          <Text style={styles.metric}>💼 {item.completedBookings || 0} Jobs</Text>
         </View>
       </TouchableOpacity>
     );
