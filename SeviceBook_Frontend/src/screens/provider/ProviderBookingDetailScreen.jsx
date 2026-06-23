@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, ScrollView, Alert,
   Linking, ActivityIndicator, Modal, TextInput
 } from 'react-native';
+import Reanimated, { FadeInUp } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import { bookingAPI } from '../../api/booking.api';
 import { socketService } from '../../services/socket.service';
@@ -112,6 +113,15 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
     if (booking?.customerId?.phone) Linking.openURL(`tel:${booking.customerId.phone}`);
   };
 
+  const handleChat = () => {
+    if (!booking?.customerId?._id) return;
+    navigation.navigate('Chat', {
+      bookingId,
+      receiverId: booking.customerId._id,
+      receiverName: booking.customerId.name || 'Customer'
+    });
+  };
+
   const handleNavigate = () => {
     if (booking?.location?.coordinates && booking.location.coordinates.length === 2) {
       const [lng, lat] = booking.location.coordinates;
@@ -156,49 +166,58 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
         </View>
 
         {/* Action Timeline (Simplified for MVP) */}
-        <Card style={styles.timelineCard}>
-          <Text style={styles.timelineTxt}>Service Status: <Text style={{fontWeight: 'bold', color: COLORS.primary}}>{booking.status.replace(/_/g, ' ').toUpperCase()}</Text></Text>
-        </Card>
+        <Reanimated.View entering={FadeInUp.delay(100).springify()}>
+          <Card style={styles.timelineCard}>
+            <Text style={styles.timelineTxt}>Service Status: <Text style={{fontWeight: 'bold', color: COLORS.primary}}>{booking.status.replace(/_/g, ' ').toUpperCase()}</Text></Text>
+          </Card>
+        </Reanimated.View>
 
         {/* Customer Info */}
-        <SectionHeader title="Customer Details" />
-        <Card>
-          <View style={styles.customerRow}>
-            <Avatar name={customerName} size={50} />
-            <View style={styles.customerInfo}>
-              <Text style={styles.customerName}>{customerName}</Text>
-              {cPhone ? <Text style={styles.customerPhone}>{cPhone}</Text> : null}
+        <Reanimated.View entering={FadeInUp.delay(200).springify()}>
+          <SectionHeader title="Customer Details" />
+          <Card style={styles.premiumCard}>
+            <View style={styles.customerRow}>
+              <Avatar name={customerName} size={50} />
+              <View style={styles.customerInfo}>
+                <Text style={styles.customerName}>{customerName}</Text>
+                {cPhone ? <Text style={styles.customerPhone}>{cPhone}</Text> : null}
+              </View>
             </View>
-          </View>
-          <View style={styles.actionRow}>
-            <PrimaryButton title="Call" variant="secondary" style={styles.actionBtn} onPress={handleCall} />
-            <PrimaryButton title="Navigate" variant="primary" style={styles.actionBtn} onPress={handleNavigate} />
-          </View>
-        </Card>
+            <View style={styles.actionRow}>
+              <PrimaryButton title="Call" variant="secondary" style={styles.actionBtn} onPress={handleCall} />
+              <PrimaryButton title="Chat" variant="secondary" style={styles.actionBtn} onPress={handleChat} />
+              <PrimaryButton title="Nav" variant="primary" style={styles.actionBtn} onPress={handleNavigate} />
+            </View>
+          </Card>
+        </Reanimated.View>
 
         {/* Address Card */}
-        <SectionHeader title="Service Location" />
-        <Card>
-          <Text style={styles.addressTxt}>{booking.address?.addressLine || 'Address not provided'}</Text>
-          {booking.address?.landmark && <Text style={styles.landmark}>Landmark: {booking.address.landmark}</Text>}
-        </Card>
+        <Reanimated.View entering={FadeInUp.delay(300).springify()}>
+          <SectionHeader title="Service Location" />
+          <Card style={styles.premiumCard}>
+            <Text style={styles.addressTxt}>{booking.address?.addressLine || 'Address not provided'}</Text>
+            {booking.address?.landmark && <Text style={styles.landmark}>Landmark: {booking.address.landmark}</Text>}
+          </Card>
+        </Reanimated.View>
 
         {/* Payment Summary */}
-        <SectionHeader title="Payment Details" />
-        <Card>
-          <View style={styles.payRow}>
-            <Text style={styles.payLabel}>Total Amount</Text>
-            <Text style={styles.payVal}>₹ {booking.pricing?.totalAmount || booking.totalAmount || 0}</Text>
-          </View>
-          <View style={styles.payRow}>
-            <Text style={styles.payLabel}>Payment Method</Text>
-            <Text style={styles.payVal}>{booking.paymentMethod?.toUpperCase() || 'COD'}</Text>
-          </View>
-          <View style={styles.payRow}>
-            <Text style={styles.payLabel}>Payment Status</Text>
-            <Text style={styles.payVal}>{booking.paymentStatus?.toUpperCase() || 'PENDING'}</Text>
-          </View>
-        </Card>
+        <Reanimated.View entering={FadeInUp.delay(400).springify()}>
+          <SectionHeader title="Payment Details" />
+          <Card style={styles.premiumCard}>
+            <View style={styles.payRow}>
+              <Text style={styles.payLabel}>Total Amount</Text>
+              <Text style={styles.payVal}>₹ {booking.pricing?.totalAmount || booking.totalAmount || 0}</Text>
+            </View>
+            <View style={styles.payRow}>
+              <Text style={styles.payLabel}>Payment Method</Text>
+              <Text style={styles.payVal}>{booking.paymentMethod?.toUpperCase() || 'COD'}</Text>
+            </View>
+            <View style={styles.payRow}>
+              <Text style={styles.payLabel}>Payment Status</Text>
+              <Text style={styles.payVal}>{booking.paymentStatus?.toUpperCase() || 'PENDING'}</Text>
+            </View>
+          </Card>
+        </Reanimated.View>
 
         <View style={{ height: 100 }} />
       </ScrollView>
@@ -245,9 +264,10 @@ const styles = StyleSheet.create({
   bookingId: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, fontWeight: '600' },
   serviceName: { fontSize: FONT_SIZES.xxl, fontWeight: '800', color: COLORS.textPrimary, marginTop: 4 },
   
-  timelineCard: { backgroundColor: COLORS.primaryLight, borderColor: COLORS.primaryLight, padding: SPACING.lg },
+  timelineCard: { backgroundColor: COLORS.primaryLight, borderColor: COLORS.primaryLight, padding: SPACING.lg, borderRadius: 16 },
   timelineTxt: { fontSize: FONT_SIZES.md, color: COLORS.textPrimary },
-
+  premiumCard: { borderRadius: 16, padding: SPACING.lg, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2, borderWidth: 0, backgroundColor: COLORS.white },
+  
   customerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.lg },
   customerInfo: { marginLeft: SPACING.md, flex: 1 },
   customerName: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary },

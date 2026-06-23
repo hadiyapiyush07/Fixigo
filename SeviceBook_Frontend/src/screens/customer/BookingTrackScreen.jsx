@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Animated, Linking
+  TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Animated, Linking, Clipboard
 } from 'react-native';
+import Reanimated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import { bookingAPI } from '../../api/booking.api';
 import { socketService } from '../../services/socket.service';
@@ -267,7 +268,8 @@ const BookingTrackScreen = ({ route, navigation }) => {
 
   const handleCopyOtp = () => {
     if (booking?.startOtp) {
-      Alert.alert('Please remember your OTP', 'Copying OTP is currently unsupported on this device.');
+      Clipboard.setString(booking.startOtp.toString());
+      Alert.alert('Copied!', 'OTP has been copied to your clipboard.');
     }
   };
 
@@ -311,13 +313,15 @@ const BookingTrackScreen = ({ route, navigation }) => {
 
         {/* ── Live Tracking Map ────────────────────────────────────────────── */}
         {(status === 'accepted' || status === 'confirmed' || status === 'provider_on_the_way' || status === 'arrived') && (
-          <LiveTrackingMap 
-            providerLocation={providerLocation}
-            customerLocation={{
-              latitude: booking.address?.location?.coordinates[1] || 0,
-              longitude: booking.address?.location?.coordinates[0] || 0,
-            }}
-          />
+          <Reanimated.View entering={FadeInUp.delay(100).springify()}>
+            <LiveTrackingMap 
+              providerLocation={providerLocation}
+              customerLocation={{
+                latitude: booking.address?.location?.coordinates[1] || 0,
+                longitude: booking.address?.location?.coordinates[0] || 0,
+              }}
+            />
+          </Reanimated.View>
         )}
 
         {/* ── Quick Actions ──────────────────────────────────────────────── */}
@@ -340,29 +344,32 @@ const BookingTrackScreen = ({ route, navigation }) => {
           </View>
         )}
 
-        {/* ── OTP Card ─────────────────────────────────────────────────── */}
+        {/* ── Premium OTP Card ─────────────────────────────────────────────────── */}
         {booking.startOtp && (status === 'arrived' || status === 'otp_verification') && (
-          <View style={[styles.otpCard, { backgroundColor: '#F5F3FF', borderColor: '#8B5CF6', borderWidth: 2, padding: 24, borderRadius: 16 }]}>
-            <Text style={{ fontSize: 12, fontWeight: '800', color: '#6D28D9', letterSpacing: 1.5, marginBottom: 16, textAlign: 'center' }}>
-              SHARE THIS OTP WITH YOUR PROVIDER
-            </Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
-              <Text style={{ fontSize: 48, fontWeight: '900', letterSpacing: 12, color: '#4C1D95' }}>
+          <Reanimated.View entering={FadeInUp.delay(200).springify()} style={[styles.otpCard, { backgroundColor: '#F3E8FD', borderColor: '#9333EA', borderWidth: 2, padding: 28, borderRadius: 20, shadowColor: '#9333EA', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.15, shadowRadius: 16, elevation: 8 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 16 }}>
+              <Text style={{ fontSize: 18 }}>🔑</Text>
+              <Text style={{ fontSize: 13, fontWeight: '800', color: '#6B21A8', letterSpacing: 2 }}>
+                SECRET OTP CODE
+              </Text>
+            </View>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 16, backgroundColor: '#FFF', paddingVertical: 16, paddingHorizontal: 32, borderRadius: 16, borderWidth: 1, borderColor: '#E9D5FF' }}>
+              <Text style={{ fontSize: 52, fontWeight: '900', letterSpacing: 14, color: '#4C1D95' }}>
                 {booking.startOtp}
               </Text>
-              <TouchableOpacity onPress={handleCopyOtp} style={{ padding: 8, backgroundColor: '#DDD6FE', borderRadius: 8 }}>
-                <Text style={{ fontSize: 20 }}>📋</Text>
+              <TouchableOpacity onPress={handleCopyOtp} style={{ padding: 12, backgroundColor: '#F3E8FD', borderRadius: 12, marginLeft: 8 }}>
+                <Text style={{ fontSize: 24 }}>📋</Text>
               </TouchableOpacity>
             </View>
-            <Text style={{ fontSize: 12, color: '#7C3AED', marginTop: 16, textAlign: 'center', fontWeight: '500' }}>
-              🔒 Share this OTP only after the provider reaches your location.
+            <Text style={{ fontSize: 13, color: '#7E22CE', marginTop: 20, textAlign: 'center', fontWeight: '600', lineHeight: 20 }}>
+              Share this code with your provider to officially start the service.
             </Text>
-          </View>
+          </Reanimated.View>
         )}
 
         {/* ── Reschedule Request Banner ─────────────────────────────────── */}
         {booking.rescheduleRequest?.status === 'pending' && booking.rescheduleRequest.requestedBy === 'provider' && (
-          <View style={styles.rescheduleCard}>
+          <Reanimated.View entering={FadeInUp.delay(200).springify()} style={styles.rescheduleCard}>
             <Text style={styles.rescheduleTitle}>📅 Reschedule Requested by Provider</Text>
             <Text style={styles.rescheduleBody}>
               Your provider has requested to reschedule to:
@@ -381,12 +388,12 @@ const BookingTrackScreen = ({ route, navigation }) => {
                 <Text style={styles.approveText}>Approve</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </Reanimated.View>
         )}
 
         {/* ── Timeline ─────────────────────────────────────────────────── */}
         {status !== 'cancelled' && status !== 'rejected' && (
-          <View style={styles.section}>
+          <Reanimated.View entering={FadeInUp.delay(300).springify()} style={styles.section}>
             <Text style={styles.sectionTitle}>📍 Booking Progress</Text>
             {TIMELINE_STEPS.map((step, idx) => {
               const isDone    = idx < currentIdx || isCompleted;
@@ -426,12 +433,12 @@ const BookingTrackScreen = ({ route, navigation }) => {
                 </View>
               );
             })}
-          </View>
+          </Reanimated.View>
         )}
 
         {/* ── Provider Card ─────────────────────────────────────────────── */}
         {provider && (
-          <View style={styles.section}>
+          <Reanimated.View entering={FadeInUp.delay(400).springify()} style={styles.section}>
             <Text style={styles.sectionTitle}>👤 Your Provider</Text>
             <View style={styles.providerCard}>
               <View style={styles.providerAvatar}>
@@ -458,12 +465,12 @@ const BookingTrackScreen = ({ route, navigation }) => {
                 </View>
               </View>
             </View>
-          </View>
+          </Reanimated.View>
         )}
 
         {/* ── Services Ordered ──────────────────────────────────────────── */}
         {(booking.subServices?.length > 0 || booking.subService?.name) && (
-          <View style={styles.section}>
+          <Reanimated.View entering={FadeInUp.delay(500).springify()} style={styles.section}>
             <Text style={styles.sectionTitle}>🛠️ Services Ordered</Text>
             {booking.subServices?.length > 0 ? (
               booking.subServices.map((s, i) => (
@@ -501,42 +508,53 @@ const BookingTrackScreen = ({ route, navigation }) => {
                 </View>
               </>
             )}
-          </View>
+          </Reanimated.View>
         )}
 
         {/* ── Booking Info ──────────────────────────────────────────────── */}
-        <View style={styles.section}>
+        <Reanimated.View entering={FadeInUp.delay(600).springify()} style={styles.section}>
           <Text style={styles.sectionTitle}>📋 Booking Info</Text>
           <InfoRow label="Booking ID" value={`#${bookingId?.slice(-8).toUpperCase()}`} />
           <InfoRow label="Category"   value={booking.categoryId?.name || '—'} />
           <InfoRow label="Type"       value="⚡ Instant Booking" />
           <InfoRow label="Address"    value={[booking.address?.addressLine, booking.address?.city, booking.address?.pincode].filter(Boolean).join(', ')} />
-        </View>
+        </Reanimated.View>
+
+        {/* ── Premium Completion / Rate Card ─────────────────────────────── */}
+        {isCompleted && (
+          <Reanimated.View entering={FadeInUp.delay(700).springify()} style={[styles.section, { backgroundColor: canRate ? '#FEFCE8' : '#DCFCE7', borderColor: canRate ? '#FDE047' : '#86EFAC', borderWidth: 2 }]}>
+            <View style={{ alignItems: 'center', paddingVertical: SPACING.lg }}>
+              <Text style={{ fontSize: 64, marginBottom: 12 }}>{canRate ? '🌟' : '🎉'}</Text>
+              <Text style={{ fontSize: FONT_SIZES.xl, fontWeight: '900', color: canRate ? '#A16207' : '#166534', textAlign: 'center', marginBottom: 8 }}>
+                {canRate ? 'Service Completed!' : 'Thank You!'}
+              </Text>
+              <Text style={{ fontSize: FONT_SIZES.md, color: canRate ? '#CA8A04' : '#15803D', textAlign: 'center', marginBottom: 24 }}>
+                {canRate ? 'Please rate your experience to help us improve.' : 'We hope you loved your Fixigo experience.'}
+              </Text>
+              
+              {canRate && (
+                <TouchableOpacity
+                  style={{ backgroundColor: '#EAB308', paddingVertical: 16, paddingHorizontal: 32, borderRadius: 100, shadowColor: '#EAB308', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
+                  onPress={() => navigation.navigate('Review', { bookingId, providerId: booking.providerId?._id })}
+                >
+                  <Text style={{ color: '#FFF', fontSize: FONT_SIZES.lg, fontWeight: '800' }}>⭐ Rate Your Provider</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </Reanimated.View>
+        )}
 
         <View style={{ height: 120 }} />
       </ScrollView>
 
       {/* ── Footer Actions ────────────────────────────────────────────── */}
-      <View style={styles.footer}>
-        {canCancel && (
+      {canCancel && (
+        <View style={styles.footer}>
           <TouchableOpacity style={styles.cancelBtn} onPress={handleCancelBooking}>
             <Text style={styles.cancelBtnText}>✕ Cancel Booking</Text>
           </TouchableOpacity>
-        )}
-        {canRate && (
-          <TouchableOpacity
-            style={styles.rateBtn}
-            onPress={() => navigation.navigate('Review', { bookingId, providerId: booking.providerId?._id })}
-          >
-            <Text style={styles.rateBtnText}>⭐ Rate Your Experience</Text>
-          </TouchableOpacity>
-        )}
-        {isCompleted && !canRate && (
-          <View style={styles.completedBanner}>
-            <Text style={styles.completedBannerText}>✅ Thank you for using Fixigo!</Text>
-          </View>
-        )}
-      </View>
+        </View>
+      )}
     </View>
   );
 };
@@ -606,7 +624,7 @@ const styles = StyleSheet.create({
   approveText:        { color: '#059669', fontWeight: '700', fontSize: FONT_SIZES.sm },
 
   // Section
-  section:      { backgroundColor: '#FFFFFF', borderRadius: BORDER_RADIUS.xl, padding: SPACING.lg, marginHorizontal: SPACING.xl, marginBottom: SPACING.lg, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 2 },
+  section:      { backgroundColor: '#FFFFFF', borderRadius: 16, padding: SPACING.lg, marginHorizontal: SPACING.xl, marginBottom: SPACING.lg, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2 },
   sectionTitle: { fontSize: FONT_SIZES.md, fontWeight: '700', color: '#111827', marginBottom: SPACING.md },
   divider:      { height: 1, backgroundColor: '#F3F4F6', marginVertical: SPACING.md },
 

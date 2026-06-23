@@ -4,6 +4,7 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, SafeAreaView, StatusBar, Platform
 } from 'react-native';
+import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 
 const CATEGORY_EMOJIS = {
@@ -64,14 +65,15 @@ const ServiceOptionsScreen = ({ navigation, route }) => {
     });
   };
 
-  const renderOptionItem = ({ item }) => {
+  const renderOptionItem = ({ item, index }) => {
     const isSelected = selectedOptions.some(opt => opt._id === item._id);
     return (
-      <TouchableOpacity
-        style={[styles.optionCard, isSelected && styles.optionCardActive]}
-        onPress={() => handleSelectOption(item)}
-        activeOpacity={0.9}
-      >
+      <Animated.View entering={FadeInUp.delay(index * 100).springify().damping(12).stiffness(90)}>
+        <TouchableOpacity
+          style={[styles.optionCard, isSelected && styles.optionCardActive]}
+          onPress={() => handleSelectOption(item)}
+          activeOpacity={0.8}
+        >
         <View style={styles.optionInfo}>
           <Text style={styles.optionName}>{item.name}</Text>
           <View style={styles.optionMeta}>
@@ -90,7 +92,8 @@ const ServiceOptionsScreen = ({ navigation, route }) => {
             <Text style={styles.selectText}>+ Add</Text>
           )}
         </View>
-      </TouchableOpacity>
+        </TouchableOpacity>
+      </Animated.View>
     );
   };
 
@@ -143,7 +146,7 @@ const ServiceOptionsScreen = ({ navigation, route }) => {
 
       {/* Bottom Proceed Panel */}
       {selectedOptions.length > 0 && (
-        <View style={styles.bottomPanel}>
+        <Animated.View entering={FadeInDown.springify().damping(15)} style={styles.bottomPanel}>
           <View style={styles.bottomInfo}>
             <Text style={styles.selectedCount}>{selectedOptions.length} Service{selectedOptions.length > 1 ? 's' : ''} Selected</Text>
             <Text style={styles.totalPrice}>₹{totalSelectedPrice} <Text style={styles.feeLabel}>+ fees</Text></Text>
@@ -151,7 +154,7 @@ const ServiceOptionsScreen = ({ navigation, route }) => {
           <TouchableOpacity style={styles.proceedBtn} onPress={handleProceed} activeOpacity={0.85}>
             <Text style={styles.proceedText}>Proceed to Details  →</Text>
           </TouchableOpacity>
-        </View>
+        </Animated.View>
       )}
     </SafeAreaView>
   );
@@ -201,16 +204,21 @@ const styles = StyleSheet.create({
   optionCard: {
     flexDirection: 'row',
     backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: 16,
     padding: SPACING.lg,
     marginBottom: SPACING.md,
     borderWidth: 1.5,
-    borderColor: COLORS.border,
+    borderColor: '#F0F0F0',
     alignItems: 'center',
-    ...SHADOWS.sm
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 12,
+    elevation: 3,
   },
   optionCardActive: {
     borderColor: COLORS.primary,
+    borderWidth: 1.5,
     backgroundColor: COLORS.primaryLight
   },
   optionInfo: { flex: 1, paddingRight: SPACING.md },
@@ -244,8 +252,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.lg,
     flexDirection: 'row',
