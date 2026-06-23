@@ -63,8 +63,10 @@ const ProviderProfileScreen = ({ navigation }) => {
           
           <View style={styles.metricsRow}>
             <View style={styles.metric}>
-              <Text style={styles.metricVal}>⭐ {profile?.aggregateRating ? Number(profile.aggregateRating).toFixed(1) : 'New'}</Text>
-              <Text style={styles.metricLabel}>Rating</Text>
+              <Text style={styles.metricVal}>⭐ {profile?.rating?.average > 0 ? Number(profile.rating.average).toFixed(1) : 'New'}</Text>
+              <Text style={styles.metricLabel}>
+                {profile?.rating?.count > 0 ? `${profile.rating.count} Reviews` : 'Rating'}
+              </Text>
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metric}>
@@ -88,7 +90,11 @@ const ProviderProfileScreen = ({ navigation }) => {
           <View style={styles.divider} />
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>Skills</Text>
-            <Text style={styles.infoVal}>{profile?.skills?.length ? profile.skills.join(', ') : 'No skills listed.'}</Text>
+            <Text style={styles.infoVal}>
+              {profile?.skills?.length
+                ? profile.skills.map(s => typeof s === 'object' && s !== null ? (s.name || '') : s).filter(Boolean).join(', ')
+                : 'No skills listed.'}
+            </Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.infoRow}>

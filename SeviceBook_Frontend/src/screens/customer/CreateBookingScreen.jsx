@@ -4,12 +4,13 @@ import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
   TextInput, Alert, ActivityIndicator, KeyboardAvoidingView, Platform, Image,
 } from 'react-native';
+import Animated, { FadeInUp } from 'react-native-reanimated';
 import { launchImageLibrary } from 'react-native-image-picker';
 import { useSelector } from 'react-redux';
 import axios from 'axios';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 
-const API_URL = 'http://10.0.2.2:5000/api';
+const API_URL = 'http://10.87.158.85:5000/api';
 
 // Instant booking — no date/time selection needed.
 // The backend auto-sets scheduledDate = now, scheduledTime = 'Instant'
@@ -126,7 +127,7 @@ const CreateBookingScreen = ({ navigation, route }) => {
     }
 
     // Compute prices (No GST)
-    const convenienceFee = 50;
+    const convenienceFee = basePrice < 200 ? 29 : 49;
     const totalAmount = Math.max(0, basePrice + convenienceFee - discount);
 
     navigation.navigate('BookingSummary', {
@@ -172,25 +173,24 @@ const CreateBookingScreen = ({ navigation, route }) => {
         showsVerticalScrollIndicator={false}
       >
         {/* Header */}
-        <View style={styles.headerCard}>
+        <Animated.View entering={FadeInUp.delay(100).springify()} style={styles.headerCard}>
           <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
             <Text style={styles.backBtnText}>‹</Text>
           </TouchableOpacity>
           <View style={{ flex: 1 }}>
             <Text style={styles.headerTitle}>Booking Details</Text>
-            <Text style={styles.headerSub}>{categoryName} - {subService?.name || 'General'}</Text>
+            <Text style={styles.headerSub}>{categoryName} • {subService?.name || 'General'}</Text>
           </View>
-          <Text style={styles.headerIcon}>📋</Text>
-        </View>
+        </Animated.View>
 
         {/* Address */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📍 Service Address *</Text>
+        <Animated.View entering={FadeInUp.delay(200).springify()} style={styles.section}>
+          <Text style={styles.sectionTitle}>📍 Service Address</Text>
 
           <Text style={styles.label}>House / Flat / Street *</Text>
           <TextInput
             style={[styles.input, errors.address && styles.inputError]}
-            placeholder="e.g. B-204, Sunrise Apartment, Near City Mall"
+            placeholder="e.g. B-204, Sunrise Apartment..."
             placeholderTextColor={COLORS.textTertiary}
             value={addressLine}
             onChangeText={v => { setAddressLine(v); if (errors.address) setErrors(p => ({ ...p, address: null })); }}
@@ -226,12 +226,12 @@ const CreateBookingScreen = ({ navigation, route }) => {
               {errors.pincode && <Text style={styles.errorText}>{errors.pincode}</Text>}
             </View>
           </View>
-        </View>
+        </Animated.View>
 
         {/* Optional Images */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📸 Upload Reference Images (Optional)</Text>
-          <Text style={styles.subtext}>Add up to 3 photos of the issue to help the provider:</Text>
+        <Animated.View entering={FadeInUp.delay(300).springify()} style={styles.section}>
+          <Text style={styles.sectionTitle}>📸 Reference Photos</Text>
+          <Text style={styles.subtext}>Add up to 3 photos of the issue</Text>
           
           <View style={styles.imagePickerRow}>
             {imageUris.map((uri, idx) => (
@@ -243,21 +243,21 @@ const CreateBookingScreen = ({ navigation, route }) => {
               </View>
             ))}
             {imageUris.length < 3 && (
-              <TouchableOpacity style={styles.pickerBtn} onPress={handlePickImage}>
-                <Text style={{ fontSize: 28, color: COLORS.textTertiary }}>+</Text>
-                <Text style={styles.pickerLabel}>Upload</Text>
+              <TouchableOpacity style={styles.pickerBtn} onPress={handlePickImage} activeOpacity={0.8}>
+                <Text style={{ fontSize: 24, color: COLORS.primary }}>+</Text>
+                <Text style={styles.pickerLabel}>Add</Text>
               </TouchableOpacity>
             )}
           </View>
-        </View>
+        </Animated.View>
 
         {/* Coupon Code */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🏷 Coupon Code (Optional)</Text>
+        <Animated.View entering={FadeInUp.delay(400).springify()} style={styles.section}>
+          <Text style={styles.sectionTitle}>🏷 Promo Code</Text>
           <View style={styles.couponRow}>
             <TextInput
               style={[styles.input, { flex: 1, marginTop: 0 }]}
-              placeholder="e.g. FIXIGO50, WELCOME100"
+              placeholder="e.g. FIXIGO50"
               placeholderTextColor={COLORS.textTertiary}
               value={couponCode}
               onChangeText={setCouponCode}
@@ -274,7 +274,7 @@ const CreateBookingScreen = ({ navigation, route }) => {
           {couponApplied && (
             <Text style={styles.appliedText}>✓ Coupon applied! Saved ₹{discount}</Text>
           )}
-        </View>
+        </Animated.View>
 
         {/* Notes */}
         <View style={styles.section}>
@@ -312,19 +312,22 @@ const styles = StyleSheet.create({
     flexDirection:   'row',
     alignItems:      'center',
     gap:             SPACING.md,
-    backgroundColor: COLORS.primary,
-    borderRadius:    BORDER_RADIUS.xl,
+    backgroundColor: COLORS.white,
+    borderRadius:    16,
     padding:         SPACING.xl,
     marginBottom:    SPACING.xl,
-    ...SHADOWS.md,
+    shadowColor:     '#000',
+    shadowOffset:    { width: 0, height: 4 },
+    shadowOpacity:   0.05,
+    shadowRadius:    12,
+    elevation:       2,
   },
-  backBtn:     { width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
-  backBtnText: { fontSize: 24, color: COLORS.white, fontWeight: '300', lineHeight: 26 },
-  headerTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.white },
-  headerSub:   { fontSize: FONT_SIZES.sm, color: 'rgba(255,255,255,0.8)', marginTop: 2 },
-  headerIcon:  { fontSize: 36 },
+  backBtn:     { width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F7FA', alignItems: 'center', justifyContent: 'center' },
+  backBtnText: { fontSize: 24, color: COLORS.textPrimary, fontWeight: '300', lineHeight: 26 },
+  headerTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.textPrimary },
+  headerSub:   { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
 
-  section:      { backgroundColor: COLORS.white, borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, marginBottom: SPACING.lg, ...SHADOWS.sm },
+  section:      { backgroundColor: COLORS.white, borderRadius: 16, padding: SPACING.xl, marginBottom: SPACING.lg, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.03, shadowRadius: 10, elevation: 2 },
   sectionTitle: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary, marginBottom: SPACING.md },
   subtext:      { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginBottom: SPACING.md },
 
@@ -341,17 +344,17 @@ const styles = StyleSheet.create({
   timeChipText:       { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
   timeChipTextActive: { color: COLORS.primary, fontWeight: '700' },
 
-  label:      { fontSize: FONT_SIZES.sm, fontWeight: '500', color: COLORS.textSecondary, marginBottom: 6, marginTop: SPACING.md },
-  input:      { backgroundColor: COLORS.background, borderWidth: 1, borderColor: COLORS.border, borderRadius: BORDER_RADIUS.md, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, fontSize: FONT_SIZES.md, color: COLORS.textPrimary },
-  inputError: { borderColor: COLORS.error },
+  label:      { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textSecondary, marginBottom: 8, marginTop: SPACING.md },
+  input:      { backgroundColor: '#FAFAFA', borderWidth: 1, borderColor: '#EEEEEE', borderRadius: 12, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, fontSize: FONT_SIZES.md, color: COLORS.textPrimary },
+  inputError: { borderColor: COLORS.error, backgroundColor: '#FFF5F5' },
   rowInputs:  { flexDirection: 'row' },
   errorText:  { fontSize: FONT_SIZES.xs, color: COLORS.error, marginTop: 4 },
 
   imagePickerRow: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.md },
-  pickerBtn: { width: 75, height: 75, borderRadius: BORDER_RADIUS.md, borderWidth: 1, borderColor: COLORS.border, borderStyle: 'dashed', backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center' },
-  pickerLabel: { fontSize: 10, color: COLORS.textSecondary, fontWeight: '500' },
+  pickerBtn: { width: 75, height: 75, borderRadius: 16, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center' },
+  pickerLabel: { fontSize: 10, color: COLORS.primary, fontWeight: '600', marginTop: 4 },
   thumbWrapper: { position: 'relative', width: 75, height: 75 },
-  thumbnail: { width: '100%', height: '100%', borderRadius: BORDER_RADIUS.md },
+  thumbnail: { width: '100%', height: '100%', borderRadius: 16 },
   removeBtn: { position: 'absolute', top: -6, right: -6, width: 20, height: 20, borderRadius: 10, backgroundColor: COLORS.error, alignItems: 'center', justifyContent: 'center' },
   removeBtnText: { color: COLORS.white, fontSize: 10, fontWeight: '700' },
 

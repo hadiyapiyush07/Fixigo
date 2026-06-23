@@ -1,7 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
+import { bookingAPI } from '../api/booking.api';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Alert, Vibration } from 'react-native';
 import { useSelector } from 'react-redux';
 import { COLORS, FONT_SIZES } from '../theme/typography';
 
@@ -78,31 +80,72 @@ const CustomerTabs = () => (
 );
 
 // ── Provider Bottom Tabs ──────────────────────────────────────────────────
-const ProviderTabs = () => (
-  <Tab.Navigator
-    screenOptions={({ route }) => ({
-      headerShown: false,
-      tabBarStyle: styles.tabBar,
-      tabBarActiveTintColor:   COLORS.primary,
-      tabBarInactiveTintColor: COLORS.textTertiary,
-      tabBarLabelStyle: styles.tabLabel,
-      tabBarIcon: ({ focused }) => {
-        const icons = {
-          Dashboard:       focused ? '📊' : '📈',
-          Requests:        focused ? '📥' : '📤',
-          Earnings:        focused ? '💰' : '💵',
-          ProviderProfile: focused ? '👤' : '👥',
-        };
-        return <Text style={{ fontSize: 22 }}>{icons[route.name] || '📱'}</Text>;
-      },
-    })}
-  >
-    <Tab.Screen name="Dashboard"       component={DashboardScreen}       options={{ tabBarLabel: 'Dashboard' }} />
-    <Tab.Screen name="Requests"        component={RequestScreen}         options={{ tabBarLabel: 'Requests' }} />
-    <Tab.Screen name="Earnings"        component={EarningsScreen}        options={{ tabBarLabel: 'Earnings' }} />
-    <Tab.Screen name="ProviderProfile" component={ProviderProfileScreen} options={{ tabBarLabel: 'Profile' }} />
-  </Tab.Navigator>
-);
+const ProviderTabs = () => {
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const fetchCount = async () => {
+    try {
+      const res = await bookingAPI.getProviderBookings({ status: 'pending', page: 1, limit: 1 });
+      setPendingCount(res.data.data?.pagination?.total || 0);
+    } catch (e) {}
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchCount();
+      const interval = setInterval(fetchCount, 15000);
+      return () => clearInterval(interval);
+    }, [])
+  );
+
+  useEffect(() => {
+    const handleNewBooking = () => {
+      fetchCount();
+      Alert.alert('New Request! 🔔', 'You have a new service request waiting for you!');
+      Vibration.vibrate([0, 500, 200, 500]);
+    };
+    
+    socketService.on('booking:new', handleNewBooking);
+    socketService.on('booking:status_update', fetchCount);
+    return () => {
+      socketService.off('booking:new', handleNewBooking);
+      socketService.off('booking:status_update', fetchCount);
+    };
+  }, []);
+
+  return (
+    <Tab.Navigator
+      screenOptions={({ route }) => ({
+        headerShown: false,
+        tabBarStyle: styles.tabBar,
+        tabBarActiveTintColor:   COLORS.primary,
+        tabBarInactiveTintColor: COLORS.textTertiary,
+        tabBarLabelStyle: styles.tabLabel,
+        tabBarIcon: ({ focused }) => {
+          const icons = {
+            Dashboard:       focused ? '📊' : '📈',
+            Requests:        focused ? '📥' : '📤',
+            Earnings:        focused ? '💰' : '💵',
+            ProviderProfile: focused ? '👤' : '👥',
+          };
+          return <Text style={{ fontSize: 22 }}>{icons[route.name] || '📱'}</Text>;
+        },
+      })}
+    >
+      <Tab.Screen name="Dashboard"       component={DashboardScreen}       options={{ tabBarLabel: 'Dashboard' }} />
+      <Tab.Screen 
+        name="Requests"        
+        component={RequestScreen}         
+        options={{ 
+          tabBarLabel: 'Requests',
+          tabBarBadge: pendingCount > 0 ? pendingCount : undefined 
+        }} 
+      />
+      <Tab.Screen name="Earnings"        component={EarningsScreen}        options={{ tabBarLabel: 'Earnings' }} />
+      <Tab.Screen name="ProviderProfile" component={ProviderProfileScreen} options={{ tabBarLabel: 'Profile' }} />
+    </Tab.Navigator>
+  );
+};
 
 // ── Root Navigator — watches Redux state automatically ────────────────────
 const AppNavigator = () => {

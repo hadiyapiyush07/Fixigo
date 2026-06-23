@@ -18,11 +18,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Your phone and PC MUST be on the same WiFi network!
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-// const BASE_URL = 'http://10.0.2.2:5000/api'; // emulator
-// const BASE_URL = 'http://localhost:5000/api'; 
-// const BASE_URL = 'http://172.17.2.85:5000/api'; // real phone — change WiFi to your PC's IP address
-
-const BASE_URL = 'http://10.207.112.85:5000/api';
+// localhost works on both emulator and physical phone via `adb reverse tcp:5000 tcp:5000`
+// For WiFi (no USB), use your PC's local IP: e.g. 'http://192.168.1.105:5000/api'
+const BASE_URL = 'http://10.87.158.85:5000/api';
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,

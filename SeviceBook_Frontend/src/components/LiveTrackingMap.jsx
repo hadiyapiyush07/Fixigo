@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, Dimensions, Platform } from 'react-native';
+import { View, StyleSheet, Dimensions, Platform, Text } from 'react-native';
 import MapView, { Marker, Polyline, AnimatedRegion } from 'react-native-maps';
 import axios from 'axios';
 

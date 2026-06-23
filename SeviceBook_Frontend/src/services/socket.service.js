@@ -1,9 +1,10 @@
 // src/services/socket.service.js
 import { io } from 'socket.io-client';
-import Config from 'react-native-config';
 
-// Ensure you define SOCKET_URL in your .env file or fallback
-const SOCKET_URL = Config.API_URL ? Config.API_URL.replace('/api', '') : 'http://10.0.2.2:5000';
+// localhost works on both:
+//   - Physical phone: via `adb reverse tcp:5000 tcp:5000`
+//   - Emulator: via `adb reverse tcp:5000 tcp:5000`
+const SOCKET_URL = 'http://10.87.158.85:5000';
 
 class SocketService {
   constructor() {
@@ -20,10 +21,11 @@ class SocketService {
 
     this.socket = io(SOCKET_URL, {
       auth: { token: `Bearer ${token}` },
-      transports: ['websocket'],
+      transports: ['polling', 'websocket'], // polling first for adb-reverse compatibility
       reconnection: true,
       reconnectionAttempts: Infinity,
-      reconnectionDelay: 1000,
+      reconnectionDelay: 2000,
+      timeout: 10000,
     });
 
     this.socket.on('connect', () => {

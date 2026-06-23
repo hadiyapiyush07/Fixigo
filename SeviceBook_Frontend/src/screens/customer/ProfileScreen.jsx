@@ -62,23 +62,23 @@ const ProfileScreen = ({ navigation }) => {
             variant="outline" 
             style={styles.editBtn} 
             textStyle={{ fontSize: FONT_SIZES.sm }}
-            onPress={() => navigation.navigate('EditProfile')} // Optional Screen if exists
+            onPress={() => Alert.alert('Coming Soon', 'Profile editing will be available soon!')}
           />
         </Card>
 
         {/* Account Settings */}
         <Text style={styles.sectionTitle}>Account Settings</Text>
         <Card noPadding>
-          {renderMenuItem('📍', 'Saved Addresses', () => navigation.navigate('SavedAddresses'))}
-          {renderMenuItem('🏷️', 'My Coupons', () => navigation.navigate('MyCoupons'))}
-          {renderMenuItem('💳', 'Payment Methods', () => {})}
+          {renderMenuItem('📍', 'Saved Addresses', () => Alert.alert('Coming Soon', 'Saved addresses will be available soon!'))}
+          {renderMenuItem('🏷️', 'My Coupons', () => Alert.alert('Coming Soon', 'Coupons will be available soon!'))}
+          {renderMenuItem('💳', 'Payment Methods', () => Alert.alert('Coming Soon', 'Payment methods will be available soon!'))}
           {renderMenuItem('🔔', 'Notifications', () => navigation.navigate('Notifications'), false)}
         </Card>
 
         {/* Support & Legal */}
         <Text style={styles.sectionTitle}>Support & Legal</Text>
         <Card noPadding>
-          {renderMenuItem('🎧', 'Help & Support', () => navigation.navigate('Support'))}
+          {renderMenuItem('🎧', 'Help & Support', () => Alert.alert('Support', 'For help, contact us at support@fixigo.in'))}
           {renderMenuItem('🔒', 'Privacy Policy', () => {})}
           {renderMenuItem('📄', 'Terms & Conditions', () => {})}
           {renderMenuItem('⭐', 'Rate Fixigo', () => {}, false)}

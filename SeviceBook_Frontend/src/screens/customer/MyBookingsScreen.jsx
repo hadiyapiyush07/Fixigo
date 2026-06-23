@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  RefreshControl, ActivityIndicator,
+  RefreshControl, ActivityIndicator, Platform
 } from 'react-native';
 import { bookingAPI } from '../../api/booking.api';
 import { StatusBadge } from '../../components/common/StatusBadge';
@@ -23,6 +23,56 @@ const FILTER_TABS = [
   { key: 'completed', label: 'Done' },
   { key: 'cancelled', label: 'Cancelled' },
 ];
+
+const BookingCard = React.memo(({ item, onPressDetail, onPressTrack, onPressReview }) => {
+  const canTrack = ['confirmed', 'provider_on_the_way', 'in_progress'].includes(item.status);
+
+  return (
+    <TouchableOpacity
+      style={styles.card}
+      onPress={() => onPressDetail(item._id)}
+      activeOpacity={0.9}
+    >
+      <View style={styles.cardTop}>
+        <View style={styles.serviceInfo}>
+          <Text style={styles.serviceName}>{item.categoryId?.name || 'Service'}</Text>
+          {item.subService?.name && (
+            <Text style={styles.subService}>{item.subService.name}</Text>
+          )}
+        </View>
+        <StatusBadge status={item.status} />
+      </View>
+
+      <View style={styles.cardMid}>
+        <Text style={styles.infoRow}>📅 {new Date(item.scheduledDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}  ⏰ {item.scheduledTime}</Text>
+        <Text style={styles.infoRow}>📍 {item.address?.city}, {item.address?.pincode}</Text>
+        {item.providerId?.userId?.name && (
+          <Text style={styles.infoRow}>👤 {item.providerId.userId.name}</Text>
+        )}
+      </View>
+
+      <View style={styles.cardBottom}>
+        <Text style={styles.amount}>₹{item.pricing?.totalAmount || 0}</Text>
+        {canTrack && (
+          <TouchableOpacity
+            style={styles.trackBtn}
+            onPress={() => onPressTrack(item._id)}
+          >
+            <Text style={styles.trackBtnText}>Track →</Text>
+          </TouchableOpacity>
+        )}
+        {item.status === 'completed' && !item.isRated && (
+          <TouchableOpacity
+            style={styles.rateBtn}
+            onPress={() => onPressReview(item._id)}
+          >
+            <Text style={styles.rateBtnText}>⭐ Rate</Text>
+          </TouchableOpacity>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+});
 
 const MyBookingsScreen = ({ navigation }) => {
   const [bookings,    setBookings]    = useState([]);
@@ -79,55 +129,26 @@ const MyBookingsScreen = ({ navigation }) => {
     setHasNextPage(true);
   };
 
-  const BookingCard = ({ item }) => {
-    const canTrack = ['confirmed', 'provider_on_the_way', 'in_progress'].includes(item.status);
+  const handlePressDetail = useCallback((bookingId) => {
+    navigation.navigate('BookingDetail', { bookingId });
+  }, [navigation]);
 
-    return (
-      <TouchableOpacity
-        style={styles.card}
-        onPress={() => navigation.navigate('BookingDetail', { bookingId: item._id })}
-        activeOpacity={0.9}
-      >
-        <View style={styles.cardTop}>
-          <View style={styles.serviceInfo}>
-            <Text style={styles.serviceName}>{item.categoryId?.name || 'Service'}</Text>
-            {item.subService?.name && (
-              <Text style={styles.subService}>{item.subService.name}</Text>
-            )}
-          </View>
-          <StatusBadge status={item.status} />
-        </View>
+  const handlePressTrack = useCallback((bookingId) => {
+    navigation.navigate('BookingTrack', { bookingId });
+  }, [navigation]);
 
-        <View style={styles.cardMid}>
-          <Text style={styles.infoRow}>📅 {new Date(item.scheduledDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}  ⏰ {item.scheduledTime}</Text>
-          <Text style={styles.infoRow}>📍 {item.address?.city}, {item.address?.pincode}</Text>
-          {item.providerId?.userId?.name && (
-            <Text style={styles.infoRow}>👤 {item.providerId.userId.name}</Text>
-          )}
-        </View>
+  const handlePressReview = useCallback((bookingId) => {
+    navigation.navigate('Review', { bookingId });
+  }, [navigation]);
 
-        <View style={styles.cardBottom}>
-          <Text style={styles.amount}>₹{item.pricing?.totalAmount || 0}</Text>
-          {canTrack && (
-            <TouchableOpacity
-              style={styles.trackBtn}
-              onPress={() => navigation.navigate('BookingTrack', { bookingId: item._id })}
-            >
-              <Text style={styles.trackBtnText}>Track →</Text>
-            </TouchableOpacity>
-          )}
-          {item.status === 'completed' && !item.isRated && (
-            <TouchableOpacity
-              style={styles.rateBtn}
-              onPress={() => navigation.navigate('Review', { bookingId: item._id })}
-            >
-              <Text style={styles.rateBtnText}>⭐ Rate</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const renderBookingCard = useCallback(({ item }) => (
+    <BookingCard 
+      item={item} 
+      onPressDetail={handlePressDetail} 
+      onPressTrack={handlePressTrack} 
+      onPressReview={handlePressReview} 
+    />
+  ), [handlePressDetail, handlePressTrack, handlePressReview]);
 
   return (
     <View style={styles.container}>
@@ -159,7 +180,7 @@ const MyBookingsScreen = ({ navigation }) => {
       <FlatList
         data={bookings}
         keyExtractor={item => item._id}
-        renderItem={({ item }) => <BookingCard item={item} />}
+        renderItem={renderBookingCard}
         onEndReached={handleLoadMore}
         onEndReachedThreshold={0.4}
         contentContainerStyle={styles.list}
@@ -179,6 +200,10 @@ const MyBookingsScreen = ({ navigation }) => {
               </View>
             : <ActivityIndicator color={COLORS.primary} style={{ marginTop: SPACING.xxxl }} />
         }
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
       />
     </View>
   );

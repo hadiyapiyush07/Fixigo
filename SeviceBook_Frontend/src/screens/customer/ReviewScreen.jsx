@@ -8,6 +8,8 @@ import {
 import { bookingAPI } from '../../api/booking.api';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 import api from '../../api/axiosInstance';
+import { CommonActions } from '@react-navigation/native';
+import Animated, { FadeIn, ZoomIn, SlideInDown } from 'react-native-reanimated';
 
 const RATING_LABELS = {
   1: 'Poor 😞',
@@ -35,6 +37,7 @@ const ReviewScreen = ({ route, navigation }) => {
   const [comment,  setComment]  = useState('');
   const [loading,  setLoading]  = useState(false);
   const [selected, setSelected] = useState([]); // quick tags selected
+  const [isSubmitted, setIsSubmitted] = useState(false);
 
   const toggleTag = (tag) => {
     setSelected(prev =>
@@ -58,26 +61,33 @@ const ReviewScreen = ({ route, navigation }) => {
       setLoading(true);
 
       // Submit review to backend
-      await api.post('/reviews', {
-        bookingId,
-        providerId,
+      await api.post(`/bookings/${bookingId}/review`, {
         rating,
-        comment: finalComment || `Rated ${rating} stars`,
+        reviewText: finalComment || `Rated ${rating} stars`,
       });
 
-      Alert.alert(
-        '🎉 Thank You!',
-        'Your review has been submitted successfully.',
-        [{ text: 'Done', onPress: () => navigation.navigate('CustomerTabs', { screen: 'MyBookings' }) }]
-      );
+      setIsSubmitted(true);
+      setTimeout(() => {
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'CustomerTabs', params: { screen: 'Home' } }],
+          })
+        );
+      }, 2500);
+
     } catch (e) {
       console.log('Review error:', e);
-      // If review API not setup yet, still mark booking as rated
-      Alert.alert(
-        '✅ Review Noted',
-        'Thank you for your feedback!',
-        [{ text: 'Done', onPress: () => navigation.navigate('CustomerTabs', { screen: 'MyBookings' }) }]
-      );
+      // If review API not setup yet, still act successfully
+      setIsSubmitted(true);
+      setTimeout(() => {
+        navigation.dispatch(
+          CommonActions.reset({
+            index: 0,
+            routes: [{ name: 'CustomerTabs', params: { screen: 'Home' } }],
+          })
+        );
+      }, 2500);
     } finally {
       setLoading(false);
     }
@@ -94,7 +104,15 @@ const ReviewScreen = ({ route, navigation }) => {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {isSubmitted ? (
+          <Animated.View entering={FadeIn.duration(400)} style={styles.successContainer}>
+            <Animated.Text entering={ZoomIn.delay(300).springify()} style={styles.successIcon}>🎉</Animated.Text>
+            <Animated.Text entering={SlideInDown.delay(500)} style={styles.successTitle}>Thank You!</Animated.Text>
+            <Animated.Text entering={SlideInDown.delay(600)} style={styles.successMessage}>Your feedback helps us provide the best experience.</Animated.Text>
+          </Animated.View>
+        ) : (
+          <>
+            {/* Header */}
         <View style={styles.header}>
           <Text style={styles.headerIcon}>⭐</Text>
           <Text style={styles.headerTitle}>Rate Your Experience</Text>
@@ -169,12 +187,14 @@ const ReviewScreen = ({ route, navigation }) => {
 
         <TouchableOpacity 
           style={styles.skipBtn} 
-          onPress={() => navigation.navigate('CustomerTabs', { screen: 'MyBookings' })}
+          onPress={() => navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'CustomerTabs', params: { screen: 'Home' } }] }))}
           disabled={loading}
         >  <Text style={styles.skipBtnText}>Skip for now</Text>
         </TouchableOpacity>
 
         <View style={{ height: SPACING.xxxl }} />
+          </>
+        )}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -226,6 +246,11 @@ const styles = StyleSheet.create({
 
   skipBtn:     { alignItems: 'center', paddingVertical: SPACING.md },
   skipBtnText: { fontSize: FONT_SIZES.md, color: COLORS.textTertiary },
+
+  successContainer: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 400, marginTop: SPACING.xxl },
+  successIcon: { fontSize: 100, marginBottom: SPACING.xl },
+  successTitle: { fontSize: FONT_SIZES.xxl, fontWeight: '800', color: COLORS.primary, marginBottom: SPACING.sm, textAlign: 'center' },
+  successMessage: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, textAlign: 'center', lineHeight: 24, paddingHorizontal: SPACING.xl },
 });
 
 export default ReviewScreen;

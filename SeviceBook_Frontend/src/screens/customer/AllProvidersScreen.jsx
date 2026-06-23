@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   ActivityIndicator, SafeAreaView, Platform, TextInput
@@ -12,12 +12,8 @@ const AllProvidersScreen = ({ navigation, route }) => {
   const [providers, setProviders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  
-  useEffect(() => {
-    fetchProviders();
-  }, []);
 
-  const fetchProviders = async () => {
+  const fetchProviders = useCallback(async () => {
     try {
       setLoading(true);
       // Pass a large radius and limit to simulate "All" nearby for now
@@ -42,7 +38,11 @@ const AllProvidersScreen = ({ navigation, route }) => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [defaultCategory]);
+  
+  useEffect(() => {
+    fetchProviders();
+  }, [fetchProviders]);
 
   const filteredProviders = providers.filter(p => 
     (p.userId?.name || '').toLowerCase().includes(search.toLowerCase()) ||

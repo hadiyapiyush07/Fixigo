@@ -150,9 +150,9 @@ const verifyPayment = async ({
   }
 
   await Notification.create({
-    userId: customerId,
+    receiver: customerId,
     title:  "Payment Successful!",
-    body:   `₹${payment.amount / 100} paid successfully.`,
+    message:   `₹${payment.amount / 100} paid successfully.`,
     type:   "payment_success",
     data:   { bookingId: String(bookingId) },
   });

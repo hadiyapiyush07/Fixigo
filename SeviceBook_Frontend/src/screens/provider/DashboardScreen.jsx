@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, RefreshControl, Animated,
@@ -11,7 +11,7 @@ import { providerAPI } from '../../api/provider.api';
 import { logoutUser } from '../../store/slices/authSlice';
 import { socketService } from '../../services/socket.service';
 
-import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../../theme/typography';
+import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 import { Card } from '../../components/ui/Card';
 import { Avatar } from '../../components/ui/Avatar';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -57,46 +57,11 @@ const DashboardScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [togglingOnline, setTogglingOnline] = useState(false);
+  const isFirstLoad = useRef(true);
 
   const toggleAnim = useRef(new Animated.Value(0)).current;
 
-  useFocusEffect(
-    React.useCallback(() => {
-      loadDashboard(false); // Silent load when focused
-      
-      const interval = setInterval(() => {
-        if (!togglingOnline) loadDashboard(false);
-      }, 20000); // 20 seconds polling as requested
-
-      return () => clearInterval(interval);
-    }, [togglingOnline])
-  );
-
-  useEffect(() => {
-    // Keep socket listener for instant updates
-    socketService.on('booking:status_update', handleSocketUpdate);
-    socketService.on('booking:new', handleSocketUpdate);
-
-    return () => {
-      socketService.off('booking:status_update', handleSocketUpdate);
-      socketService.off('booking:new', handleSocketUpdate);
-    };
-  }, []);
-
-  const handleSocketUpdate = () => {
-    loadDashboard(false);
-  };
-
-  useEffect(() => {
-    Animated.spring(toggleAnim, {
-      toValue: isOnline ? 1 : 0,
-      useNativeDriver: false,
-      friction: 6,
-      tension: 80,
-    }).start();
-  }, [isOnline]);
-
-  const loadDashboard = async (showLoading = true) => {
+  const loadDashboard = useCallback(async (showLoading = true) => {
     if (showLoading) setLoading(true);
     try {
       const profRes = await providerAPI.getMyProfile();
@@ -114,7 +79,7 @@ const DashboardScreen = ({ navigation }) => {
       setStats(statsRes.data.data || {});
 
       const active = data.find(b => 
-        ['provider_on_the_way', 'arrived', 'otp_verification', 'in_progress'].includes(b.status)
+        ['provider_on_the_way', 'arrived', 'otp_verification', 'in_progress', 'payment_pending'].includes(b.status)
       );
       setActiveBooking(active);
     } catch (e) {
@@ -123,7 +88,49 @@ const DashboardScreen = ({ navigation }) => {
       if (showLoading) setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
+
+  const handleSocketUpdate = useCallback(() => {
+    loadDashboard(false);
+  }, [loadDashboard]);
+
+  useFocusEffect(
+    React.useCallback(() => {
+      // First time this screen focuses: show skeleton. After that: silent refresh.
+      if (isFirstLoad.current) {
+        isFirstLoad.current = false;
+        loadDashboard(true);
+      } else {
+        loadDashboard(false);
+      }
+
+      const interval = setInterval(() => {
+        if (!togglingOnline) loadDashboard(false);
+      }, 20000);
+
+      return () => clearInterval(interval);
+    }, [togglingOnline, loadDashboard])
+  );
+
+  useEffect(() => {
+    // Keep socket listener for instant updates
+    socketService.on('booking:status_update', handleSocketUpdate);
+    socketService.on('booking:new', handleSocketUpdate);
+
+    return () => {
+      socketService.off('booking:status_update', handleSocketUpdate);
+      socketService.off('booking:new', handleSocketUpdate);
+    };
+  }, [handleSocketUpdate]);
+
+  useEffect(() => {
+    Animated.spring(toggleAnim, {
+      toValue: isOnline ? 1 : 0,
+      useNativeDriver: false,
+      friction: 6,
+      tension: 80,
+    }).start();
+  }, [isOnline, toggleAnim]);
 
   const handleToggleOnline = async (newValue) => {
     if (providerProfile && !providerProfile.isVerified) {
@@ -263,8 +270,8 @@ const DashboardScreen = ({ navigation }) => {
               </View>
               <View style={styles.divider} />
               <View style={styles.activeMeta}>
-                <Text style={styles.metaTxt}>📍 {activeBooking.distance || '?'} km away</Text>
-                <Text style={styles.metaTxt}>₹ {activeBooking.totalAmount}</Text>
+                <Text style={styles.metaTxt} numberOfLines={1}>📍 {activeBooking.address?.addressLine || (activeBooking.distance ? `${activeBooking.distance} km away` : 'Address unknown')}</Text>
+                <Text style={styles.metaTxt}>₹ {activeBooking.pricing?.totalAmount || activeBooking.totalAmount || 0}</Text>
               </View>
               <TouchableOpacity 
                 style={styles.manageBtn}
@@ -324,11 +331,11 @@ const styles = StyleSheet.create({
   
   switchBox: { width: 56, height: 32, justifyContent: 'center' },
   switchTrack: { width: 56, height: 32, borderRadius: 16, justifyContent: 'center' },
-  switchThumb: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.white, ...COLORS.shadow },
+  switchThumb: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.white, ...SHADOWS.sm },
 
   section: { paddingHorizontal: SPACING.lg, marginTop: SPACING.xl },
-  statsGrid: { flexDirection: 'row', gap: SPACING.sm },
-  statBox: { flex: 1, alignItems: 'center', paddingVertical: SPACING.lg },
+  statsGrid: { flexDirection: 'row' },
+  statBox: { flex: 1, alignItems: 'center', paddingVertical: SPACING.lg, marginHorizontal: SPACING.xs / 2 },
   statVal: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.primary },
   statLabel: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 4, fontWeight: '600' },
 

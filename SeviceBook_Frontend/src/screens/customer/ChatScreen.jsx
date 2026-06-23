@@ -8,8 +8,8 @@ import axios from 'axios';
 import { useSelector } from 'react-redux';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 
-const API_URL = 'http://10.0.2.2:5000/api';
-const SOCKET_URL = 'http://10.0.2.2:5000';
+const API_URL = 'http://10.87.158.85:5000/api';
+const SOCKET_URL = 'http://10.87.158.85:5000';
 
 const ChatScreen = ({ route, navigation }) => {
   const { bookingId, receiverId, receiverName } = route.params;

@@ -124,12 +124,17 @@ const ProviderDetailScreen = ({ navigation, route }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Services Offered</Text>
           <View style={styles.skillsWrapper}>
-            {skills.map((s, idx) => (
-              <View key={idx} style={styles.skillBadge}>
-                <Text style={styles.skillIcon}>{s.icon || '🔧'}</Text>
-                <Text style={styles.skillText}>{s.name}</Text>
-              </View>
-            ))}
+            {skills.map((s, idx) => {
+              // s.icon may be an object {url, publicId} from Cloudinary — use emoji fallback
+              const iconEmoji = typeof s.icon === 'string' ? s.icon : '🔧';
+              const skillName = typeof s.name === 'string' ? s.name : String(s.name || '');
+              return (
+                <View key={idx} style={styles.skillBadge}>
+                  <Text style={styles.skillIcon}>{iconEmoji}</Text>
+                  <Text style={styles.skillText}>{skillName}</Text>
+                </View>
+              );
+            })}
           </View>
         </View>
 
