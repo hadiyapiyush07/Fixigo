@@ -62,14 +62,14 @@ const ProfileScreen = ({ navigation }) => {
             variant="outline" 
             style={styles.editBtn} 
             textStyle={{ fontSize: FONT_SIZES.sm }}
-            onPress={() => Alert.alert('Coming Soon', 'Profile editing will be available soon!')}
+            onPress={() => navigation.navigate('EditProfile')}
           />
         </Card>
 
         {/* Account Settings */}
         <Text style={styles.sectionTitle}>Account Settings</Text>
         <Card noPadding>
-          {renderMenuItem('📍', 'Saved Addresses', () => Alert.alert('Coming Soon', 'Saved addresses will be available soon!'))}
+          {renderMenuItem('📍', 'Saved Addresses', () => navigation.navigate('SavedAddresses'))}
           {renderMenuItem('🏷️', 'My Coupons', () => Alert.alert('Coming Soon', 'Coupons will be available soon!'))}
           {renderMenuItem('💳', 'Payment Methods', () => Alert.alert('Coming Soon', 'Payment methods will be available soon!'))}
           {renderMenuItem('🔔', 'Notifications', () => navigation.navigate('Notifications'), false)}

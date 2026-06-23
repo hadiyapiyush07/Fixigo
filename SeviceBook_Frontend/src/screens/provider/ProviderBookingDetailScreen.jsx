@@ -7,6 +7,8 @@ import Reanimated, { FadeInUp } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
 import { bookingAPI } from '../../api/booking.api';
 import { socketService } from '../../services/socket.service';
+import { useLocation } from '../../hooks/useLocation';
+import { calculateDistance, formatDistance } from '../../utils/distance';
 
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../../theme/typography';
 import { Card } from '../../components/ui/Card';
@@ -22,6 +24,10 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
   const [actionLoading, setActionLoading] = useState(false);
   const [otpModalVisible, setOtpModalVisible] = useState(false);
   const [otpInput, setOtpInput] = useState('');
+
+  // Start tracking when booking is loaded and not completed
+  const isActive = booking && !['completed', 'cancelled', 'rejected'].includes(booking.status);
+  const { location } = useLocation({ isActiveBooking: isActive });
 
   const fetchBooking = useCallback(async (showLoad = true) => {
     if (showLoad) setLoading(true);
@@ -63,6 +69,20 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
     setActionLoading(true);
     try {
       await bookingAPI.updateStatus(bookingId, newStatus);
+      if (newStatus === 'completed') {
+        Alert.alert('Job Completed! 🎉', 'You have successfully completed this booking.', [
+          {
+            text: 'OK',
+            onPress: () => {
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'ProviderTabs', state: { routes: [{ name: 'Bookings' }] } }],
+              });
+            }
+          }
+        ]);
+        return;
+      }
       await fetchBooking(false);
     } catch (e) {
       Alert.alert('Error', e.response?.data?.message || 'Failed to update status');
@@ -133,6 +153,32 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleCancelBooking = () => {
+    Alert.alert(
+      'Cancel Booking',
+      'Are you sure you want to cancel this booking?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              setActionLoading(true);
+              await bookingAPI.providerCancel(bookingId, 'Cancelled by provider');
+              Alert.alert('Cancelled', 'Booking unassigned from you.');
+              navigation.goBack();
+            } catch (e) {
+              Alert.alert('Error', e?.response?.data?.message || 'Failed to cancel booking.');
+            } finally {
+              setActionLoading(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   if (loading) {
     return (
       <View style={[styles.safe, { justifyContent: 'center', alignItems: 'center' }]}>
@@ -152,6 +198,13 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
   const customerName = booking.customerId?.name || 'Customer';
   const cPhone = booking.customerId?.phone || '';
   const serviceName = booking.serviceId?.name || 'Service';
+  
+  let displayDistance = null;
+  if (location && booking.address?.location?.coordinates && booking.address.location.coordinates.length === 2) {
+    const [lng, lat] = booking.address.location.coordinates;
+    const dist = calculateDistance(location.latitude, location.longitude, lat, lng);
+    displayDistance = formatDistance(dist);
+  }
 
   return (
     <View style={styles.safe}>
@@ -193,7 +246,14 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
 
         {/* Address Card */}
         <Reanimated.View entering={FadeInUp.delay(300).springify()}>
-          <SectionHeader title="Service Location" />
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+            <SectionHeader title="Service Location" />
+            {displayDistance && (
+              <Text style={{ fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: '700', marginBottom: SPACING.md }}>
+                📍 {displayDistance}
+              </Text>
+            )}
+          </View>
           <Card style={styles.premiumCard}>
             <Text style={styles.addressTxt}>{booking.address?.addressLine || 'Address not provided'}</Text>
             {booking.address?.landmark && <Text style={styles.landmark}>Landmark: {booking.address.landmark}</Text>}
@@ -218,6 +278,15 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
             </View>
           </Card>
         </Reanimated.View>
+
+        {booking.status !== 'completed' && booking.status !== 'cancelled' && (
+          <TouchableOpacity 
+            style={{ backgroundColor: '#FEE2E2', padding: 16, borderRadius: BORDER_RADIUS.md, marginTop: SPACING.xl, alignItems: 'center' }}
+            onPress={handleCancelBooking}
+          >
+            <Text style={{ color: '#EF4444', fontWeight: 'bold', fontSize: 16 }}>Cancel Booking</Text>
+          </TouchableOpacity>
+        )}
 
         <View style={{ height: 100 }} />
       </ScrollView>

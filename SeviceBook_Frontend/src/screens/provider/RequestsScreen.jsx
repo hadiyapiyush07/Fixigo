@@ -8,49 +8,69 @@ import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { SectionHeader } from '../../components/ui/SectionHeader';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { LoadingSkeleton } from '../../components/ui/LoadingSkeleton';
-import { socketService } from '../../services/socket.service';
+import { formatDistance, calculateDistance } from '../../utils/distance';
 
-const RequestItem = React.memo(({ item, onAccept, onDecline }) => (
-  <Card>
-    <View style={styles.reqHeader}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.serviceName}>{item.serviceId?.name}</Text>
-        <Text style={styles.customerName}>{item.customerId?.name}</Text>
+const RequestItem = React.memo(({ item, onAccept, onDecline, currentLocation }) => {
+  let displayDistance = 'Distance unknown';
+  
+  if (currentLocation && item.location?.coordinates && item.location.coordinates.length === 2) {
+    const [lng, lat] = item.location.coordinates;
+    const dist = calculateDistance(currentLocation.latitude, currentLocation.longitude, lat, lng);
+    displayDistance = formatDistance(dist);
+  } else if (item.distance) {
+    displayDistance = `${item.distance} km away`;
+  } else if (item.address?.addressLine) {
+    displayDistance = item.address.addressLine;
+  }
+
+  return (
+    <Card>
+      <View style={styles.reqHeader}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.serviceName}>{item.serviceId?.name}</Text>
+          <Text style={styles.customerName}>{item.customerId?.name}</Text>
+        </View>
+        <Text style={styles.amount}>₹{item.pricing?.totalAmount || item.totalAmount || 0}</Text>
       </View>
-      <Text style={styles.amount}>₹{item.pricing?.totalAmount || item.totalAmount || 0}</Text>
-    </View>
-    
-    <View style={styles.metaRow}>
-      <Text style={[styles.metaTxt, { flex: 1, marginRight: SPACING.sm }]} numberOfLines={1}>
-        📍 {item.address?.addressLine ? item.address.addressLine : (item.distance ? `${item.distance} km away` : 'Distance unknown')}
-      </Text>
-      <Text style={styles.metaTxt}>⏱ {new Date(item.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
-    </View>
+      
+      <View style={styles.metaRow}>
+        <Text style={[styles.metaTxt, { flex: 1, marginRight: SPACING.sm }]} numberOfLines={1}>
+          📍 {displayDistance}
+        </Text>
+        <Text style={styles.metaTxt}>⏱ {new Date(item.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</Text>
+      </View>
 
-    <View style={styles.actionRow}>
-      <PrimaryButton 
-        title="Decline" 
-        variant="danger" 
-        style={styles.btn} 
-        textStyle={{ fontSize: FONT_SIZES.sm }}
-        onPress={() => onDecline(item._id)} 
-      />
-      <View style={{ width: SPACING.md }} />
-      <PrimaryButton 
-        title="Accept" 
-        variant="primary" 
-        style={styles.btn} 
-        textStyle={{ fontSize: FONT_SIZES.sm }}
-        onPress={() => onAccept(item._id)} 
-      />
-    </View>
-  </Card>
-));
+      <View style={styles.actionRow}>
+        <PrimaryButton 
+          title="Decline" 
+          variant="danger" 
+          style={styles.btn} 
+          textStyle={{ fontSize: FONT_SIZES.sm }}
+          onPress={() => onDecline(item._id)} 
+        />
+        <View style={{ width: SPACING.md }} />
+        <PrimaryButton 
+          title="Accept" 
+          variant="primary" 
+          style={styles.btn} 
+          textStyle={{ fontSize: FONT_SIZES.sm }}
+          onPress={() => onAccept(item._id)} 
+        />
+      </View>
+    </Card>
+  );
+});
+
+import { socketService } from '../../services/socket.service';
+import { useLocation } from '../../hooks/useLocation';
 
 const RequestsScreen = ({ navigation }) => {
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Track location since we are online receiving requests
+  const { location } = useLocation({ isOnline: true });
 
   useFocusEffect(
     useCallback(() => {
@@ -108,8 +128,9 @@ const RequestsScreen = ({ navigation }) => {
       item={item} 
       onAccept={handleAccept} 
       onDecline={handleDecline} 
+      currentLocation={location}
     />
-  ), [handleAccept, handleDecline]);
+  ), [handleAccept, handleDecline, location]);
 
   if (loading) {
     return (

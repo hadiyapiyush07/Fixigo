@@ -3,10 +3,10 @@ import {
   View, Text, TextInput, TouchableOpacity, 
   FlatList, StyleSheet, KeyboardAvoidingView, Platform, SafeAreaView, ActivityIndicator
 } from 'react-native';
-import io from 'socket.io-client';
 import axios from 'axios';
 import { useSelector } from 'react-redux';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
+import { socketService } from '../../services/socket.service';
 
 const API_URL = 'http://10.87.158.85:5000/api';
 const SOCKET_URL = 'http://10.87.158.85:5000';
@@ -36,26 +36,21 @@ const ChatScreen = ({ route, navigation }) => {
     };
     fetchMessages();
 
-    // Setup Socket
-    socketRef.current = io(SOCKET_URL, { transports: ['websocket'] });
-    
-    socketRef.current.on('connect', () => {
-      socketRef.current.emit('booking:join', bookingId);
-    });
+    // Setup Socket via global service
+    socketService.joinBookingRoom(bookingId);
 
-    socketRef.current.on('newMessage', (msg) => {
+    const handleNewMessage = (msg) => {
       setMessages(prev => {
-        // Prevent duplicates if we already optimistically added it
         if (prev.find(m => m._id === msg._id)) return prev;
         return [...prev, msg];
       });
-    });
+    };
+
+    socketService.on('newMessage', handleNewMessage);
 
     return () => {
-      if (socketRef.current) {
-        socketRef.current.emit('booking:leave', bookingId);
-        socketRef.current.disconnect();
-      }
+      socketService.leaveBookingRoom(bookingId);
+      socketService.off('newMessage', handleNewMessage);
     };
   }, [bookingId, accessToken]);
 

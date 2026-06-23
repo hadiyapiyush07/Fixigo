@@ -70,7 +70,7 @@ const ProviderProfileScreen = ({ navigation }) => {
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metric}>
-              <Text style={styles.metricVal}>💼 {profile?.completedJobs || 0}</Text>
+              <Text style={styles.metricVal}>💼 {profile?.completedBookings || 0}</Text>
               <Text style={styles.metricLabel}>Jobs Done</Text>
             </View>
             <View style={styles.metricDivider} />
