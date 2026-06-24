@@ -41,3 +41,25 @@ export const formatDistance = (distanceKm) => {
   }
   return `${distanceKm.toFixed(1)} km away`;
 };
+
+/**
+ * Estimates arrival time based on distance.
+ * Assumes average city speed of 20 km/h.
+ * @param {number} distanceKm - Distance in kilometers
+ * @returns {string} Formatted ETA string
+ */
+export const calculateETA = (distanceKm) => {
+  if (distanceKm === null || distanceKm === undefined) return 'Calculating ETA...';
+  
+  // Speed: 20 km/h = 1 km every 3 mins.
+  // Add 2 mins base buffer.
+  const etaMins = Math.round((distanceKm * 3) + 2);
+  
+  if (etaMins < 2) return 'Arriving now';
+  if (etaMins >= 60) {
+    const hrs = Math.floor(etaMins / 60);
+    const mins = etaMins % 60;
+    return `${hrs}h ${mins}m`;
+  }
+  return `~${etaMins} mins`;
+};

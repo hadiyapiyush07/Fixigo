@@ -79,7 +79,7 @@ const DashboardScreen = ({ navigation }) => {
       setStats(statsRes.data.data || {});
 
       const active = data.find(b => 
-        ['provider_on_the_way', 'arrived', 'otp_verification', 'in_progress', 'payment_pending'].includes(b.status)
+        ['accepted', 'confirmed', 'provider_on_the_way', 'arrived', 'otp_verification', 'in_progress', 'payment_pending'].includes(b.status)
       );
       setActiveBooking(active);
     } catch (e) {

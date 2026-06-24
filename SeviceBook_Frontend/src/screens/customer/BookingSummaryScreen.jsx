@@ -255,6 +255,10 @@ const BookingSummaryScreen = ({ navigation, route }) => {
           onPress={handleConfirm}
           disabled={submitting}
           activeOpacity={0.85}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Confirm Booking"
+          accessibilityHint="Submits your booking request and navigates to the tracking screen"
         >
           {submitting ? (
             <ActivityIndicator color={COLORS.white} />

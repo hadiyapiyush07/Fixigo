@@ -41,6 +41,9 @@ const ChatScreen = ({ route, navigation }) => {
 
     const handleNewMessage = (msg) => {
       setMessages(prev => {
+        // Ignore messages from self to prevent duplicating the local optimistic update
+        if (String(msg.sender?._id || msg.sender) === String(user?._id)) return prev;
+        
         if (prev.find(m => m._id === msg._id)) return prev;
         return [...prev, msg];
       });

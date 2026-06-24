@@ -3,6 +3,7 @@ const Booking      = require("../models/Booking.model");
 const Provider     = require("../models/Provider.model");
 const User         = require("../models/User.model");
 const Notification = require("../models/Notification.model");
+const Coupon       = require("../models/Coupon.model");
 const ApiError     = require("../utils/ApiError");
 const { getPagination, paginate } = require("../utils/pagination");
 const notificationService = require("./notification.service");
@@ -148,6 +149,20 @@ const createBooking = async (customerId, bookingData) => {
   console.log("  → subServicesArr   :", JSON.stringify(subServicesArr));
   console.log("  → uploadedImages   :", uploadedImages.length);
 
+  // ── Record coupon usage if provided ───────────────────────
+  if (bookingData.couponCode) {
+    try {
+      const coupon = await Coupon.findOne({ code: bookingData.couponCode.toUpperCase() });
+      if (coupon) {
+        coupon.usedBy.push({ userId: customerId });
+        await coupon.save();
+        console.log(`🎟️ [booking.service] Recorded coupon usage for ${coupon.code} by user ${customerId}`);
+      }
+    } catch (err) {
+      console.error("⚠️ Failed to record coupon usage:", err.message);
+    }
+  }
+
   // ── Build booking document ────────────────────────────────
   const bookingDoc = {
     customerId,
@@ -160,6 +175,7 @@ const createBooking = async (customerId, bookingData) => {
     scheduledTime: bookingData.scheduledTime || "Instant",
     address:       bookingData.address,
     pricing:       bookingData.pricing || { baseAmount: 0, convenienceFee: 0, discount: 0, totalAmount: 0 },
+    couponCode:    bookingData.couponCode || null,
     statusHistory: [{ status: "pending", changedBy: customerId, note: "Booking created" }],
   };
 

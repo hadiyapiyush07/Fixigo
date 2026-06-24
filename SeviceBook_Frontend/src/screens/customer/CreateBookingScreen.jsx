@@ -98,6 +98,8 @@ const CreateBookingScreen = ({ navigation, route }) => {
 
   const { accessToken } = useSelector(state => state.auth);
 
+  const [applyingCoupon, setApplyingCoupon] = useState(false);
+
   const handleApplyCoupon = async () => {
     if (couponApplied) {
       setDiscount(0);
@@ -114,6 +116,7 @@ const CreateBookingScreen = ({ navigation, route }) => {
     }
 
     try {
+      setApplyingCoupon(true);
       // API call to validate and calculate discount
       const res = await axios.post(`${API_URL}/coupons/apply`, {
         code,
@@ -130,6 +133,8 @@ const CreateBookingScreen = ({ navigation, route }) => {
     } catch (err) {
       const msg = err.response?.data?.message || 'Invalid or expired coupon code.';
       Alert.alert('Coupon Error', msg);
+    } finally {
+      setApplyingCoupon(false);
     }
   };
 
@@ -315,10 +320,15 @@ const CreateBookingScreen = ({ navigation, route }) => {
               editable={!couponApplied}
             />
             <TouchableOpacity
-              style={[styles.applyBtn, couponApplied && styles.applyBtnActive]}
+              style={[styles.applyBtn, couponApplied && styles.applyBtnActive, applyingCoupon && { opacity: 0.7 }]}
               onPress={handleApplyCoupon}
+              disabled={applyingCoupon}
             >
-              <Text style={styles.applyBtnText}>{couponApplied ? 'Remove' : 'Apply'}</Text>
+              {applyingCoupon ? (
+                <ActivityIndicator color={couponApplied ? COLORS.white : COLORS.primary} size="small" />
+              ) : (
+                <Text style={styles.applyBtnText}>{couponApplied ? 'Remove' : 'Apply'}</Text>
+              )}
             </TouchableOpacity>
           </View>
           {couponApplied && (
@@ -344,6 +354,10 @@ const CreateBookingScreen = ({ navigation, route }) => {
           style={styles.confirmBtn}
           onPress={handleProceedToSummary}
           activeOpacity={0.85}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="Proceed to Summary"
+          accessibilityHint="Navigates to the booking summary page where you can review your details"
         >
           <Text style={styles.confirmBtnText}>Proceed to Summary  →</Text>
         </TouchableOpacity>

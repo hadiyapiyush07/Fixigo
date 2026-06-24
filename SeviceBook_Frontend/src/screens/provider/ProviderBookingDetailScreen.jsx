@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, Alert,
-  Linking, ActivityIndicator, Modal, TextInput
+  Linking, ActivityIndicator, Modal, TextInput, TouchableOpacity
 } from 'react-native';
 import Reanimated, { FadeInUp } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
@@ -9,6 +9,7 @@ import { bookingAPI } from '../../api/booking.api';
 import { socketService } from '../../services/socket.service';
 import { useLocation } from '../../hooks/useLocation';
 import { calculateDistance, formatDistance } from '../../utils/distance';
+import Skeleton from '../../components/Skeleton';
 
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../../theme/typography';
 import { Card } from '../../components/ui/Card';
@@ -25,6 +26,8 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
   const [otpModalVisible, setOtpModalVisible] = useState(false);
   const [otpInput, setOtpInput] = useState('');
 
+  const [error, setError] = useState(null);
+
   // Start tracking when booking is loaded and not completed
   const isActive = booking && !['completed', 'cancelled', 'rejected'].includes(booking.status);
   const { location } = useLocation({ isActiveBooking: isActive });
@@ -32,10 +35,12 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
   const fetchBooking = useCallback(async (showLoad = true) => {
     if (showLoad) setLoading(true);
     try {
+      if (showLoad) setError(null);
       const res = await bookingAPI.getById(bookingId);
       setBooking(res.data.data);
-    } catch (error) {
-      console.log('Error fetching booking detail:', error);
+    } catch (err) {
+      if (showLoad) setError('Failed to load booking. Please check your internet connection.');
+      console.log('Error fetching booking detail:', err);
     } finally {
       if (showLoad) setLoading(false);
     }
@@ -181,8 +186,35 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
 
   if (loading) {
     return (
-      <View style={[styles.safe, { justifyContent: 'center', alignItems: 'center' }]}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
+      <View style={[styles.safe, { padding: SPACING.lg, paddingTop: 60 }]}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 }}>
+          <View>
+            <Skeleton width={80} height={16} style={{ marginBottom: 8 }} />
+            <Skeleton width={150} height={24} />
+          </View>
+          <Skeleton width={80} height={24} borderRadius={12} />
+        </View>
+
+        <Skeleton width="100%" height={60} borderRadius={16} style={{ marginBottom: 30 }} />
+        
+        <Skeleton width={140} height={20} style={{ marginBottom: 16 }} />
+        <Skeleton width="100%" height={120} borderRadius={16} style={{ marginBottom: 30 }} />
+
+        <Skeleton width={140} height={20} style={{ marginBottom: 16 }} />
+        <Skeleton width="100%" height={80} borderRadius={16} style={{ marginBottom: 30 }} />
+
+        <Skeleton width={140} height={20} style={{ marginBottom: 16 }} />
+        <Skeleton width="100%" height={120} borderRadius={16} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.safe, { justifyContent: 'center', alignItems: 'center', padding: SPACING.xl }]}>
+        <Text style={{ fontSize: 48, marginBottom: SPACING.md }}>🌐</Text>
+        <Text style={{ fontSize: FONT_SIZES.lg, color: COLORS.textSecondary, textAlign: 'center', marginBottom: SPACING.xl }}>{error}</Text>
+        <PrimaryButton title="Retry" onPress={() => fetchBooking(true)} style={{ minWidth: 150 }} />
       </View>
     );
   }
@@ -281,10 +313,15 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
 
         {booking.status !== 'completed' && booking.status !== 'cancelled' && (
           <TouchableOpacity 
-            style={{ backgroundColor: '#FEE2E2', padding: 16, borderRadius: BORDER_RADIUS.md, marginTop: SPACING.xl, alignItems: 'center' }}
+            style={[{ backgroundColor: '#FEE2E2', padding: 16, borderRadius: BORDER_RADIUS.md, marginTop: SPACING.xl, alignItems: 'center' }, actionLoading && { opacity: 0.5 }]}
             onPress={handleCancelBooking}
+            disabled={actionLoading}
           >
-            <Text style={{ color: '#EF4444', fontWeight: 'bold', fontSize: 16 }}>Cancel Booking</Text>
+            {actionLoading ? (
+               <ActivityIndicator color="#EF4444" size="small" />
+            ) : (
+               <Text style={{ color: '#EF4444', fontWeight: 'bold', fontSize: 16 }}>Cancel Booking</Text>
+            )}
           </TouchableOpacity>
         )}
 
