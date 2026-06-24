@@ -6,6 +6,7 @@ import {
 } from 'react-native';
 import Reanimated, { FadeInUp, FadeIn, Layout, SlideOutRight } from 'react-native-reanimated';
 import { Swipeable } from 'react-native-gesture-handler';
+import Skeleton from '../../components/Skeleton';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 
 const DUMMY_NOTIFICATIONS = [
@@ -165,6 +166,28 @@ const NotificationsScreen = () => {
       </Reanimated.View>
     );
   };
+
+  if (!isLoaded) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Notifications</Text>
+        </View>
+        <View style={{ padding: SPACING.lg, gap: SPACING.md }}>
+          {[1, 2, 3, 4, 5].map(i => (
+            <View key={i} style={[styles.card, { paddingVertical: 20 }]}>
+              <Skeleton width={48} height={48} borderRadius={24} style={{ marginRight: SPACING.md }} />
+              <View style={{ flex: 1, gap: 8 }}>
+                <Skeleton width="70%" height={16} />
+                <Skeleton width="100%" height={12} />
+                <Skeleton width="40%" height={12} />
+              </View>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
+  }
 
   if (notifications.length === 0) {
     return (

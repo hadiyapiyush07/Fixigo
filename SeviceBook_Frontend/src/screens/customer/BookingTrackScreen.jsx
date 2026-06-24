@@ -8,6 +8,8 @@ import { useFocusEffect } from '@react-navigation/native';
 import { bookingAPI } from '../../api/booking.api';
 import { socketService } from '../../services/socket.service';
 import LiveTrackingMap from '../../components/LiveTrackingMap';
+import Skeleton from '../../components/Skeleton';
+import { calculateDistance, calculateETA } from '../../utils/distance';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 
 // ── Status display config ─────────────────────────────────────────────────
@@ -59,22 +61,26 @@ const BookingTrackScreen = ({ route, navigation }) => {
   const counterRef = useRef(null);
   const pulseAnim  = useRef(new Animated.Value(1)).current;
 
+  const [error, setError] = useState(null);
+
   // ── Load booking ─────────────────────────────────────────────────────────
   const loadBooking = useCallback(async (silent = false) => {
     if (!bookingId) { setLoading(false); return; }
     try {
+      if (!silent && !booking) setError(null);
       const res = await bookingAPI.getById(bookingId);
       const data = res?.data?.data || res?.data || null;
       setBooking(data);
       setLastUpdated(Date.now());
       setSecondsAgo(0);
     } catch (e) {
-      if (!silent) console.log('Track error:', e?.message);
+      if (!silent && !booking) setError('Failed to load tracking info. Please check your connection.');
+      console.log('Track error:', e?.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [bookingId]);
+  }, [bookingId, booking]);
 
   const [hasNewMessage, setHasNewMessage] = useState(false);
 
@@ -205,12 +211,44 @@ const BookingTrackScreen = ({ route, navigation }) => {
     await loadBooking();
   };
 
-  // ── Loading state ─────────────────────────────────────────────────────────
   if (loading && !booking) {
     return (
-      <View style={styles.loaderBox}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={styles.loaderText}>Loading tracking info...</Text>
+      <View style={[styles.safe, { padding: SPACING.lg, paddingTop: 60 }]}>
+        {/* Header Skeleton */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 30 }}>
+          <Skeleton width={40} height={40} borderRadius={20} style={{ marginRight: 16 }} />
+          <Skeleton width={150} height={24} />
+        </View>
+
+        {/* Status Card Skeleton */}
+        <Skeleton width="100%" height={160} borderRadius={16} style={{ marginBottom: 24 }} />
+
+        {/* Buttons Skeleton */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 }}>
+          <Skeleton width="48%" height={50} borderRadius={12} />
+          <Skeleton width="48%" height={50} borderRadius={12} />
+        </View>
+
+        {/* Timeline Skeleton */}
+        <Skeleton width={120} height={20} style={{ marginBottom: 16 }} />
+        <Skeleton width="100%" height={60} borderRadius={12} style={{ marginBottom: 12 }} />
+        <Skeleton width="100%" height={60} borderRadius={12} style={{ marginBottom: 12 }} />
+        <Skeleton width="100%" height={60} borderRadius={12} />
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.loaderBox, { padding: SPACING.xl }]}>
+        <Text style={{ fontSize: 48 }}>🌐</Text>
+        <Text style={styles.loaderText}>{error}</Text>
+        <TouchableOpacity onPress={loadBooking} style={[styles.backBtn, { backgroundColor: COLORS.primary, borderWidth: 0 }]}>
+          <Text style={[styles.backBtnText, { color: COLORS.white }]}>Retry</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backBtn, { marginTop: SPACING.sm }]}>
+          <Text style={styles.backBtnText}>Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -282,6 +320,17 @@ const BookingTrackScreen = ({ route, navigation }) => {
     }
   };
 
+  let distanceKm = null;
+  let etaText = null;
+  if (providerLocation && booking?.address?.location?.coordinates?.length === 2) {
+    const lat1 = providerLocation.latitude;
+    const lon1 = providerLocation.longitude;
+    const lon2 = booking.address.location.coordinates[0];
+    const lat2 = booking.address.location.coordinates[1];
+    distanceKm = calculateDistance(lat1, lon1, lat2, lon2);
+    etaText = calculateETA(distanceKm);
+  }
+
   return (
     <View style={styles.container}>
       {/* ── Header ─────────────────────────────────────────────────────── */}
@@ -304,20 +353,20 @@ const BookingTrackScreen = ({ route, navigation }) => {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
       >
         {/* ── Live Status Card ─────────────────────────────────────────── */}
-        <Animated.View style={[styles.statusCard, { backgroundColor: info.bg, borderColor: info.color, transform: [{ scale: info.pulse ? pulseAnim : 1 }] }]}>
-          <Text style={styles.statusIcon}>{info.icon}</Text>
-          <Text style={[styles.statusTitle, { color: info.color }]}>{info.title}</Text>
-          <Text style={styles.statusMessage}>{info.message}</Text>
-          {status === 'pending' && (
-            <View style={styles.searchingRow}>
-              <ActivityIndicator color={info.color} size="small" />
-              <Text style={[styles.searchingText, { color: info.color }]}>Searching nearby providers...</Text>
+        <Animated.View style={[styles.statusCard, { transform: [{ scale: info.pulse ? pulseAnim : 1 }] }]}>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: '#E8F5E9', alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
+              <Text style={{ fontSize: 32 }}>{info.icon}</Text>
             </View>
-          )}
-          {/* Last updated indicator */}
-          <Text style={[styles.lastUpdated, { color: info.color + 'AA' }]}>
-            🔄 Auto-refreshing · Updated {secondsAgo < 5 ? 'just now' : `${secondsAgo}s ago`}
-          </Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.statusTitle, { color: '#2563EB', textAlign: 'left' }]}>{info.title}</Text>
+              <Text style={[styles.statusMessage, { textAlign: 'left' }]}>{info.message}</Text>
+            </View>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 16, borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingTop: 16 }}>
+             <Text style={{ fontSize: 14, color: '#2563EB', marginRight: 6 }}>🔄</Text>
+             <Text style={{ fontSize: 14, color: '#2563EB', fontWeight: '500' }}>Auto-refreshing · Updated {secondsAgo < 5 ? 'just now' : `${secondsAgo}s ago`}</Text>
+          </View>
         </Animated.View>
 
         {/* ── Live Tracking Map ────────────────────────────────────────────── */}
@@ -335,46 +384,71 @@ const BookingTrackScreen = ({ route, navigation }) => {
 
         {/* ── Quick Actions ──────────────────────────────────────────────── */}
         {provider && status !== 'cancelled' && status !== 'completed' && (
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 20 }}>
+          <Reanimated.View entering={FadeInUp.delay(150).springify()} style={{ flexDirection: 'row', backgroundColor: '#FFFFFF', marginHorizontal: SPACING.xl, marginTop: SPACING.lg, borderRadius: 16, padding: 8, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2, alignItems: 'center' }}>
             <TouchableOpacity 
-              style={{ width: '48%', backgroundColor: '#FFFFFF', paddingVertical: 14, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', borderWidth: 1, borderColor: '#E5E7EB' }}
+              style={{ flex: 1, paddingVertical: 14, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}
               onPress={() => Linking.openURL(`tel:${provider.userId?.phone || ''}`)}
             >
-              <Text style={{ fontSize: 16, marginRight: 6 }}>📞</Text>
-              <Text style={{ color: '#111827', fontWeight: '600', fontSize: 15 }}>Call Provider</Text>
+              <Text style={{ fontSize: 16, marginRight: 8, color: '#2563EB' }}>📞</Text>
+              <Text style={{ color: '#111827', fontWeight: '700', fontSize: 14 }}>Call Provider</Text>
             </TouchableOpacity>
+            
+            <View style={{ width: 1, height: 30, backgroundColor: '#E5E7EB' }} />
+            
             <TouchableOpacity 
-              style={{ width: '48%', backgroundColor: '#111827', paddingVertical: 14, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center' }}
+              style={{ flex: 1, backgroundColor: '#EFF6FF', paddingVertical: 14, borderRadius: 12, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', marginLeft: 8 }}
               onPress={() => handleChat(provider.userId?.phone)}
             >
-              <Text style={{ fontSize: 16, marginRight: 6 }}>💬</Text>
-              <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 15 }}>Message</Text>
+              <Text style={{ fontSize: 16, marginRight: 8, color: '#3B82F6' }}>💬</Text>
+              <Text style={{ color: '#3B82F6', fontWeight: '700', fontSize: 14 }}>Message Provider</Text>
               {hasNewMessage && (
-                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#EF4444', position: 'absolute', top: 12, right: 16 }} />
+                <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#EF4444', position: 'absolute', top: 12, right: 16 }} />
               )}
             </TouchableOpacity>
-          </View>
+          </Reanimated.View>
         )}
 
         {/* ── Minimalist OTP Card ─────────────────────────────────────────────────── */}
         {booking.startOtp && (status === 'arrived' || status === 'otp_verification') && (
-          <Reanimated.View entering={FadeInUp.delay(200).springify()} style={{ backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E5E7EB', padding: 24, borderRadius: 16, marginTop: 20 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 12 }}>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#6B7280', letterSpacing: 1.5, textTransform: 'uppercase' }}>
-                Service Verification OTP
-              </Text>
+          <Reanimated.View entering={FadeInUp.delay(200).springify()} style={{ backgroundColor: '#F0F9FF', borderWidth: 1, borderColor: '#BAE6FD', padding: 20, borderRadius: 16, marginTop: 20, marginHorizontal: SPACING.xl }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              {/* Left Side: Info */}
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ backgroundColor: '#FFFFFF', width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 }}>
+                  <Text style={{ fontSize: 20 }}>🛡️</Text>
+                </View>
+                <View style={{ marginLeft: 12, flex: 1, paddingRight: 10 }}>
+                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#111827' }}>Service OTP</Text>
+                  <Text style={{ fontSize: 12, color: '#4B5563', marginTop: 2, lineHeight: 16 }}>
+                    Share this OTP with your provider only when they arrive.
+                  </Text>
+                </View>
+              </View>
+
+              {/* Right Side: Code */}
+              <View style={{ alignItems: 'center' }}>
+                <View style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingVertical: 12, borderRadius: 12, borderWidth: 1, borderColor: '#E0F2FE', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 4, elevation: 1 }}>
+                  <Text style={{ fontSize: 24, fontWeight: '800', letterSpacing: 8, color: '#0369A1', marginLeft: 8 }}>
+                    {booking.startOtp}
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 11, color: '#0284C7', marginTop: 8, fontWeight: '600' }}>
+                  ⏱️ Valid for 10:00 mins
+                </Text>
+              </View>
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F9FAFB', paddingVertical: 20, borderRadius: 12, borderWidth: 1, borderColor: '#F3F4F6', borderStyle: 'dashed' }}>
-              <Text style={{ fontSize: 48, fontWeight: '800', letterSpacing: 16, color: '#111827', marginLeft: 16 }}>
-                {booking.startOtp}
-              </Text>
-              <TouchableOpacity onPress={handleCopyOtp} style={{ padding: 10, marginLeft: 8 }}>
-                <Text style={{ fontSize: 20, opacity: 0.6 }}>📋</Text>
+
+            {/* Bottom Actions */}
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 20, gap: 12 }}>
+              <TouchableOpacity onPress={handleCopyOtp} style={{ flex: 1, backgroundColor: '#FFFFFF', paddingVertical: 12, borderRadius: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', borderWidth: 1, borderColor: '#E0F2FE' }}>
+                <Text style={{ fontSize: 16, marginRight: 6 }}>📋</Text>
+                <Text style={{ color: '#0369A1', fontWeight: '700', fontSize: 13 }}>Copy OTP</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={{ flex: 1, backgroundColor: '#FFFFFF', paddingVertical: 12, borderRadius: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', borderWidth: 1, borderColor: '#E0F2FE' }}>
+                <Text style={{ fontSize: 16, marginRight: 6 }}>🔗</Text>
+                <Text style={{ color: '#0369A1', fontWeight: '700', fontSize: 13 }}>Share OTP</Text>
               </TouchableOpacity>
             </View>
-            <Text style={{ fontSize: 13, color: '#6B7280', marginTop: 16, textAlign: 'center', fontWeight: '500', lineHeight: 18 }}>
-              Please share this code with the provider to begin the service.
-            </Text>
           </Reanimated.View>
         )}
 
@@ -522,6 +596,30 @@ const BookingTrackScreen = ({ route, navigation }) => {
           </Reanimated.View>
         )}
 
+        {/* ── Payment Status ────────────────────────────────────────────── */}
+        {(booking.paymentStatus || booking.paymentMethod) && (
+          <Reanimated.View entering={FadeInUp.delay(550).springify()} style={styles.section}>
+            <Text style={styles.sectionTitle}>💳 Payment Details</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+              <Text style={{ fontSize: FONT_SIZES.sm, color: COLORS.textSecondary }}>Payment Method</Text>
+              <Text style={{ fontSize: FONT_SIZES.sm, fontWeight: '700', color: COLORS.textPrimary }}>{booking.paymentMethod?.toUpperCase() || 'CASH ON DELIVERY'}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: FONT_SIZES.sm, color: COLORS.textSecondary }}>Payment Status</Text>
+              <Text style={{ fontSize: FONT_SIZES.sm, fontWeight: '700', color: booking.paymentStatus === 'completed' ? COLORS.success : '#F59E0B' }}>
+                {booking.paymentStatus?.toUpperCase().replace(/_/g, ' ') || 'PENDING'}
+              </Text>
+            </View>
+            {status === 'payment_pending' && (
+              <View style={{ marginTop: 16, backgroundColor: '#FEF3C7', padding: 12, borderRadius: 8 }}>
+                 <Text style={{ color: '#D97706', fontSize: 13, fontWeight: '600', textAlign: 'center' }}>
+                   Please pay ₹{booking.pricing?.totalAmount || booking.totalAmount || 0} to the provider.
+                 </Text>
+              </View>
+            )}
+          </Reanimated.View>
+        )}
+
         {/* ── Booking Info ──────────────────────────────────────────────── */}
         <Reanimated.View entering={FadeInUp.delay(600).springify()} style={styles.section}>
           <Text style={styles.sectionTitle}>📋 Booking Info</Text>
@@ -546,7 +644,7 @@ const BookingTrackScreen = ({ route, navigation }) => {
               {canRate && (
                 <TouchableOpacity
                   style={{ backgroundColor: '#EAB308', paddingVertical: 16, paddingHorizontal: 32, borderRadius: 100, shadowColor: '#EAB308', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 4 }}
-                  onPress={() => navigation.navigate('Review', { bookingId, providerId: booking.providerId?._id })}
+                  onPress={() => navigation.navigate('Review', { bookingId, providerId: typeof booking.providerId === 'string' ? booking.providerId : booking.providerId?._id })}
                 >
                   <Text style={{ color: '#FFF', fontSize: FONT_SIZES.lg, fontWeight: '800' }}>⭐ Rate Your Provider</Text>
                 </TouchableOpacity>
@@ -578,7 +676,7 @@ const InfoRow = ({ label, value }) => (
 );
 
 const styles = StyleSheet.create({
-  container:  { flex: 1, backgroundColor: '#F5F7FA' },
+  container:  { flex: 1, backgroundColor: '#F7F8FC' },
   content:    { paddingBottom: SPACING.xxxl },
   loaderBox:  { flex: 1, justifyContent: 'center', alignItems: 'center', padding: SPACING.xl },
   loaderText: { marginTop: SPACING.md, color: COLORS.textSecondary, fontSize: FONT_SIZES.md },
@@ -588,26 +686,25 @@ const styles = StyleSheet.create({
   // Header
   header: {
     flexDirection: 'row', alignItems: 'center', gap: SPACING.md,
-    paddingHorizontal: SPACING.xl, paddingTop: SPACING.xl + SPACING.lg, paddingBottom: SPACING.md,
-    backgroundColor: '#FFFFFF',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 4,
+    paddingHorizontal: 20, paddingTop: 60, paddingBottom: 16,
+    backgroundColor: '#F7F8FC',
   },
   headerBack:      { padding: 4 },
   headerBackText:  { fontSize: 28, color: COLORS.textPrimary, fontWeight: '300' },
-  headerTitle:     { fontSize: FONT_SIZES.lg, fontWeight: '800', color: '#111827' },
-  headerSub:       { fontSize: FONT_SIZES.xs, color: '#9CA3AF', marginTop: 1 },
-  statusBadge:     { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20, borderWidth: 1 },
-  statusBadgeText: { fontSize: 10, fontWeight: '700', textTransform: 'uppercase' },
+  headerTitle:     { fontSize: 20, fontWeight: '800', color: '#111827' },
+  headerSub:       { fontSize: 14, color: '#64748B', fontWeight: '500', marginTop: 1 },
+  statusBadge:     { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1 },
+  statusBadgeText: { fontSize: 11, fontWeight: '700', textTransform: 'uppercase' },
 
   // Status Card
   statusCard: {
-    margin: SPACING.xl, borderRadius: BORDER_RADIUS.xl, borderWidth: 2,
-    padding: SPACING.xl, alignItems: 'center',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.08, shadowRadius: 12, elevation: 4,
+    marginHorizontal: 20, marginBottom: 16, borderRadius: 16, backgroundColor: '#FFFFFF',
+    padding: 20, 
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 3,
   },
   statusIcon:    { fontSize: 64, marginBottom: SPACING.md },
-  statusTitle:   { fontSize: FONT_SIZES.xl, fontWeight: '800', textAlign: 'center' },
-  statusMessage: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, textAlign: 'center', marginTop: SPACING.sm, lineHeight: 20 },
+  statusTitle:   { fontSize: 18, fontWeight: '800' },
+  statusMessage: { fontSize: 14, color: '#64748B', marginTop: 4, lineHeight: 20 },
   searchingRow:  { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm, marginTop: SPACING.md },
   searchingText: { fontSize: FONT_SIZES.sm, fontWeight: '600' },
   lastUpdated:   { fontSize: 11, marginTop: SPACING.md, fontWeight: '500' },
@@ -640,7 +737,7 @@ const styles = StyleSheet.create({
   divider:      { height: 1, backgroundColor: '#F3F4F6', marginVertical: SPACING.md },
 
   // Timeline
-  timelineRow:         { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 0 },
+  timelineRow:         { flexDirection: 'row', alignItems: 'flex-start', marginBottom: 20 },
   timelineLeft:        { alignItems: 'center', width: 32, marginRight: SPACING.md },
   timelineDot:         { width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E5E7EB' },
   timelineDotDone:     { backgroundColor: '#16A34A' },
@@ -650,11 +747,11 @@ const styles = StyleSheet.create({
   timelineLine:        { width: 2, flex: 1, minHeight: 28, backgroundColor: '#E5E7EB', marginVertical: 2 },
   timelineLineDone:    { backgroundColor: '#16A34A' },
   timelineContent:     { flex: 1, paddingBottom: 16 },
-  timelineLabel:       { fontSize: FONT_SIZES.sm, fontWeight: '600', color: '#9CA3AF' },
-  timelineLabelDone:   { color: '#16A34A', fontWeight: '700' },
-  timelineLabelCurrent:{ color: COLORS.primary, fontWeight: '800' },
-  timelineLabelFuture: { color: '#D1D5DB' },
-  timelineTime:        { fontSize: 11, color: '#9CA3AF', marginTop: 2 },
+  timelineLabel:       { fontSize: 15, fontWeight: '700', color: '#111827' },
+  timelineLabelDone:   { color: '#16A34A' },
+  timelineLabelCurrent:{ color: '#2563EB' },
+  timelineLabelFuture: { color: '#9CA3AF' },
+  timelineTime:        { fontSize: 13, color: '#94A3B8', marginTop: 4 },
 
   // Provider
   providerCard:       { flexDirection: 'row', alignItems: 'flex-start', gap: SPACING.md },
@@ -690,13 +787,13 @@ const styles = StyleSheet.create({
   infoValue: { fontSize: FONT_SIZES.sm, color: '#111827', fontWeight: '600', flex: 1.8, textAlign: 'right' },
 
   // Footer
-  footer:      { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#FFF', padding: SPACING.lg, borderTopWidth: 1, borderTopColor: '#E5E7EB', gap: SPACING.sm, shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.06, shadowRadius: 8, elevation: 6 },
-  cancelBtn:   { backgroundColor: '#FEE2E2', paddingVertical: 14, borderRadius: BORDER_RADIUS.lg, alignItems: 'center', borderWidth: 1, borderColor: '#FCA5A5' },
-  cancelBtnText:{ color: '#EF4444', fontWeight: '700', fontSize: FONT_SIZES.md },
-  rateBtn:     { backgroundColor: '#FEF3C7', paddingVertical: 14, borderRadius: BORDER_RADIUS.lg, alignItems: 'center', borderWidth: 1, borderColor: '#FDE68A' },
-  rateBtnText: { color: '#B7770D', fontWeight: '700', fontSize: FONT_SIZES.md },
-  completedBanner:     { backgroundColor: '#DCFCE7', paddingVertical: 14, borderRadius: BORDER_RADIUS.lg, alignItems: 'center' },
-  completedBannerText: { color: '#16A34A', fontWeight: '700', fontSize: FONT_SIZES.md },
+  footer:      { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: '#F7F8FC', padding: 20, paddingTop: 10 },
+  cancelBtn:   { backgroundColor: '#FEE2E2', height: 56, borderRadius: 16, alignItems: 'center', justifyContent: 'center', flexDirection: 'row' },
+  cancelBtnText:{ color: '#EF4444', fontWeight: '700', fontSize: 16, marginLeft: 8 },
+  rateBtn:     { backgroundColor: '#FEF3C7', paddingVertical: 14, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#FDE68A' },
+  rateBtnText: { color: '#B7770D', fontWeight: '700', fontSize: 16 },
+  completedBanner:     { backgroundColor: '#DCFCE7', paddingVertical: 14, borderRadius: 16, alignItems: 'center' },
+  completedBannerText: { color: '#16A34A', fontWeight: '700', fontSize: 16 },
 });
 
 export default BookingTrackScreen;

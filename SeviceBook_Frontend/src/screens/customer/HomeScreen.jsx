@@ -11,6 +11,7 @@ import { categoryAPI } from '../../api/category.api';
 import { providerAPI } from '../../api/provider.api';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 import Geolocation from '@react-native-community/geolocation';
+import Skeleton from '../../components/Skeleton';
 
 const CATEGORY_ICONS = {
   'Electrician':      '⚡',
@@ -67,9 +68,12 @@ const HomeScreen = ({ navigation }) => {
     );
   });
 
+  const [error, setError] = useState(null);
+
   const initScreen = async () => {
     try {
       setLoading(true);
+      setError(null);
       const hasPerm = await requestLocationPermission();
       let loc = null;
       if (hasPerm) {
@@ -92,6 +96,8 @@ const HomeScreen = ({ navigation }) => {
         // Filter out "Pest Control" category per user request
         const filteredCats = catRes.data.data.filter(c => c.name !== 'Pest Control');
         setCategories(filteredCats);
+      } else {
+        throw new Error('Failed to load categories');
       }
       if (provRes?.data?.data) {
         let pData = Array.isArray(provRes.data.data) ? provRes.data.data : provRes.data.data.data || [];
@@ -105,6 +111,7 @@ const HomeScreen = ({ navigation }) => {
       }
     } catch (e) {
       console.warn(e);
+      setError('Failed to connect to the server. Please check your internet connection.');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -116,7 +123,7 @@ const HomeScreen = ({ navigation }) => {
     initScreen();
   };
 
-  const renderCategory = ({ item }) => {
+  const renderCategory = useCallback(({ item }) => {
     const icon = CATEGORY_ICONS[item.name] || '🔧';
     return (
       <TouchableOpacity 
@@ -130,9 +137,9 @@ const HomeScreen = ({ navigation }) => {
         <Text style={styles.catName} numberOfLines={2}>{item.name}</Text>
       </TouchableOpacity>
     );
-  };
+  }, [navigation]);
 
-  const renderProvider = ({ item }) => {
+  const renderProvider = useCallback(({ item }) => {
     const pName = item.userId?.name || 'Unknown';
     const rating = item.aggregateRating ? Number(item.aggregateRating).toFixed(1) : 'New';
     const jobs = item.completedJobs || 0;
@@ -181,9 +188,9 @@ const HomeScreen = ({ navigation }) => {
         </TouchableOpacity>
       </TouchableOpacity>
     );
-  };
+  }, [navigation]);
 
-  const renderPromo = ({ item }) => (
+  const renderPromo = useCallback(({ item }) => (
     <View style={[styles.promoCard, { backgroundColor: item.color }]}>
       <Text style={styles.promoTitle}>{item.title}</Text>
       <Text style={styles.promoSubtitle}>{item.subtitle}</Text>
@@ -191,13 +198,53 @@ const HomeScreen = ({ navigation }) => {
         <Text style={styles.promoCodeText}>Use code: {item.code}</Text>
       </View>
     </View>
-  );
+  ), []);
 
   if (loading) {
     return (
-      <View style={styles.loader}>
-        <ActivityIndicator size="large" color={COLORS.primary} />
-        <Text style={{ marginTop: 12, color: COLORS.textSecondary }}>Finding services near you...</Text>
+      <View style={[styles.container, { padding: SPACING.lg, paddingTop: 60 }]}>
+        {/* Header Skeleton */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 }}>
+          <View>
+            <Skeleton width={120} height={24} style={{ marginBottom: 8 }} />
+            <Skeleton width={180} height={16} />
+          </View>
+          <Skeleton width={44} height={44} borderRadius={22} />
+        </View>
+
+        {/* Search Bar Skeleton */}
+        <Skeleton width="100%" height={50} borderRadius={12} style={{ marginBottom: 30 }} />
+
+        {/* Promo Slider Skeleton */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: 30 }}>
+          <Skeleton width={280} height={140} borderRadius={16} style={{ marginRight: 16 }} />
+          <Skeleton width={280} height={140} borderRadius={16} />
+        </ScrollView>
+
+        {/* Categories Skeleton */}
+        <Skeleton width={180} height={20} style={{ marginBottom: 16 }} />
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+          <Skeleton width={80} height={100} borderRadius={16} />
+          <Skeleton width={80} height={100} borderRadius={16} />
+          <Skeleton width={80} height={100} borderRadius={16} />
+          <Skeleton width={80} height={100} borderRadius={16} />
+        </View>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: SPACING.xl }]}>
+        <Text style={{ fontSize: 48, marginBottom: SPACING.md }}>🌐</Text>
+        <Text style={{ fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary, marginBottom: SPACING.sm, textAlign: 'center' }}>Oops! Something went wrong</Text>
+        <Text style={{ fontSize: FONT_SIZES.md, color: COLORS.textSecondary, textAlign: 'center', marginBottom: SPACING.xl }}>{error}</Text>
+        <TouchableOpacity 
+          style={{ backgroundColor: COLORS.primary, paddingHorizontal: SPACING.xl, paddingVertical: 14, borderRadius: BORDER_RADIUS.md }}
+          onPress={initScreen}
+        >
+          <Text style={{ color: COLORS.white, fontWeight: '700', fontSize: FONT_SIZES.md }}>Retry</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -241,6 +288,9 @@ const HomeScreen = ({ navigation }) => {
             renderItem={renderPromo}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: SPACING.lg }}
+            initialNumToRender={3}
+            windowSize={5}
+            removeClippedSubviews={true}
           />
         </View>
 
@@ -254,6 +304,9 @@ const HomeScreen = ({ navigation }) => {
             renderItem={renderCategory}
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={{ paddingHorizontal: SPACING.lg }}
+            initialNumToRender={5}
+            windowSize={5}
+            removeClippedSubviews={true}
           />
         </View>
 
@@ -273,6 +326,9 @@ const HomeScreen = ({ navigation }) => {
               renderItem={renderProvider}
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={{ paddingHorizontal: SPACING.lg }}
+              initialNumToRender={3}
+              windowSize={5}
+              removeClippedSubviews={true}
               snapToInterval={280 + SPACING.md}
               decelerationRate="fast"
             />

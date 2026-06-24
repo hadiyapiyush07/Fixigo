@@ -159,6 +159,10 @@ const ProviderBookingsHistoryScreen = ({ navigation }) => {
         contentContainerStyle={styles.list}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
         ListFooterComponent={
           loading && bookings.length > 0
             ? <ActivityIndicator color={COLORS.primary} style={{ padding: SPACING.xl }} />

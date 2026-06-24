@@ -79,6 +79,7 @@ const bookingSchema = new mongoose.Schema(
       convenienceFee: { type: Number, default: 0 },
       totalAmount:    { type: Number, default: 0 },
     },
+    couponCode: { type: String, default: null },
 
     paymentStatus: {
       type: String,
