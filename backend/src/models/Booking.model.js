@@ -67,10 +67,13 @@ const bookingSchema = new mongoose.Schema(
     // The provider currently notified who needs to respond
     notifiedProviderId: { type: mongoose.Schema.Types.ObjectId, ref: "Provider", default: null },
 
+    // Device ID the notification was sent to (for security validation)
+    notifiedDeviceId: { type: String, default: null },
+
     // OTP to start service
     startOtp: { type: String, default: null },
 
-    // If provider doesn't respond in 2 minutes → try next provider
+    // If provider doesn't respond in 20 seconds → try next provider
     providerResponseDeadline: { type: Date, default: null },
 
     pricing: {
@@ -112,6 +115,7 @@ const bookingSchema = new mongoose.Schema(
 bookingSchema.index({ customerId: 1, createdAt: -1 });
 bookingSchema.index({ providerId: 1, createdAt: -1 });
 bookingSchema.index({ status: 1 });
+bookingSchema.index({ status: 1, providerResponseDeadline: 1 }); // For heartbeat timeout sweeps
 bookingSchema.index({ "address.location": "2dsphere" });
 
 const Booking = mongoose.model("Booking", bookingSchema);

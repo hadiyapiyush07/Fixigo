@@ -2,7 +2,8 @@ const express    = require("express");
 const router     = express.Router();
 const {
   getNearbyProviders, getMyProviderProfile, getProviderById,
-  updateProviderProfile, toggleOnlineStatus, updateAvailability, getMyStats, getMyEarnings
+  updateProviderProfile, toggleOnlineStatus, updateAvailability, getMyStats, getMyEarnings,
+  heartbeatProvider
 } = require("../controllers/provider.controller");
 const { verifyToken }  = require("../middleware/auth.middleware");
 const { requireRole }  = require("../middleware/role.middleware");
@@ -14,6 +15,7 @@ router.get( "/my-earnings",    verifyToken, requireRole("provider"), getMyEarnin
 router.put( "/profile",        verifyToken, requireRole("provider"), updateProviderProfile);
 router.put( "/online-status",  verifyToken, requireRole("provider"), toggleOnlineStatus);
 router.put( "/availability",   verifyToken, requireRole("provider"), updateAvailability);
+router.post("/heartbeat",      verifyToken, requireRole("provider"), heartbeatProvider);
 
 // ── Public ────────────────────────────────────────────────────────────────
 router.get("/nearby",  getNearbyProviders);

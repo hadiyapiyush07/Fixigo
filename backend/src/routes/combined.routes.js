@@ -165,7 +165,6 @@ adminRouter.put("/providers/:id/verify", asyncHandler(async (req, res) => {
 
   // If rejected or pending, provider must go offline
   if (updateObj.isVerified === false) {
-    updateObj.isOnline = false;
     updateObj.status = "offline";
   }
 

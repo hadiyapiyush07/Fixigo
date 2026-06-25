@@ -31,6 +31,8 @@ const notifyNextProvider = async (booking) => {
     const providers = await Provider.find({
       skills: booking.categoryId,
       _id: { $nin: booking.rejectedProviders },
+      status: "available",
+      isVerified: true,
       currentLocation: {
         $nearSphere: {
           $geometry: { type: "Point", coordinates },
@@ -39,22 +41,19 @@ const notifyNextProvider = async (booking) => {
       }
     }).populate("userId", "name fcmToken");
 
-    console.log(`📊 Found ${providers.length} providers in ${radius}m radius`);
+    console.log(`📊 Found ${providers.length} available providers in ${radius}m radius`);
 
-    for (const provider of providers) {
+    // Sort providers by Rating, Acceptance Rate, etc.
+    const sortedProviders = providers.sort((a, b) => {
+      // Primary: Rating (Descending)
+      if (b.metrics?.rating !== a.metrics?.rating) return (b.metrics?.rating || 0) - (a.metrics?.rating || 0);
+      // Secondary: Acceptance Rate
+      return (b.metrics?.acceptanceRate || 0) - (a.metrics?.acceptanceRate || 0);
+    });
+
+    for (const provider of sortedProviders) {
       console.log(`  -> Checking Provider: ${provider._id} (User: ${provider.userId?.name})`);
-      console.log(`     Status: ${provider.status}, isOnline: ${provider.isOnline}, isVerified: ${provider.isVerified}`);
       
-      if (!provider.isOnline || provider.status !== 'online') {
-        console.log(`     ❌ Rejected: Offline or busy`);
-        continue;
-      }
-      if (!provider.isVerified) {
-        console.log(`     ❌ Rejected: Unverified (${provider.verificationStatus})`);
-        continue;
-      }
-      
-      // If passed all checks:
       selectedProvider = provider;
       console.log(`     ✅ SELECTED Provider ${provider._id} at radius ${radius}m`);
       break;
@@ -83,7 +82,7 @@ const notifyNextProvider = async (booking) => {
     return;
   }
 
-  const deadline = new Date(Date.now() + 2 * 60 * 1000);
+  const deadline = new Date(Date.now() + 20 * 1000); // 20 seconds timeout
   await Booking.findByIdAndUpdate(booking._id, {
     notifiedProviderId: selectedProvider._id,
     providerResponseDeadline: deadline
@@ -216,23 +215,40 @@ const acceptBooking = async (bookingId, providerUserId) => {
     }
     throw new ApiError(403, "Provider is not verified. Your profile is under verification. Please wait until the admin approves your account.");
   }
+  
+  if (provider.status !== "available") {
+    throw new ApiError(400, "You must be 'Available' to accept a booking.");
+  }
 
-  const booking = await Booking.findById(bookingId);
-  if (!booking) throw new ApiError(404, "Booking not found.");
-  if (booking.status !== "pending") throw new ApiError(400, "Booking is no longer pending.");
-
-  const updated = await Booking.findByIdAndUpdate(bookingId, {
-    status: "confirmed", // Automatically confirms on accept
-    providerId: provider._id,
-    notifiedProviderId: null,
-    acceptedAt: new Date(),
-    $push: { 
-      statusHistory: [
-        { status: "accepted", changedBy: providerUserId, note: "Provider accepted" },
-        { status: "confirmed", changedBy: providerUserId, note: "Auto-transition to confirmed" }
-      ]
+  // ATOMIC UPDATE: Ensure no double booking acceptance
+  const updated = await Booking.findOneAndUpdate(
+    { _id: bookingId, status: "pending" }, // Strictly match pending state
+    {
+      $set: {
+        status: "confirmed",
+        providerId: provider._id,
+        notifiedProviderId: null,
+        acceptedAt: new Date(),
+      },
+      $push: { 
+        statusHistory: [
+          { status: "accepted", changedBy: providerUserId, note: "Provider accepted" },
+          { status: "confirmed", changedBy: providerUserId, note: "Auto-transition to confirmed" }
+        ]
+      }
     },
-  }, { new: true }).populate("customerId", "name phone fcmToken");
+    { new: true }
+  ).populate("customerId", "name phone fcmToken");
+
+  if (!updated) {
+    throw new ApiError(400, "Booking already accepted by another provider or expired.");
+  }
+
+  // Automatically mark provider as busy
+  await Provider.findByIdAndUpdate(provider._id, { 
+    status: "busy", 
+    $inc: { "metrics.acceptedJobs": 1 } 
+  });
 
   if (updated.customerId) {
     await notificationService.sendNotification({
@@ -305,13 +321,13 @@ const updateBookingStatus = async (bookingId, status, userId, otp) => {
   if (status === "completed") {
     update.completedAt = new Date();
     await Provider.findByIdAndUpdate(booking.providerId, { 
-      status: "online",
+      status: "available",
       $inc: { completedBookings: 1, totalBookings: 1 } 
     });
   }
   if (status === "cancelled") {
     if (booking.providerId) {
-      await Provider.findByIdAndUpdate(booking.providerId, { status: "online" });
+      await Provider.findByIdAndUpdate(booking.providerId, { status: "available" });
     }
   }
 
@@ -358,7 +374,7 @@ const cancelBooking = async (bookingId, customerUserId, reason) => {
   await booking.save();
 
   if (booking.providerId) {
-    await Provider.findByIdAndUpdate(booking.providerId._id, { status: "online" });
+    await Provider.findByIdAndUpdate(booking.providerId._id, { status: "available" });
     const providerUser = await User.findById(booking.providerId.userId).select("fcmToken");
     if (providerUser) {
       await notificationService.sendNotification({
