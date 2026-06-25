@@ -83,7 +83,17 @@ const getMyEarnings = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, earnings, "Provider earnings fetched."));
 });
 
+// POST /api/providers/heartbeat
+const heartbeatProvider = asyncHandler(async (req, res) => {
+  const { latitude, longitude, accuracy, heading, speed } = req.body;
+  const result = await providerService.heartbeatProvider(req.user._id, {
+    latitude, longitude, accuracy, heading, speed
+  });
+  res.status(200).json(new ApiResponse(200, result, "Heartbeat logged."));
+});
+
 module.exports = {
   getNearbyProviders, getMyProviderProfile, getProviderById,
-  updateProviderProfile, toggleOnlineStatus, updateAvailability, getMyStats, getMyEarnings
+  updateProviderProfile, toggleOnlineStatus, updateAvailability, getMyStats, getMyEarnings,
+  heartbeatProvider
 };

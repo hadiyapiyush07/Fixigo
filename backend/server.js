@@ -36,6 +36,7 @@ const connectDB          = require("./src/config/db");
 const { connectRedis }   = require("./src/config/redis");
 const { initFirebase }   = require("./src/config/firebase");
 const { initSocket }     = require("./src/socket/socket");
+const { startHeartbeatService } = require("./src/services/heartbeat.service");
 
 const PORT = process.env.PORT || 5000;
 
@@ -69,6 +70,9 @@ const startServer = async () => {
   //   - Booking status updates (customer sees status change instantly)
   //   - Live chat between customer and provider
   initSocket(server);
+
+  // ── Step 5.1: Start Heartbeat Service ────────────────────
+  startHeartbeatService();
 
   // ── Step 6: Start listening ──────────────────────────────
   server.listen(PORT, () => {

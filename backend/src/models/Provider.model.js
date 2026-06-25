@@ -33,15 +33,30 @@ const providerSchema = new mongoose.Schema(
       ifscCode: { type: String, default: null },
       accountHolderName: { type: String, default: null }
     },
-    status: { type: String, enum: ["offline", "online", "busy"], default: "offline" },
+    status: { type: String, enum: ["offline", "available", "busy"], default: "offline" },
     address: { type: String, default: null },
 
     // Admin must approve before provider can receive jobs
     isVerified: { type: Boolean, default: false },
     verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
 
-    // Provider toggles online/offline (like Uber driver status)
-    isOnline: { type: Boolean, default: false },
+    // For background heartbeat system
+    lastSeen: { type: Date, default: Date.now },
+
+    // Performance & Analytics Score (for smart matching)
+    metrics: {
+      rating: { type: Number, default: 0 },
+      totalReviews: { type: Number, default: 0 },
+      acceptedJobs: { type: Number, default: 0 },
+      rejectedJobs: { type: Number, default: 0 },
+      missedRequests: { type: Number, default: 0 },
+      completedJobs: { type: Number, default: 0 },
+      cancelledJobs: { type: Number, default: 0 },
+      averageResponseTime: { type: Number, default: 0 }, // in seconds
+      completionRate: { type: Number, default: 100 },    // percentage
+      acceptanceRate: { type: Number, default: 100 },    // percentage
+      cancellationRate: { type: Number, default: 0 }     // percentage
+    },
 
     // Real-time GPS — updated by socket every 5-10 seconds while on job
     // Longitude FIRST — that is GeoJSON standard
@@ -87,9 +102,9 @@ const providerSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-// Required for $nearSphere geo queries — find providers within X km
 providerSchema.index({ currentLocation: "2dsphere" });
-providerSchema.index({ isVerified: 1, isOnline: 1, skills: 1 });
+providerSchema.index({ isVerified: 1, status: 1, skills: 1 });
+providerSchema.index({ status: 1, lastSeen: 1 }); // For heartbeat timeout sweeps
 
 const Provider = mongoose.model("Provider", providerSchema);
 module.exports = Provider;

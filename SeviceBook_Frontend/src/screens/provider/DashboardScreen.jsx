@@ -1,15 +1,12 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import {
-  View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, RefreshControl, Animated,
-  PermissionsAndroid, Platform, Alert,
-} from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Animated, PermissionsAndroid, Platform, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
-import { useDispatch, useSelector } from 'react-redux';
+import { useSelector } from 'react-redux';
 import { bookingAPI } from '../../api/booking.api';
 import { providerAPI } from '../../api/provider.api';
-import { logoutUser } from '../../store/slices/authSlice';
 import { socketService } from '../../services/socket.service';
+import BackgroundLocationService from '../../services/BackgroundLocationService';
+import BatteryOptimizationService from '../../services/BatteryOptimizationService';
 
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 import { Card } from '../../components/ui/Card';
@@ -46,7 +43,6 @@ const getDistance = (coord1, coord2) => {
 };
 
 const DashboardScreen = ({ navigation }) => {
-  const dispatch = useDispatch();
   const { user } = useSelector(s => s.auth);
 
   const [isOnline, setIsOnline] = useState(false);
@@ -57,6 +53,7 @@ const DashboardScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [togglingOnline, setTogglingOnline] = useState(false);
+  const togglingOnlineRef = useRef(false);
   const isFirstLoad = useRef(true);
 
   const toggleAnim = useRef(new Animated.Value(0)).current;
@@ -67,7 +64,22 @@ const DashboardScreen = ({ navigation }) => {
       const profRes = await providerAPI.getMyProfile();
       const profile = profRes.data.data;
       setProviderProfile(profile);
-      setIsOnline(profile?.isOnline || false);
+      const isCurrentlyOnline = profile?.status === 'available';
+      
+      // Prevent UI flicker: Don't overwrite state if we are actively toggling
+      if (!togglingOnlineRef.current) {
+        setIsOnline(isCurrentlyOnline);
+        
+        // Auto-restart background service if app crashed while online
+        if (isCurrentlyOnline) {
+          if (Platform.OS === 'android' && Platform.Version >= 33) {
+            await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+          }
+          BackgroundLocationService.start();
+        } else {
+          BackgroundLocationService.stop();
+        }
+      }
 
       const [bookingsRes, statsRes] = await Promise.all([
         bookingAPI.getProviderBookings({ page: 1, limit: 10 }),
@@ -144,15 +156,20 @@ const DashboardScreen = ({ navigation }) => {
     
     if (togglingOnline) return;
     setTogglingOnline(true);
+    togglingOnlineRef.current = true;
     setIsOnline(newValue);
 
     try {
       if (Platform.OS === 'android') {
+        if (Platform.Version >= 33) {
+          await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+        }
         const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
           Alert.alert('Permission Denied', 'Location access is required.');
           setIsOnline(!newValue);
           setTogglingOnline(false);
+          togglingOnlineRef.current = false;
           return;
         }
       }
@@ -160,17 +177,28 @@ const DashboardScreen = ({ navigation }) => {
       Geolocation.getCurrentPosition(
         async ({ coords: { latitude, longitude } }) => {
           try {
+            if (newValue) {
+              await BatteryOptimizationService.checkAndPrompt();
+              await BackgroundLocationService.start();
+            } else {
+              await BackgroundLocationService.stop();
+            }
+            
             await providerAPI.toggleOnline({ isOnline: newValue, latitude, longitude });
             await loadDashboard(false);
           } catch (e) {
+            console.log("Toggle Error", e);
             setIsOnline(!newValue);
+            if (newValue) await BackgroundLocationService.stop();
           } finally {
             setTogglingOnline(false);
+            togglingOnlineRef.current = false;
           }
         },
         () => {
           setIsOnline(!newValue);
           setTogglingOnline(false);
+          togglingOnlineRef.current = false;
           Alert.alert('Location Error', 'Could not fetch your location.');
         },
         { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
@@ -178,6 +206,7 @@ const DashboardScreen = ({ navigation }) => {
     } catch (error) {
       setIsOnline(!newValue);
       setTogglingOnline(false);
+      togglingOnlineRef.current = false;
     }
   };
 

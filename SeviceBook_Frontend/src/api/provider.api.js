@@ -10,4 +10,5 @@ export const providerAPI = {
   updateProfile:        (data)   => api.put('/providers/profile', data),
   toggleOnline:         (data)   => api.put('/providers/online-status', data),
   updateAvailability:   (availability) => api.put('/providers/availability', { availability }),
+  heartbeat:            (data)   => api.post('/providers/heartbeat', data),
 };

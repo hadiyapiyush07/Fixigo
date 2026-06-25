@@ -21,24 +21,24 @@ const sendNotification = async ({ userId, fcmToken, title, body, type, data = {}
   }
 
   try {
+    // Use data-only messages for booking requests so React Native Notifee can show custom action buttons
+    const isDataOnly = type === 'booking_request';
+
     const payload = {
-      notification: { title, body },
+      ...(isDataOnly ? {} : { notification: { title, body } }),
       data: {
         ...data,
+        type: type, // Explicitly pass type to frontend for background message routing
+        title: title, // Pass title/body inside data for Notifee to use
+        body: body,
         click_action: "FLUTTER_NOTIFICATION_CLICK", // for Flutter/RN handling
       },
       token: fcmToken,
       android: {
-        notification: {
-          sound: "default"
-        }
+        ...(isDataOnly ? {} : { notification: { sound: "default" } })
       },
       apns: {
-        payload: {
-          aps: {
-            sound: "default"
-          }
-        }
+        ...(isDataOnly ? {} : { payload: { aps: { sound: "default" } } })
       }
     };
 

@@ -28,7 +28,7 @@ const getNearbyProviders = async ({ latitude, longitude, categoryId, radiusKm = 
 
   const filter = {
     isVerified: true,
-    isOnline:   true,
+    status:     "available",
     ...(categoryId && { skills: categoryId }),
     currentLocation: {
       $nearSphere: {
@@ -139,13 +139,11 @@ const updateProviderProfile = async (userId, updateData) => {
   if (currentProvider && (currentProvider.isVerified || currentProvider.verificationStatus === "verified")) {
     providerUpdates.verificationStatus = "verified";
     providerUpdates.isVerified = true;
-    providerUpdates.isOnline = currentProvider.isOnline;
     providerUpdates.status = currentProvider.status;
   } else {
     // Reset verification to pending and status to offline for new/unverified providers
     providerUpdates.verificationStatus = "pending";
     providerUpdates.isVerified = false;
-    providerUpdates.isOnline = false;
     providerUpdates.status = "offline";
   }
 
@@ -157,13 +155,6 @@ const updateProviderProfile = async (userId, updateData) => {
   return provider;
 };
 
-// const toggleOnlineStatus = async (userId, isOnline) => {
-//   const provider = await Provider.findOneAndUpdate(
-//     { userId }, { isOnline }, { new: true }
-//   );
-//   if (!provider) throw new ApiError(404, "Provider not found.");
-//   return { isOnline: provider.isOnline };
-// };
 
 const toggleOnlineStatus = async (userId, isOnline, latitude, longitude) => {
   const provider = await Provider.findOne({ userId });
@@ -180,7 +171,7 @@ const toggleOnlineStatus = async (userId, isOnline, latitude, longitude) => {
     throw new ApiError(403, "Your profile is under verification. Please wait until the admin approves your account.");
   }
 
-  let updateData = { isOnline, status: isOnline ? "online" : "offline" };
+  let updateData = { status: isOnline ? "available" : "offline" };
   
   // Agar location mila hai, toh DB mein update karo (Longitude hamesha pehle aata hai)
   if (latitude && longitude) {
@@ -193,7 +184,25 @@ const toggleOnlineStatus = async (userId, isOnline, latitude, longitude) => {
   const updated = await Provider.findOneAndUpdate(
     { userId }, updateData, { new: true }
   );
-  return { isOnline: updated.isOnline, status: updated.status, currentLocation: updated.currentLocation };
+  return { status: updated.status, currentLocation: updated.currentLocation };
+};
+
+const heartbeatProvider = async (userId, data) => {
+  const { latitude, longitude, accuracy, heading, speed } = data;
+  const updateData = { lastSeen: new Date() };
+
+  // Only update location if accuracy is acceptable
+  if (latitude && longitude && accuracy <= 50) {
+    updateData.currentLocation = {
+      type: "Point",
+      coordinates: [parseFloat(longitude), parseFloat(latitude)]
+    };
+    if (heading) updateData.heading = heading;
+    if (speed) updateData.speed = speed;
+  }
+
+  await Provider.findOneAndUpdate({ userId }, updateData);
+  return { success: true };
 };
 
 const updateLocation = async (userId, longitude, latitude, heading = 0, speed = 0) => {
@@ -415,8 +424,15 @@ const getProviderEarnings = async (providerId, timeframe) => {
 };
 
 module.exports = {
-  getProviderById, getProviderByUserId, getNearbyProviders,
-  updateProviderProfile, toggleOnlineStatus, updateLocation,
-  updateAvailability, recalculateRating, getProviderStats, getProviderEarnings,
+  getNearbyProviders,
+  getProviderById,
+  getProviderByUserId,
+  updateProviderProfile,
+  toggleOnlineStatus,
+  updateLocation,
+  updateAvailability,
+  getProviderStats,
+  getProviderEarnings,
+  recalculateRating,
+  heartbeatProvider
 };
-

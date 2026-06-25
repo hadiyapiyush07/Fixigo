@@ -79,7 +79,7 @@ const logoutUser = async (userId) => {
   if (user && user.role === 'provider') {
     await Provider.findOneAndUpdate(
       { userId: userId },
-      { isOnline: false }
+      { status: "offline" }
     );
   }
 };

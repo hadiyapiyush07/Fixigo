@@ -6,6 +6,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, Vibration } from 'react-native';
 import { useSelector } from 'react-redux';
 import { showMessage } from 'react-native-flash-message';
+import notifee from '@notifee/react-native';
 import { COLORS, FONT_SIZES } from '../theme/typography';
 
 // Auth screens
@@ -59,24 +60,26 @@ const Tab   = createBottomTabNavigator();
 // ── Customer Bottom Tabs ──────────────────────────────────────────────────
 const CustomerTabs = () => {
   useEffect(() => {
-    const handleNewMessage = (msg) => {
-      showMessage({
-        message: "New Message",
-        description: `You received a message: ${msg?.message || 'New chat message'}`,
-        type: "success",
-        icon: "success",
-        duration: 3000,
+    const handleNewMessage = async (msg) => {
+      await notifee.displayNotification({
+        title: "New Message",
+        body: `You received a message: ${msg?.message || 'New chat message'}`,
+        android: {
+          channelId: 'booking_updates',
+          smallIcon: 'ic_launcher',
+        },
       });
       Vibration.vibrate(200);
     };
 
-    const handleNewNotification = (notif) => {
-      showMessage({
-        message: notif?.title || "New Alert",
-        description: notif?.message || "You have a new notification",
-        type: "info",
-        icon: "info",
-        duration: 4000,
+    const handleNewNotification = async (notif) => {
+      await notifee.displayNotification({
+        title: notif?.title || "New Alert",
+        body: notif?.message || "You have a new notification",
+        android: {
+          channelId: 'booking_updates',
+          smallIcon: 'ic_launcher',
+        },
       });
       Vibration.vibrate([0, 500, 200, 500]);
     };
@@ -136,25 +139,27 @@ const ProviderTabs = () => {
   );
 
   useEffect(() => {
-    const handleNewBooking = () => {
+    const handleNewBooking = async (data) => {
       fetchCount();
-      showMessage({
-        message: "New Service Request!",
-        description: "You have a new request waiting for you.",
-        type: "info",
-        icon: "info",
-        duration: 4000,
+      await notifee.displayNotification({
+        title: "New Service Request!",
+        body: "You have a new request waiting for you.",
+        android: {
+          channelId: 'booking_updates',
+          smallIcon: 'ic_launcher',
+        },
       });
       Vibration.vibrate([0, 500, 200, 500]);
     };
 
-    const handleNewMessage = (msg) => {
-      showMessage({
-        message: "New Message",
-        description: `You received a message: ${msg?.message || 'New chat message'}`,
-        type: "success",
-        icon: "success",
-        duration: 3000,
+    const handleNewMessage = async (msg) => {
+      await notifee.displayNotification({
+        title: "New Message",
+        body: `You received a message: ${msg?.message || 'New chat message'}`,
+        android: {
+          channelId: 'booking_updates',
+          smallIcon: 'ic_launcher',
+        },
       });
       Vibration.vibrate(200);
     };
