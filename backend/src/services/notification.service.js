@@ -35,9 +35,13 @@ const sendNotification = async ({ userId, fcmToken, title, body, type, data = {}
       },
       token: fcmToken,
       android: {
+        priority: 'high',
         ...(isDataOnly ? {} : { notification: { sound: "default" } })
       },
       apns: {
+        headers: {
+          'apns-priority': '10',
+        },
         ...(isDataOnly ? {} : { payload: { aps: { sound: "default" } } })
       }
     };

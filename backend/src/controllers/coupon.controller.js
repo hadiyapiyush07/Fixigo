@@ -53,6 +53,26 @@ const applyCoupon = asyncHandler(async (req, res) => {
   );
 });
 
+const getActiveCoupons = asyncHandler(async (req, res) => {
+  const coupons = await Coupon.find({
+    isActive: true,
+    $or: [
+      { expiryDate: null },
+      { expiryDate: { $gt: new Date() } }
+    ]
+  });
+
+  // Filter out coupons that the user has already used up to their limit
+  const userIdStr = String(req.user._id);
+  const availableCoupons = coupons.filter(c => {
+    const usageCount = c.usedBy.filter(u => String(u.userId) === userIdStr).length;
+    return usageCount < c.usageLimitPerUser;
+  });
+
+  res.status(200).json(new ApiResponse(200, availableCoupons, "Active coupons fetched successfully."));
+});
+
 module.exports = {
-  applyCoupon
+  applyCoupon,
+  getActiveCoupons
 };

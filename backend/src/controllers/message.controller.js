@@ -28,8 +28,7 @@ const sendMessage = asyncHandler(async (req, res) => {
     message
   });
   
-  const { emitToBooking, emitToUser } = require("../socket/socket");
-  emitToBooking(bookingId, "newMessage", newMessage);
+  const { emitToUser } = require("../socket/socket");
   emitToUser(receiverId, "newMessage", newMessage);
   
   res.status(201).json(new ApiResponse(201, newMessage, "Message sent successfully."));

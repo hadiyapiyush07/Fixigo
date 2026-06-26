@@ -8,58 +8,95 @@ const { sendOTP, verifyOTP } = require("../utils/sendOTP");
 const register = asyncHandler(async (req, res) => {
   const { name, email, phone, password, role } = req.body;
 
-  if (!name || !email || !phone || !password) {
-    throw new ApiError(400, "name, email, phone and password are all required.");
-  }
-  if (role && !["customer", "provider"].includes(role)) {
-    throw new ApiError(400, "role must be customer or provider.");
-  }
-
   const result = await authService.registerUser({
     name, email, phone, password,
     role: role || "customer",
   });
 
-  res.status(201).json(new ApiResponse(201, result, "Registration successful."));
+  // NO TOKENS RETURNED. Redirect to login.
+  res.status(201).json(new ApiResponse(201, { user: result }, "Account created successfully. Please login to continue."));
 });
-
-// POST /api/auth/login
-// const login = asyncHandler(async (req, res) => {
-//   const { email, phone, password } = req.body;
-
-//   if ((!email && !phone) || !password) {
-//     throw new ApiError(400, "Email or phone, and password are required.");
-//   }
-
-//   const result = await authService.loginUser({ email, phone, password });
-//   res.status(200).json(new ApiResponse(200, result, "Login successful."));
-// });
 
 // POST /api/auth/login
 const login = asyncHandler(async (req, res) => {
   const { email, phone, password } = req.body;
 
-  if ((!email && !phone) || !password) {
-    throw new ApiError(400, "Email or phone, and password are required.");
-  }
+  // 1. Validate credentials and check lockout
+  const userBasics = await authService.validateCredentials({ email, phone, password });
 
-  const result = await authService.loginUser({ email, phone, password });
+  // 2. Generate and send OTP
+  const smsResponse = await sendOTP(userBasics.phone, 'login');
 
-  // For admin web panel — set cookie (browser only)
-  // React Native app ignores this and uses the token from response body
-  if (result.user.role === "admin") {
-    res.cookie("adminToken", result.accessToken, {
-      httpOnly: true,     // cannot be accessed by JavaScript
+  // 3. Return success so frontend can redirect to OTP screen
+  res.status(200).json(new ApiResponse(200, { phone: userBasics.phone, mockOtp: smsResponse.mockOtp || undefined }, "Credentials verified. OTP sent to your registered mobile number."));
+});
+
+// POST /api/auth/verify-login-otp
+const verifyLoginOtp = asyncHandler(async (req, res) => {
+  const { phone, otp } = req.body;
+  if (!phone || !otp) throw new ApiError(400, "phone and otp are required.");
+
+  // 1. Verify OTP
+  const result = await verifyOTP(phone, otp, 'login');
+  if (!result.success) throw new ApiError(400, result.message);
+
+  // 2. Generate Tokens
+  const authData = await authService.generateAuthTokens(phone);
+
+  // For admin web panel
+  if (authData.user.role === "admin") {
+    res.cookie("adminToken", authData.accessToken, {
+      httpOnly: true,
       secure:   process.env.NODE_ENV === "production",
       sameSite: "strict",
-      maxAge:   7 * 24 * 60 * 60 * 1000, // 7 days
+      maxAge:   7 * 24 * 60 * 60 * 1000,
     });
   }
 
-  res.status(200).json(new ApiResponse(200, result, "Login successful."));
+  res.status(200).json(new ApiResponse(200, authData, "Login successful."));
 });
 
-// POST /api/auth/logout  (protected)
+// POST /api/auth/forgot-password
+const forgotPassword = asyncHandler(async (req, res) => {
+  const { phone } = req.body;
+  if (!phone) throw new ApiError(400, "phone is required.");
+
+  // Make sure user exists
+  const User = require("../models/User.model");
+  const user = await User.findOne({ phone });
+  if (!user) throw new ApiError(404, "User not found with this mobile number.");
+
+  const smsResponse = await sendOTP(phone, 'forgot_password');
+  res.status(200).json(new ApiResponse(200, { phone, mockOtp: smsResponse.mockOtp || undefined }, "OTP sent to your mobile number."));
+});
+
+// POST /api/auth/reset-password
+const resetPassword = asyncHandler(async (req, res) => {
+  const { phone, otp, newPassword } = req.body;
+  if (!phone || !otp || !newPassword) throw new ApiError(400, "phone, otp, and new password are required.");
+
+  if (newPassword.length < 6 || !/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[!@#$%^&*]/.test(newPassword)) {
+    throw new ApiError(400, "Password must be at least 6 characters and contain uppercase, lowercase, number, and special character.");
+  }
+
+  // Verify OTP
+  const result = await verifyOTP(phone, otp, 'forgot_password');
+  if (!result.success) throw new ApiError(400, result.message);
+
+  // Reset Password
+  await authService.resetPassword(phone, newPassword);
+
+  res.status(200).json(new ApiResponse(200, null, "Password reset successfully. Please login with your new password."));
+});
+
+// POST /api/auth/change-password (protected)
+const changePassword = asyncHandler(async (req, res) => {
+  const { currentPassword, newPassword } = req.body;
+  await authService.changePassword(req.user._id, currentPassword, newPassword);
+  res.status(200).json(new ApiResponse(200, null, "Password changed successfully."));
+});
+
+// POST /api/auth/logout (protected)
 const logout = asyncHandler(async (req, res) => {
   await authService.logoutUser(req.user._id);
   res.status(200).json(new ApiResponse(200, null, "Logged out successfully."));
@@ -72,31 +109,7 @@ const refreshToken = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, tokens, "Token refreshed."));
 });
 
-// POST /api/auth/send-otp  (protected)
-const sendOTPController = asyncHandler(async (req, res) => {
-  const phone = req.body.phone || req.user.phone;
-  if (!phone) throw new ApiError(400, "phone is required.");
-
-  const result = await sendOTP(phone);
-  res.status(200).json(new ApiResponse(200, null, result.message));
-});
-
-// POST /api/auth/verify-otp  (protected)
-const verifyOTPController = asyncHandler(async (req, res) => {
-  const { phone, otp } = req.body;
-  if (!phone || !otp) throw new ApiError(400, "phone and otp are required.");
-
-  const result = await verifyOTP(phone, otp);
-  if (!result.success) throw new ApiError(400, result.message);
-
-  // Mark phone as verified in DB
-  const User = require("../models/User.model");
-  await User.findByIdAndUpdate(req.user._id, { isPhoneVerified: true });
-
-  res.status(200).json(new ApiResponse(200, null, "Phone verified successfully."));
-});
-
-// PUT /api/auth/fcm-token  (protected)
+// PUT /api/auth/fcm-token (protected)
 const updateFcmToken = asyncHandler(async (req, res) => {
   const { fcmToken } = req.body;
   if (!fcmToken) throw new ApiError(400, "fcmToken is required.");
@@ -104,4 +117,14 @@ const updateFcmToken = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, null, "FCM token updated."));
 });
 
-module.exports = { register, login, logout, refreshToken, sendOTPController, verifyOTPController, updateFcmToken };
+module.exports = { 
+  register, 
+  login, 
+  verifyLoginOtp,
+  forgotPassword,
+  resetPassword,
+  changePassword,
+  logout, 
+  refreshToken, 
+  updateFcmToken 
+};

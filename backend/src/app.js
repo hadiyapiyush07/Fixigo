@@ -39,6 +39,7 @@ const otpRoutes      = require("./routes/otp.routes");
 const messageRoutes  = require("./routes/message.routes");
 const couponRoutes   = require("./routes/coupon.routes");
 const notificationRoutes = require("./routes/notification.routes");
+const addressRoutes  = require("./routes/address.routes");
 const { categoryRouter, adminRouter } = require("./routes/combined.routes");
 
 // ── Import middleware ─────────────────────────────────────────────────────
@@ -87,7 +88,10 @@ app.use("/api/bookings",   bookingRoutes);   // create, accept, track bookings
 app.use("/api/payments",   paymentRoutes);   // Razorpay payment flow
 app.use("/api/otp",        otpRoutes);       // send and verify OTP
 app.use("/api/categories", categoryRouter);  // service categories
-app.use("/api/admin",      adminRouter);     // admin dashboard
+app.use("/api/admin",      adminRouter);     // admin
+app.use("/api/addresses", addressRoutes);
+
+// Messages
 app.use("/api/messages",   messageRoutes);   // chat and messaging
 app.use("/api/coupons",    couponRoutes);
 app.use("/api/notifications", notificationRoutes);

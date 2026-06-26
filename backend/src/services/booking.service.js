@@ -324,10 +324,14 @@ const updateBookingStatus = async (bookingId, status, userId, otp) => {
       status: "available",
       $inc: { completedBookings: 1, totalBookings: 1 } 
     });
+    const { emitToAll } = require("../socket/socket");
+    emitToAll("providers:status_changed", { providerId: booking.providerId, status: "available" });
   }
   if (status === "cancelled") {
     if (booking.providerId) {
       await Provider.findByIdAndUpdate(booking.providerId, { status: "available" });
+      const { emitToAll } = require("../socket/socket");
+      emitToAll("providers:status_changed", { providerId: booking.providerId, status: "available" });
     }
   }
 
@@ -375,6 +379,8 @@ const cancelBooking = async (bookingId, customerUserId, reason) => {
 
   if (booking.providerId) {
     await Provider.findByIdAndUpdate(booking.providerId._id, { status: "available" });
+    const { emitToAll } = require("../socket/socket");
+    emitToAll("providers:status_changed", { providerId: booking.providerId._id, status: "available" });
     const providerUser = await User.findById(booking.providerId.userId).select("fcmToken");
     if (providerUser) {
       await notificationService.sendNotification({
@@ -454,7 +460,8 @@ const getBookingById = async (bookingId, userId) => {
   if (!booking) throw new ApiError(404, "Booking not found.");
   const isCustomer = String(booking.customerId._id) === String(userId);
   const isProvider = booking.providerId && String(booking.providerId.userId && booking.providerId.userId._id) === String(userId);
-  if (!isCustomer && !isProvider) throw new ApiError(403, "Access denied.");
+  const isPending = booking.status === "pending";
+  if (!isCustomer && !isProvider && !isPending) throw new ApiError(403, "Access denied.");
   return booking;
 };
 
