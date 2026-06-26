@@ -234,8 +234,8 @@ const CreateBookingScreen = ({ navigation, route }) => {
                       setErrors(p => ({ ...p, address: null, city: null, pincode: null }));
                     }}
                   >
-                    <Text style={{ fontSize: 16 }}>{addr.type === 'Home' ? '🏠' : addr.type === 'Work' ? '🏢' : '📍'}</Text>
-                    <Text style={styles.addressChipText}>{addr.type}</Text>
+                    <Text style={{ fontSize: 16 }}>{(addr.label || addr.type) === 'Home' ? '🏠' : (addr.label || addr.type) === 'Work' ? '🏢' : '📍'}</Text>
+                    <Text style={styles.addressChipText}>{addr.label || addr.type || 'Other'}</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>

@@ -25,7 +25,7 @@ const BookingCard = React.memo(({ item, onPressDetail }) => {
     >
       <View style={styles.cardTop}>
         <View style={styles.serviceInfo}>
-          <Text style={styles.serviceName}>{item.serviceId?.name || 'Service'}</Text>
+          <Text style={styles.serviceName}>{item.categoryId?.name || item.category || 'Service'}</Text>
           {item.subService?.name && (
             <Text style={styles.subService}>{item.subService.name}</Text>
           )}
@@ -66,7 +66,6 @@ const ProviderBookingsHistoryScreen = ({ navigation }) => {
   const [activeTab,   setActiveTab]   = useState('all');
 
   const loadBookings = useCallback(async (pageNum = 1, status = 'all', reset = false) => {
-    if (loading && !reset) return;
     if (!reset && !hasNextPage) return;
 
     try {
@@ -89,7 +88,7 @@ const ProviderBookingsHistoryScreen = ({ navigation }) => {
     } finally {
       setLoading(false);
     }
-  }, [loading, hasNextPage]);
+  }, [hasNextPage]);
 
   useEffect(() => {
     loadBookings(1, activeTab, true);

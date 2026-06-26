@@ -169,6 +169,9 @@ const SavedAddressesScreen = ({ navigation }) => {
                 <Text style={{ fontSize: 16 }}>⭐</Text>
               </TouchableOpacity>
             )}
+            <TouchableOpacity style={[styles.iconBtn, { marginLeft: 8, backgroundColor: '#ffebee' }]} onPress={() => Alert.alert('Delete', 'Are you sure you want to delete this address?', [{ text: 'Cancel' }, { text: 'Delete', onPress: () => handleDelete(item._id), style: 'destructive' }])}>
+              <Text style={{ fontSize: 16 }}>🗑️</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </Swipeable>

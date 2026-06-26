@@ -40,7 +40,7 @@ class BackgroundLocationService {
             }
           },
           (error) => console.log("Background GPS Error: ", error),
-          { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+          { enableHighAccuracy: false, timeout: 20000, maximumAge: 10000 }
         );
 
         await sleep(this.currentInterval);

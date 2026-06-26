@@ -70,6 +70,7 @@ const ProfileScreen = ({ navigation }) => {
         <Text style={styles.sectionTitle}>Account Settings</Text>
         <Card noPadding>
           {renderMenuItem('📍', 'Saved Addresses', () => navigation.navigate('SavedAddresses'))}
+          {renderMenuItem('🔑', 'Change Password', () => navigation.navigate('ChangePassword'))}
           {renderMenuItem('🏷️', 'My Coupons', () => Alert.alert('Coming Soon', 'Coupons will be available soon!'))}
           {renderMenuItem('💳', 'Payment Methods', () => Alert.alert('Coming Soon', 'Payment methods will be available soon!'))}
           {renderMenuItem('🔔', 'Notifications', () => navigation.navigate('Notifications'), false)}

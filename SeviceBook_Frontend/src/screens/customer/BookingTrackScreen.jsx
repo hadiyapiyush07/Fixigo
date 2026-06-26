@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Animated, Linking, Clipboard
+  TouchableOpacity, ActivityIndicator, Alert, RefreshControl, Animated, Linking, Clipboard, BackHandler
 } from 'react-native';
 import Reanimated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
@@ -62,6 +62,25 @@ const BookingTrackScreen = ({ route, navigation }) => {
   const pulseAnim  = useRef(new Animated.Value(1)).current;
 
   const [error, setError] = useState(null);
+
+  // ── Custom Back Navigation Logic ─────────────────────────────────────────
+  const handleBack = useCallback(() => {
+    // Reset navigation stack to prevent returning to BookingSummary / CreateBooking
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'CustomerTabs', params: { screen: 'MyBookings' } }],
+    });
+  }, [navigation]);
+
+  // Handle Android Hardware Back Button
+  useEffect(() => {
+    const onBackPress = () => {
+      handleBack();
+      return true; // Prevent default popping
+    };
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => backHandler.remove();
+  }, [handleBack]);
 
   // ── Load booking ─────────────────────────────────────────────────────────
   const loadBooking = useCallback(async (silent = false) => {
@@ -246,7 +265,7 @@ const BookingTrackScreen = ({ route, navigation }) => {
         <TouchableOpacity onPress={loadBooking} style={[styles.backBtn, { backgroundColor: COLORS.primary, borderWidth: 0 }]}>
           <Text style={[styles.backBtnText, { color: COLORS.white }]}>Retry</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.backBtn, { marginTop: SPACING.sm }]}>
+        <TouchableOpacity onPress={handleBack} style={[styles.backBtn, { marginTop: SPACING.sm }]}>
           <Text style={styles.backBtnText}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -258,7 +277,7 @@ const BookingTrackScreen = ({ route, navigation }) => {
       <View style={styles.loaderBox}>
         <Text style={{ fontSize: 48 }}>😕</Text>
         <Text style={styles.loaderText}>Booking not found</Text>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={handleBack} style={styles.backBtn}>
           <Text style={styles.backBtnText}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -335,7 +354,7 @@ const BookingTrackScreen = ({ route, navigation }) => {
     <View style={styles.container}>
       {/* ── Header ─────────────────────────────────────────────────────── */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerBack}>
+        <TouchableOpacity onPress={handleBack} style={styles.headerBack}>
           <Text style={styles.headerBackText}>‹</Text>
         </TouchableOpacity>
         <View style={{ flex: 1 }}>

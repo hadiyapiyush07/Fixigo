@@ -105,6 +105,7 @@ const ProviderProfileScreen = ({ navigation }) => {
 
         <View style={styles.btnGroup}>
           <PrimaryButton title="Edit Profile" variant="primary" style={{ marginBottom: SPACING.md }} onPress={() => navigation.navigate('EditProviderProfile')} />
+          <PrimaryButton title="Change Password" variant="outline" style={{ marginBottom: SPACING.md }} onPress={() => navigation.navigate('ChangePassword')} />
           <PrimaryButton title="Support" variant="secondary" style={{ marginBottom: SPACING.md }} />
           <PrimaryButton title="Logout" variant="danger" onPress={handleLogout} />
         </View>

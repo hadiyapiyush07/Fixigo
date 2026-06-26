@@ -9,9 +9,11 @@ import {
 import { useSelector } from 'react-redux';
 import { categoryAPI } from '../../api/category.api';
 import { providerAPI } from '../../api/provider.api';
+import { couponAPI } from '../../api/coupon.api';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 import Geolocation from '@react-native-community/geolocation';
 import Skeleton from '../../components/Skeleton';
+import { socketService } from '../../services/socket.service';
 
 const CATEGORY_ICONS = {
   'Electrician':      '⚡',
@@ -38,11 +40,36 @@ const HomeScreen = ({ navigation }) => {
 
   const [categories,  setCategories]  = useState([]);
   const [providers,   setProviders]   = useState([]);
+  const [coupons,     setCoupons]     = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [refreshing,  setRefreshing]  = useState(false);
   const [coords,      setCoords]      = useState(null);
 
   useEffect(() => { initScreen(); }, []);
+
+  // Listen for provider status changes to auto-refresh nearby providers
+  useEffect(() => {
+    const handleProviderUpdate = () => {
+      if (coords) {
+        providerAPI.getNearby({
+          latitude: coords.latitude, longitude: coords.longitude, page: 1, limit: 5
+        }).then(provRes => {
+          if (provRes?.data?.data) {
+            let pData = Array.isArray(provRes.data.data) ? provRes.data.data : provRes.data.data.data || [];
+            pData.sort((a, b) => {
+              if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
+              if ((b.aggregateRating || 0) !== (a.aggregateRating || 0)) return (b.aggregateRating || 0) - (a.aggregateRating || 0);
+              return (b.completedJobs || 0) - (a.completedJobs || 0);
+            });
+            setProviders(pData.slice(0, 5));
+          }
+        }).catch(e => console.log("Silent refresh failed", e));
+      }
+    };
+
+    socketService.on('providers:status_changed', handleProviderUpdate);
+    return () => socketService.off('providers:status_changed', handleProviderUpdate);
+  }, [coords]);
 
   const requestLocationPermission = async () => {
     if (Platform.OS !== 'android') return true;
@@ -64,7 +91,7 @@ const HomeScreen = ({ navigation }) => {
     Geolocation.getCurrentPosition(
       pos => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
       err => reject(err),
-      { enableHighAccuracy: false, timeout: 30000, maximumAge: 60000 }
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
     );
   });
 
@@ -85,11 +112,12 @@ const HomeScreen = ({ navigation }) => {
       }
       setCoords(loc);
 
-      const [catRes, provRes] = await Promise.all([
+      const [catRes, provRes, couponRes] = await Promise.all([
         categoryAPI.getAll().catch(() => null),
         providerAPI.getNearby({
           latitude: loc.latitude, longitude: loc.longitude, page: 1, limit: 5
-        }).catch(() => null)
+        }).catch(() => null),
+        couponAPI.getActive().catch(() => null)
       ]);
 
       if (catRes?.data?.data) {
@@ -108,6 +136,19 @@ const HomeScreen = ({ navigation }) => {
           return (b.completedJobs || 0) - (a.completedJobs || 0);
         });
         setProviders(pData.slice(0, 5));
+        setProviders(pData.slice(0, 5));
+      }
+
+      if (couponRes?.data?.data) {
+        const colors = ['#3B82F6', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444'];
+        const formattedCoupons = couponRes.data.data.map((c, i) => ({
+          id: c._id || String(i),
+          title: c.discountType === 'flat' ? `Flat ₹${c.discountValue} Off` : `${c.discountValue}% Off`,
+          subtitle: c.description || (c.minBookingAmount ? `Min order ₹${c.minBookingAmount}` : 'Limited time offer'),
+          code: c.code,
+          color: colors[i % colors.length]
+        }));
+        setCoupons(formattedCoupons);
       }
     } catch (e) {
       console.warn(e);
@@ -280,19 +321,21 @@ const HomeScreen = ({ navigation }) => {
         </View>
 
         {/* PROMO SLIDER */}
-        <View style={styles.section}>
-          <FlatList
-            horizontal
-            data={PROMO_BANNERS}
-            keyExtractor={item => item.id}
-            renderItem={renderPromo}
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={{ paddingHorizontal: SPACING.lg }}
-            initialNumToRender={3}
-            windowSize={5}
-            removeClippedSubviews={true}
-          />
-        </View>
+        {coupons.length > 0 && (
+          <View style={styles.section}>
+            <FlatList
+              horizontal
+              data={coupons}
+              keyExtractor={item => item.id}
+              renderItem={renderPromo}
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: SPACING.lg }}
+              initialNumToRender={3}
+              windowSize={5}
+              removeClippedSubviews={true}
+            />
+          </View>
+        )}
 
         {/* CATEGORIES */}
         <View style={styles.section}>

@@ -1,16 +1,15 @@
-// src/api/auth.api.js
 import api from './axiosInstance';
 
 export const authAPI = {
   register: (data) => api.post('/auth/register', data),
-  login: (data) => api.post('/auth/login', data),
-  logout: () => api.post('/auth/logout'),
-  refreshToken: (refreshToken) => api.post('/auth/refresh-token', { refreshToken }),
-  updateFcmToken: (fcmToken) => api.put('/auth/fcm-token', { fcmToken }),
-};
+  login: (credentials) => api.post('/auth/login', credentials),
+  verifyLoginOtp: (phone, otp) => api.post('/auth/verify-login-otp', { phone, otp }),
+  
+  forgotPassword: (phone) => api.post('/auth/forgot-password', { phone }),
+  resetPassword: (phone, otp, newPassword) => api.post('/auth/reset-password', { phone, otp, newPassword }),
+  changePassword: (currentPassword, newPassword) => api.post('/auth/change-password', { currentPassword, newPassword }),
 
-export const otpAPI = {
-  send: (phone) => api.post('/otp/send', { phone }),
-  verify: (phone, otp) => api.post('/otp/verify', { phone, otp }),
-  resend: (phone) => api.post('/otp/resend', { phone }),
+  logout: () => api.post('/auth/logout'),
+  refreshToken: (token) => api.post('/auth/refresh-token', { refreshToken: token }),
+  updateFcmToken: (token) => api.put('/auth/fcm-token', { fcmToken: token }),
 };

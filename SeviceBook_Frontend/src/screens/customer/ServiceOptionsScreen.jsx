@@ -210,11 +210,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: '#F0F0F0',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 12,
-    elevation: 3,
+    // Removed shadows and elevation to fix Android reanimated lag and massive shadow bugs
   },
   optionCardActive: {
     borderColor: COLORS.primary,

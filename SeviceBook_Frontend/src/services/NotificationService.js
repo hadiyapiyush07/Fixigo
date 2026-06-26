@@ -31,7 +31,6 @@ class NotificationService {
       data: { bookingId: bookingData.bookingId },
       android: {
         channelId: 'booking_requests_v2',
-        smallIcon: 'ic_launcher', // Explicitly set small icon
         importance: AndroidImportance.HIGH,
         pressAction: {
           id: 'default',
@@ -63,7 +62,7 @@ notifee.onBackgroundEvent(async ({ type, detail }) => {
       // We will use bookingAPI.acceptBooking in reality, but since we are in a headless state
       // we must rely on the imported axios instance retaining the token from AsyncStorage.
       const { bookingAPI } = require('../api/booking.api');
-      await bookingAPI.acceptBooking(bookingId);
+      await bookingAPI.accept(bookingId);
       
       // Notify success locally
       await notifee.displayNotification({
