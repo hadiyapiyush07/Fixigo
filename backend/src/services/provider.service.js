@@ -15,10 +15,17 @@ const getProviderById = async (providerId) => {
 };
 
 const getProviderByUserId = async (userId) => {
-  const provider = await Provider.findOne({ userId })
+  let provider = await Provider.findOne({ userId })
     .populate("userId", "name email phone profilePhoto")
     .populate("skills", "name icon basePrice");
-  if (!provider) throw new ApiError(404, "Provider profile not found.");
+    
+  if (!provider) {
+    // Backward compatibility for users created before auto-creation logic
+    const newProv = await Provider.create({ userId });
+    provider = await Provider.findById(newProv._id)
+      .populate("userId", "name email phone profilePhoto")
+      .populate("skills", "name icon basePrice");
+  }
   return provider;
 };
 
@@ -171,7 +178,10 @@ const toggleOnlineStatus = async (userId, isOnline, latitude, longitude) => {
     throw new ApiError(403, "Your profile is under verification. Please wait until the admin approves your account.");
   }
 
-  let updateData = { status: isOnline ? "available" : "offline" };
+  let updateData = { 
+    status: isOnline ? "available" : "offline",
+    lastSeen: new Date()
+  };
   
   // Agar location mila hai, toh DB mein update karo (Longitude hamesha pehle aata hai)
   if (latitude && longitude) {
@@ -184,6 +194,10 @@ const toggleOnlineStatus = async (userId, isOnline, latitude, longitude) => {
   const updated = await Provider.findOneAndUpdate(
     { userId }, updateData, { new: true }
   );
+  
+  const { emitToAll } = require("../socket/socket");
+  emitToAll("providers:status_changed", { providerId: updated._id, status: updated.status });
+
   return { status: updated.status, currentLocation: updated.currentLocation };
 };
 

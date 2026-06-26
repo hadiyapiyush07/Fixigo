@@ -4,6 +4,9 @@ const Provider          = require("../models/Provider.model");
 const ApiError          = require("../utils/ApiError");
 const { generateTokenPair } = require("../utils/generateToken");
 
+const MAX_LOGIN_ATTEMPTS = 5;
+const LOCK_TIME_MS = 15 * 60 * 1000; // 15 minutes
+
 // ── Register ──────────────────────────────────────────────────────────────
 const registerUser = async ({ name, email, phone, password, role }) => {
   // Check duplicate email or phone
@@ -21,9 +24,56 @@ const registerUser = async ({ name, email, phone, password, role }) => {
     await Provider.create({ userId: user._id });
   }
 
-  const tokens = generateTokenPair(user._id, user.role);
+  return {
+    _id: user._id,
+    name: user.name,
+    email: user.email,
+    phone: user.phone,
+    role: user.role
+  };
+};
 
-  // Save refresh token to DB so we can invalidate it on logout
+// ── Validate Credentials (for Login) ───────────────────────────────────────
+const validateCredentials = async ({ email, phone, password }) => {
+  const query = email ? { email } : { phone };
+  const user  = await User.findOne(query).select("+password +failedLoginAttempts +lockUntil");
+
+  if (!user) throw new ApiError(404, "No account found with these credentials.");
+  if (!user.isActive) throw new ApiError(403, "Account has been deactivated.");
+
+  // Check lockout
+  if (user.lockUntil && user.lockUntil > Date.now()) {
+    const minutesLeft = Math.ceil((user.lockUntil - Date.now()) / 60000);
+    throw new ApiError(403, `Account locked due to too many failed attempts. Try again in ${minutesLeft} minutes.`);
+  }
+
+  const isMatch = await user.comparePassword(password);
+  
+  if (!isMatch) {
+    user.failedLoginAttempts += 1;
+    if (user.failedLoginAttempts >= MAX_LOGIN_ATTEMPTS) {
+      user.lockUntil = Date.now() + LOCK_TIME_MS;
+    }
+    await user.save({ validateBeforeSave: false });
+    throw new ApiError(401, "Incorrect password.");
+  }
+
+  // Reset failed attempts on success
+  if (user.failedLoginAttempts > 0) {
+    user.failedLoginAttempts = 0;
+    user.lockUntil = undefined;
+    await user.save({ validateBeforeSave: false });
+  }
+
+  return { phone: user.phone, email: user.email };
+};
+
+// ── Generate Auth Tokens (After OTP) ───────────────────────────────────────
+const generateAuthTokens = async (phone) => {
+  const user = await User.findOne({ phone });
+  if (!user) throw new ApiError(404, "User not found.");
+
+  const tokens = generateTokenPair(user._id, user.role);
   user.refreshToken = tokens.refreshToken;
   await user.save({ validateBeforeSave: false });
 
@@ -41,39 +91,31 @@ const registerUser = async ({ name, email, phone, password, role }) => {
   };
 };
 
-// ── Login ─────────────────────────────────────────────────────────────────
-const loginUser = async ({ email, phone, password }) => {
-  const query = email ? { email } : { phone };
-  const user  = await User.findOne(query).select("+password +refreshToken");
+// ── Change Password ────────────────────────────────────────────────────────
+const changePassword = async (userId, oldPassword, newPassword) => {
+  const user = await User.findById(userId).select("+password");
+  if (!user) throw new ApiError(404, "User not found.");
 
-  if (!user)          throw new ApiError(404, "No account found with these credentials.");
-  if (!user.isActive) throw new ApiError(403, "Account has been deactivated.");
+  const isMatch = await user.comparePassword(oldPassword);
+  if (!isMatch) throw new ApiError(401, "Incorrect current password.");
 
-  const isMatch = await user.comparePassword(password);
-  if (!isMatch) throw new ApiError(401, "Incorrect password.");
+  user.password = newPassword;
+  await user.save(); // Password hashed in pre-save hook
+};
 
-  const tokens = generateTokenPair(user._id, user.role);
-  user.refreshToken = tokens.refreshToken;
-  await user.save({ validateBeforeSave: false });
+// ── Forgot Password Reset ──────────────────────────────────────────────────
+const resetPassword = async (phone, newPassword) => {
+  const user = await User.findOne({ phone }).select("+password");
+  if (!user) throw new ApiError(404, "User not found.");
 
-  return {
-    user: {
-      _id:          user._id,
-      name:         user.name,
-      email:        user.email,
-      phone:        user.phone,
-      role:         user.role,
-      profilePhoto: user.profilePhoto,
-    },
-    accessToken:  tokens.accessToken,
-    refreshToken: tokens.refreshToken,
-  };
+  user.password = newPassword;
+  await user.save();
 };
 
 // ── Logout ────────────────────────────────────────────────────────────────
 const logoutUser = async (userId) => {
   const user = await User.findByIdAndUpdate(userId, {
-    $unset: { refreshToken: "", fcmToken: "" },
+    $unset: { refreshToken: "", fcmTokens: "" }, // Unset fcmTokens not fcmToken
   });
 
   if (user && user.role === 'provider') {
@@ -108,9 +150,19 @@ const refreshAccessToken = async (incomingRefreshToken) => {
 };
 
 // ── Update FCM token ──────────────────────────────────────────────────────
-// Called from mobile app every time app opens — FCM token can change
 const updateFcmToken = async (userId, fcmToken) => {
-  await User.findByIdAndUpdate(userId, { fcmToken });
+  await User.findByIdAndUpdate(userId, {
+    $addToSet: { fcmTokens: fcmToken } // Add token to array
+  });
 };
 
-module.exports = { registerUser, loginUser, logoutUser, refreshAccessToken, updateFcmToken };
+module.exports = { 
+  registerUser, 
+  validateCredentials, 
+  generateAuthTokens, 
+  changePassword,
+  resetPassword,
+  logoutUser, 
+  refreshAccessToken, 
+  updateFcmToken 
+};

@@ -70,4 +70,9 @@ const emitToBooking = (bookingId, event, data) => {
   if (io) io.to(`booking:${bookingId}`).emit(event, data);
 };
 
-module.exports = { initSocket, emitToUser, emitToBooking };
+// Push event globally to all connected clients
+const emitToAll = (event, data) => {
+  if (io) io.emit(event, data);
+};
+
+module.exports = { initSocket, emitToUser, emitToBooking, emitToAll };

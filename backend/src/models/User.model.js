@@ -46,6 +46,7 @@ const userSchema = new mongoose.Schema(
     savedAddresses: [
       {
         label:       { type: String, default: "Home" },  // Home | Work | Other
+        isDefault:   { type: Boolean, default: false },
         addressLine: String,
         city:        String,
         pincode:     String,
@@ -57,6 +58,10 @@ const userSchema = new mongoose.Schema(
     ],
 
     refreshToken: { type: String, select: false },
+
+    // Brute force protection
+    failedLoginAttempts: { type: Number, default: 0 },
+    lockUntil: { type: Date },
   },
   { timestamps: true }
 );

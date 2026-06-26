@@ -16,6 +16,7 @@ const getNearbyProviders = asyncHandler(async (req, res) => {
 
 // GET /api/providers/me  (provider's own profile)
 const getMyProviderProfile = asyncHandler(async (req, res) => {
+  console.log(`\n\n=== API HIT: /api/providers/me by user ${req.user._id} ===\n\n`);
   const provider = await providerService.getProviderByUserId(req.user._id);
   res.status(200).json(new ApiResponse(200, provider));
 });

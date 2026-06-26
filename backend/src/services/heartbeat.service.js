@@ -24,6 +24,9 @@ const startHeartbeatService = () => {
           // We can optionally track metrics here, like force-offline count.
           await provider.save();
 
+          const { emitToAll } = require("../socket/socket");
+          emitToAll("providers:status_changed", { providerId: provider._id, status: "offline" });
+
           // Emit to the specific user that they were taken offline by system
           if (provider.userId) {
             emitToUser(provider.userId, "provider:auto_offline", { reason: "heartbeat_timeout" });
