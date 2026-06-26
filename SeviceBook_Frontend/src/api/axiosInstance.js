@@ -1,6 +1,7 @@
 // src/api/axiosInstance.js
 import axios from 'axios';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SecureStorage } from '../utils/secureStorage';
+import Config from 'react-native-config';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // IMPORTANT — CHANGE THIS IP FOR YOUR SETUP:
@@ -18,9 +19,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Your phone and PC MUST be on the same WiFi network!
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-// localhost works on both emulator and physical phone via `adb reverse tcp:5000 tcp:5000`
-// For WiFi (no USB), use your PC's local IP: e.g. 'http://192.168.1.105:5000/api'
-const BASE_URL = 'http://10.87.158.85:5000/api';
+// Loaded from .env.development or .env.emulator via react-native-config
+const BASE_URL = Config.API_URL || 'http://10.87.158.85:5000/api';
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -31,7 +31,7 @@ const axiosInstance = axios.create({
 axiosInstance.interceptors.request.use(
   async (config) => {
     try {
-      const token = await AsyncStorage.getItem('accessToken');
+      const token = await SecureStorage.getItem('accessToken');
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }
@@ -50,7 +50,7 @@ axiosInstance.interceptors.response.use(
       original._retry = true;
 
       try {
-        const refreshToken = await AsyncStorage.getItem('refreshToken');
+        const refreshToken = await SecureStorage.getItem('refreshToken');
         if (!refreshToken) throw new Error('No refresh token');
 
         const res = await axios.post(`${BASE_URL}/auth/refresh-token`, {
@@ -67,17 +67,34 @@ axiosInstance.interceptors.response.use(
 
         if (!newToken) throw new Error('No new access token');
 
-        await AsyncStorage.setItem('accessToken', newToken);
+        await SecureStorage.setItem('accessToken', newToken);
         if (newRefreshToken) {
-          await AsyncStorage.setItem('refreshToken', newRefreshToken);
+          await SecureStorage.setItem('refreshToken', newRefreshToken);
         }
 
         original.headers.Authorization = `Bearer ${newToken}`;
         return axiosInstance(original);
       } catch (e) {
-        await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'user']);
+        await SecureStorage.clearAll();
       }
     }
+
+    // Show visual error to help debugging
+    const errorMsg = error?.response?.data?.message || error.message || 'API Request Failed';
+    
+    // Use setTimeout to avoid interfering with current render cycle
+    setTimeout(() => {
+      // Need to import showMessage dynamically or statically
+      try {
+        const { showMessage } = require('react-native-flash-message');
+        showMessage({
+          message: "API Error",
+          description: errorMsg,
+          type: "danger",
+          duration: 4000
+        });
+      } catch (err) {}
+    }, 100);
 
     return Promise.reject(error);
   }

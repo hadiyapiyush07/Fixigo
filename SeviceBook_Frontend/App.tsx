@@ -19,8 +19,13 @@ import store from './src/store/index';
 import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/common/ErrorBoundary';
 import FlashMessage from 'react-native-flash-message';
+import NotificationService from './src/services/NotificationService';
 
 const App = () => {
+  React.useEffect(() => {
+    NotificationService.setupChannels();
+  }, []);
+
   return (
     // GestureHandlerRootView — required for react-native-gesture-handler
     // Must wrap everything at the root level

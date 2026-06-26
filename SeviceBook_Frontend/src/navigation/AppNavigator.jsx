@@ -1,18 +1,20 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { bookingAPI } from '../api/booking.api';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, ActivityIndicator, Alert, Vibration } from 'react-native';
 import { useSelector } from 'react-redux';
 import { showMessage } from 'react-native-flash-message';
-import notifee from '@notifee/react-native';
+import notifee, { AndroidImportance } from '@notifee/react-native';
 import { COLORS, FONT_SIZES } from '../theme/typography';
 
 // Auth screens
 import SplashScreen   from '../screens/auth/SplashScreen';
 import LoginScreen    from '../screens/auth/LoginScreen';
 import RegisterScreen from '../screens/auth/RegisterScreen';
+import OtpVerificationScreen from '../screens/auth/OtpVerificationScreen';
+import ForgotPasswordScreen from '../screens/auth/ForgotPasswordScreen';
 
 // Customer screens
 import HomeScreen          from '../screens/customer/HomeScreen';
@@ -35,6 +37,7 @@ import { notificationService } from '../services/notification.service';
 import ChatScreen from '../screens/customer/ChatScreen';
 import AllProvidersScreen from '../screens/customer/AllProvidersScreen';
 import NotificationScreen from '../screens/common/NotificationScreen';
+import ChangePasswordScreen from '../screens/common/ChangePasswordScreen';
 
 // Provider screens
 import DashboardScreen       from '../screens/provider/DashboardScreen';
@@ -60,13 +63,26 @@ const Tab   = createBottomTabNavigator();
 // ── Customer Bottom Tabs ──────────────────────────────────────────────────
 const CustomerTabs = () => {
   useEffect(() => {
+    const setupChannels = async () => {
+      if (Platform.OS === 'android') {
+        await notifee.createChannel({
+          id: 'booking_updates',
+          name: 'Booking Updates',
+          importance: AndroidImportance.HIGH,
+          sound: 'default',
+          vibration: true,
+        });
+      }
+    };
+    setupChannels();
+
     const handleNewMessage = async (msg) => {
       await notifee.displayNotification({
         title: "New Message",
         body: `You received a message: ${msg?.message || 'New chat message'}`,
         android: {
           channelId: 'booking_updates',
-          smallIcon: 'ic_launcher',
+          pressAction: { id: 'default' },
         },
       });
       Vibration.vibrate(200);
@@ -78,7 +94,7 @@ const CustomerTabs = () => {
         body: notif?.message || "You have a new notification",
         android: {
           channelId: 'booking_updates',
-          smallIcon: 'ic_launcher',
+          pressAction: { id: 'default' },
         },
       });
       Vibration.vibrate([0, 500, 200, 500]);
@@ -120,8 +136,13 @@ const CustomerTabs = () => {
 };
 
 // ── Provider Bottom Tabs ──────────────────────────────────────────────────
+import IncomingRequestModal from '../components/provider/IncomingRequestModal';
+
 const ProviderTabs = () => {
   const [pendingCount, setPendingCount] = useState(0);
+  const [incomingRequest, setIncomingRequest] = useState(null);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const navigation = useNavigation();
 
   const fetchCount = async () => {
     try {
@@ -139,26 +160,48 @@ const ProviderTabs = () => {
   );
 
   useEffect(() => {
+    const setupChannels = async () => {
+      if (Platform.OS === 'android') {
+        await notifee.createChannel({
+          id: 'booking_updates',
+          name: 'Booking Updates',
+          importance: AndroidImportance.HIGH,
+          sound: 'default',
+          vibration: true,
+        });
+        await notifee.createChannel({
+          id: 'booking_requests_v2',
+          name: 'Booking Requests',
+          importance: AndroidImportance.HIGH,
+          sound: 'default',
+          vibration: true,
+        });
+      }
+    };
+    setupChannels();
+
     const handleNewBooking = async (data) => {
       fetchCount();
       await notifee.displayNotification({
         title: "New Service Request!",
         body: "You have a new request waiting for you.",
-        android: {
-          channelId: 'booking_updates',
-          smallIcon: 'ic_launcher',
+        android: { 
+          channelId: 'booking_requests_v2',
+          pressAction: { id: 'default' }
         },
       });
-      Vibration.vibrate([0, 500, 200, 500]);
+      // Show Uber-like Modal
+      setIncomingRequest(data.booking || data);
+      setIsModalVisible(true);
     };
 
     const handleNewMessage = async (msg) => {
       await notifee.displayNotification({
         title: "New Message",
         body: `You received a message: ${msg?.message || 'New chat message'}`,
-        android: {
+        android: { 
           channelId: 'booking_updates',
-          smallIcon: 'ic_launcher',
+          pressAction: { id: 'default' }
         },
       });
       Vibration.vibrate(200);
@@ -175,8 +218,34 @@ const ProviderTabs = () => {
     };
   }, []);
 
+  const handleAcceptRequest = async (id) => {
+    setIsModalVisible(false);
+    try {
+      await bookingAPI.accept(id);
+      fetchCount();
+      navigation.navigate('BookingDetail', { bookingId: id });
+    } catch (error) {
+      // Alert.alert("Error", error?.response?.data?.message || "Failed to accept job.");
+    }
+  };
+
+  const handleDeclineRequest = async (id) => {
+    setIsModalVisible(false);
+    try {
+      await bookingAPI.reject(id);
+      fetchCount();
+    } catch (error) {}
+  };
+
   return (
-    <Tab.Navigator
+    <>
+      <IncomingRequestModal
+        isVisible={isModalVisible}
+        requestData={incomingRequest}
+        onAccept={handleAcceptRequest}
+        onDecline={handleDeclineRequest}
+      />
+      <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: styles.tabBar,
@@ -208,6 +277,7 @@ const ProviderTabs = () => {
       <Tab.Screen name="Earnings"        component={EarningsScreen}        options={{ tabBarLabel: 'Earnings' }} />
       <Tab.Screen name="ProviderProfile" component={ProviderProfileScreen} options={{ tabBarLabel: 'Profile' }} />
     </Tab.Navigator>
+    </>
   );
 };
 
@@ -254,6 +324,8 @@ const AppNavigator = () => {
       >
         <Stack.Screen name="Login"    component={LoginScreen} />
         <Stack.Screen name="Register" component={RegisterScreen} />
+        <Stack.Screen name="OtpVerification" component={OtpVerificationScreen} />
+        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
       </Stack.Navigator>
     );
   }
@@ -269,6 +341,7 @@ const AppNavigator = () => {
         <Stack.Screen name="EditProviderProfile" component={EditProviderProfileScreen} />
         <Stack.Screen name="Chat" component={ChatScreen} />
         <Stack.Screen name="Notifications" component={NotificationScreen} />
+        <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
       </Stack.Navigator>
     );
   }
@@ -292,6 +365,7 @@ const AppNavigator = () => {
       <Stack.Screen name="BookingSummary" component={BookingSummaryScreen} />
       <Stack.Screen name="Chat"           component={ChatScreen} />
       <Stack.Screen name="Notifications"  component={NotificationScreen} />
+      <Stack.Screen name="ChangePassword" component={ChangePasswordScreen} />
     </Stack.Navigator>
   );
 };

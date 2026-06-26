@@ -15,6 +15,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge';
 import { LoadingSkeleton } from '../../components/ui/LoadingSkeleton';
 import { SectionHeader } from '../../components/ui/SectionHeader';
 import { EmptyState } from '../../components/ui/EmptyState';
+import Button from '../../components/common/Button';
 
 import Geolocation from '@react-native-community/geolocation';
 
@@ -64,7 +65,7 @@ const DashboardScreen = ({ navigation }) => {
       const profRes = await providerAPI.getMyProfile();
       const profile = profRes.data.data;
       setProviderProfile(profile);
-      const isCurrentlyOnline = profile?.status === 'available';
+      const isCurrentlyOnline = profile?.status === 'available' || profile?.status === 'busy';
       
       // Prevent UI flicker: Don't overwrite state if we are actively toggling
       if (!togglingOnlineRef.current) {
@@ -201,7 +202,7 @@ const DashboardScreen = ({ navigation }) => {
           togglingOnlineRef.current = false;
           Alert.alert('Location Error', 'Could not fetch your location.');
         },
-        { enableHighAccuracy: true, timeout: 15000, maximumAge: 10000 }
+        { enableHighAccuracy: false, timeout: 20000, maximumAge: 10000 }
       );
     } catch (error) {
       setIsOnline(!newValue);
@@ -220,6 +221,55 @@ const DashboardScreen = ({ navigation }) => {
         <LoadingSkeleton height={200} style={{ margin: SPACING.md }} />
       </View>
     );
+  }
+
+  const isProfileComplete = providerProfile && (
+    providerProfile.skills && providerProfile.skills.length > 0 && 
+    providerProfile.address && 
+    providerProfile.aadhaar
+  );
+
+  if (providerProfile && !providerProfile.isVerified) {
+    if (!isProfileComplete) {
+      return (
+        <View style={[styles.safe, { justifyContent: 'center', alignItems: 'center', padding: SPACING.xl, backgroundColor: COLORS.background }]}>
+          <Text style={{ fontSize: 72, marginBottom: SPACING.lg }}>📋</Text>
+          <Text style={{ fontSize: FONT_SIZES.xxl, fontWeight: '700', color: COLORS.textPrimary, textAlign: 'center', marginBottom: SPACING.md }}>
+            Complete Your Profile
+          </Text>
+          <Text style={{ fontSize: FONT_SIZES.md, color: COLORS.textSecondary, textAlign: 'center', lineHeight: 24, marginBottom: SPACING.xxl }}>
+            Welcome to Fixigo! To start receiving service requests, you must build your professional profile and submit your documents.
+          </Text>
+          <Button 
+            title="Setup Profile Now" 
+            onPress={() => navigation.navigate('EditProviderProfile')}
+            style={{ width: '100%', marginBottom: SPACING.lg }}
+          />
+        </View>
+      );
+    } else {
+      return (
+        <View style={[styles.safe, { justifyContent: 'center', alignItems: 'center', padding: SPACING.xl, backgroundColor: COLORS.background }]}>
+          <Text style={{ fontSize: 72, marginBottom: SPACING.lg }}>⏳</Text>
+          <Text style={{ fontSize: FONT_SIZES.xxl, fontWeight: '700', color: COLORS.textPrimary, textAlign: 'center', marginBottom: SPACING.md }}>
+            Account Under Review
+          </Text>
+          <Text style={{ fontSize: FONT_SIZES.md, color: COLORS.textSecondary, textAlign: 'center', lineHeight: 24, marginBottom: SPACING.xxl }}>
+            Thank you for completing your profile! Our admin team is currently reviewing your details. We will notify you once your account is approved.
+          </Text>
+          <Button 
+            title="Refresh Status" 
+            onPress={() => loadDashboard(true)}
+            style={{ width: '100%', marginBottom: SPACING.md }}
+          />
+          <TouchableOpacity onPress={() => navigation.navigate('EditProviderProfile')}>
+            <Text style={{ color: COLORS.primary, fontSize: FONT_SIZES.md, fontWeight: '600', padding: SPACING.sm }}>
+              Edit Profile Again
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    }
   }
 
   return (
@@ -292,7 +342,7 @@ const DashboardScreen = ({ navigation }) => {
             <Card onPress={() => navigation.navigate('BookingDetail', { bookingId: activeBooking._id })}>
               <View style={styles.activeRow}>
                 <View>
-                  <Text style={styles.activeService}>{activeBooking.serviceId?.name || 'Service'}</Text>
+                  <Text style={styles.activeService}>{activeBooking.categoryId?.name || activeBooking.category || 'Service'}</Text>
                   <Text style={styles.activeCustomer}>{activeBooking.customerId?.name || 'Customer'}</Text>
                 </View>
                 <StatusBadge status={activeBooking.status} />

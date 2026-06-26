@@ -1,35 +1,47 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { SecureStorage } from '../../utils/secureStorage';
 import { authAPI } from '../../api/auth.api';
 
-// ── Login ─────────────────────────────────────────────────────────────────
+// ── Login (Validate Credentials & Send OTP) ───────────────────────────────
 export const loginUser = createAsyncThunk(
   'auth/login',
   async (credentials, { rejectWithValue }) => {
     try {
       const res = await authAPI.login(credentials);
-      const { user, accessToken, refreshToken } = res.data.data;
-      await AsyncStorage.setItem('accessToken',  accessToken);
-      await AsyncStorage.setItem('refreshToken', refreshToken);
-      await AsyncStorage.setItem('user', JSON.stringify(user));
-      return { user, accessToken, refreshToken };
+      return res.data.data; // Returns { phone, mockOtp }
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Login failed');
     }
   }
 );
 
-// ── Register ──────────────────────────────────────────────────────────────
+// ── Verify OTP (Finalize Login) ───────────────────────────────────────────
+export const verifyLoginOtpUser = createAsyncThunk(
+  'auth/verifyOtp',
+  async ({ phone, otp }, { rejectWithValue }) => {
+    try {
+      const res = await authAPI.verifyLoginOtp(phone, otp);
+      const { user, accessToken, refreshToken } = res.data.data;
+      
+      // Store securely
+      await SecureStorage.setItem('accessToken', accessToken);
+      await SecureStorage.setItem('refreshToken', refreshToken);
+      await SecureStorage.setItem('user', user);
+      
+      return { user, accessToken, refreshToken };
+    } catch (error) {
+      return rejectWithValue(error.response?.data?.message || 'OTP Verification failed');
+    }
+  }
+);
+
+// ── Register (Only create account) ────────────────────────────────────────
 export const registerUser = createAsyncThunk(
   'auth/register',
   async (userData, { rejectWithValue }) => {
     try {
       const res = await authAPI.register(userData);
-      const { user, accessToken, refreshToken } = res.data.data;
-      await AsyncStorage.setItem('accessToken',  accessToken);
-      await AsyncStorage.setItem('refreshToken', refreshToken);
-      await AsyncStorage.setItem('user', JSON.stringify(user));
-      return { user, accessToken, refreshToken };
+      return res.data.message; // Just success message
     } catch (error) {
       return rejectWithValue(error.response?.data?.message || 'Registration failed');
     }
@@ -37,13 +49,11 @@ export const registerUser = createAsyncThunk(
 );
 
 // ── Logout ────────────────────────────────────────────────────────────────
-// NO navigation here — AppNavigator watches isLoggedIn automatically
-// When isLoggedIn becomes false → AppNavigator shows Login instantly
 export const logoutUser = createAsyncThunk(
   'auth/logout',
   async () => {
     try { await authAPI.logout(); } catch (e) {}
-    try { await AsyncStorage.multiRemove(['accessToken', 'refreshToken', 'user']); } catch (e) {}
+    try { await SecureStorage.clearAll(); } catch (e) {}
     return true;
   }
 );
@@ -53,10 +63,10 @@ export const loadStoredAuth = createAsyncThunk(
   'auth/loadStored',
   async () => {
     try {
-      const token   = await AsyncStorage.getItem('accessToken');
-      const userStr = await AsyncStorage.getItem('user');
-      if (token && userStr) {
-        return { accessToken: token, user: JSON.parse(userStr) };
+      const token = await SecureStorage.getItem('accessToken');
+      const user  = await SecureStorage.getItem('user');
+      if (token && user) {
+        return { accessToken: token, user };
       }
     } catch (e) {}
     return null;
@@ -73,59 +83,71 @@ const authSlice = createSlice({
     isLoading:     false,
     error:         null,
     isInitialized: false,
+    otpPendingPhone: null, // Stores phone while waiting for OTP
   },
   reducers: {
     clearError:  (state)         => { state.error = null; },
     updateUser:  (state, action) => { state.user = { ...state.user, ...action.payload }; },
+    clearOtpPending: (state)     => { state.otpPendingPhone = null; },
   },
   extraReducers: (builder) => {
     builder
-      // Login
+      // loadStoredAuth
+      .addCase(loadStoredAuth.fulfilled, (state, action) => {
+        if (action.payload) {
+          state.user        = action.payload.user;
+          state.accessToken = action.payload.accessToken;
+          state.isLoggedIn  = true;
+        }
+        state.isInitialized = true;
+      })
+      .addCase(loadStoredAuth.rejected, (state) => {
+        state.isInitialized = true;
+      })
+
+      // Login (OTP Gen)
       .addCase(loginUser.pending,   (state) => { state.isLoading = true;  state.error = null; })
       .addCase(loginUser.fulfilled, (state, action) => {
-        state.isLoading   = false;
-        state.user        = action.payload.user;
-        state.accessToken = action.payload.accessToken;
-        state.isLoggedIn  = true;
+        state.isLoading       = false;
+        state.otpPendingPhone = action.payload; // Set phone for OTP screen
       })
       .addCase(loginUser.rejected,  (state, action) => {
         state.isLoading = false;
         state.error     = action.payload;
       })
 
+      // Verify OTP
+      .addCase(verifyLoginOtpUser.pending,   (state) => { state.isLoading = true;  state.error = null; })
+      .addCase(verifyLoginOtpUser.fulfilled, (state, action) => {
+        state.isLoading       = false;
+        state.user            = action.payload.user;
+        state.accessToken     = action.payload.accessToken;
+        state.isLoggedIn      = true;
+        state.otpPendingPhone = null;
+      })
+      .addCase(verifyLoginOtpUser.rejected,  (state, action) => {
+        state.isLoading = false;
+        state.error     = action.payload;
+      })
+
       // Register
       .addCase(registerUser.pending,   (state) => { state.isLoading = true;  state.error = null; })
-      .addCase(registerUser.fulfilled, (state, action) => {
-        state.isLoading   = false;
-        state.user        = action.payload.user;
-        state.accessToken = action.payload.accessToken;
-        state.isLoggedIn  = true;
+      .addCase(registerUser.fulfilled, (state) => {
+        state.isLoading = false;
       })
       .addCase(registerUser.rejected,  (state, action) => {
         state.isLoading = false;
         state.error     = action.payload;
       })
 
-      // Logout — just clear state, AppNavigator handles redirect automatically
+      // Logout
       .addCase(logoutUser.fulfilled, (state) => {
         state.user        = null;
         state.accessToken = null;
         state.isLoggedIn  = false;
-        // No navigation needed here — AppNavigator watches isLoggedIn
-        // When isLoggedIn = false → Auth stack renders → Login shows instantly
-      })
-
-      // Load stored auth
-      .addCase(loadStoredAuth.fulfilled, (state, action) => {
-        state.isInitialized = true;
-        if (action.payload) {
-          state.user        = action.payload.user;
-          state.accessToken = action.payload.accessToken;
-          state.isLoggedIn  = true;
-        }
       });
   },
 });
 
-export const { clearError, updateUser } = authSlice.actions;
+export const { clearError, updateUser, clearOtpPending } = authSlice.actions;
 export default authSlice.reducer;
