@@ -57,7 +57,13 @@ const app = express();
 // CORS — Cross Origin Resource Sharing
 // Allows your React Native app and admin panel to call this API
 // Without this, browser/app would block the request
-app.use(cors({ origin: "*", credentials: true }));
+app.use(cors({ 
+  origin: function (origin, callback) {
+    // Allow all origins
+    callback(null, true);
+  }, 
+  credentials: true 
+}));
 
 // JSON Parser — reads request body as JSON
 // Without this, req.body would be undefined
@@ -88,6 +94,8 @@ app.use("/api/bookings",   bookingRoutes);   // create, accept, track bookings
 app.use("/api/payments",   paymentRoutes);   // Razorpay payment flow
 app.use("/api/otp",        otpRoutes);       // send and verify OTP
 app.use("/api/categories", categoryRouter);  // service categories
+const adminAuthRoutes = require("./routes/admin.auth.routes");
+app.use("/api/admin/auth",   adminAuthRoutes);
 app.use("/api/admin",      adminRouter);     // admin
 app.use("/api/addresses", addressRoutes);
 

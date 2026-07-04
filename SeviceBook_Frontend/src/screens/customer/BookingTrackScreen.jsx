@@ -458,14 +458,10 @@ const BookingTrackScreen = ({ route, navigation }) => {
             </View>
 
             {/* Bottom Actions */}
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 20, gap: 12 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'center', marginTop: 20 }}>
               <TouchableOpacity onPress={handleCopyOtp} style={{ flex: 1, backgroundColor: '#FFFFFF', paddingVertical: 12, borderRadius: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', borderWidth: 1, borderColor: '#E0F2FE' }}>
                 <Text style={{ fontSize: 16, marginRight: 6 }}>📋</Text>
                 <Text style={{ color: '#0369A1', fontWeight: '700', fontSize: 13 }}>Copy OTP</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={{ flex: 1, backgroundColor: '#FFFFFF', paddingVertical: 12, borderRadius: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', borderWidth: 1, borderColor: '#E0F2FE' }}>
-                <Text style={{ fontSize: 16, marginRight: 6 }}>🔗</Text>
-                <Text style={{ color: '#0369A1', fontWeight: '700', fontSize: 13 }}>Share OTP</Text>
               </TouchableOpacity>
             </View>
           </Reanimated.View>

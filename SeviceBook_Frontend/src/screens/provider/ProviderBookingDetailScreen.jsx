@@ -25,6 +25,7 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
   const [actionLoading, setActionLoading] = useState(false);
   const [otpModalVisible, setOtpModalVisible] = useState(false);
   const [otpInput, setOtpInput] = useState('');
+  const [hasNewMessage, setHasNewMessage] = useState(false);
 
   const [error, setError] = useState(null);
 
@@ -61,12 +62,16 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
   useEffect(() => {
     fetchBooking();
 
+    const handleNewMsg = () => setHasNewMessage(true);
+
     socketService.joinBookingRoom(bookingId);
     socketService.on('booking:status_update', handleSocketUpdate);
+    socketService.on('newMessage', handleNewMsg);
 
     return () => {
       socketService.leaveBookingRoom(bookingId);
       socketService.off('booking:status_update', handleSocketUpdate);
+      socketService.off('newMessage', handleNewMsg);
     };
   }, [bookingId, fetchBooking, handleSocketUpdate]);
 
@@ -140,6 +145,7 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
 
   const handleChat = () => {
     if (!booking?.customerId?._id) return;
+    setHasNewMessage(false);
     navigation.navigate('Chat', {
       bookingId,
       receiverId: booking.customerId._id,
@@ -270,7 +276,12 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
             </View>
             <View style={styles.actionRow}>
               <PrimaryButton title="Call" variant="secondary" style={styles.actionBtn} onPress={handleCall} />
-              <PrimaryButton title="Chat" variant="secondary" style={styles.actionBtn} onPress={handleChat} />
+              <View style={{ flex: 1, marginHorizontal: SPACING.sm }}>
+                <PrimaryButton title="Chat" variant="secondary" style={{ width: '100%' }} onPress={handleChat} />
+                {hasNewMessage && (
+                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#EF4444', position: 'absolute', top: -2, right: -2, elevation: 5, zIndex: 5 }} />
+                )}
+              </View>
               <PrimaryButton title="Nav" variant="primary" style={styles.actionBtn} onPress={handleNavigate} />
             </View>
           </Card>

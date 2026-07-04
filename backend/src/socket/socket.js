@@ -54,6 +54,25 @@ const initSocket = (httpServer) => {
 
     socket.on("disconnect", () => {
       console.log(`🔌 Disconnected: ${socket.userId}`);
+      if (socket.userRole === "provider") {
+        setTimeout(async () => {
+          // Check if they reconnected (room will have sockets if they did)
+          const room = io.sockets.adapter.rooms.get(socket.userId);
+          if (!room || room.size === 0) {
+            console.log(`🔌 Provider ${socket.userId} fully disconnected. Marking offline.`);
+            try {
+              const Provider = require("../models/Provider.model");
+              await Provider.findOneAndUpdate(
+                { userId: socket.userId },
+                { status: "offline" }
+              );
+              io.emit("providers:status_changed", { providerId: socket.userId, isOnline: false });
+            } catch (err) {
+              console.error("Error setting offline on disconnect:", err);
+            }
+          }
+        }, 10000); // 10 seconds grace period for network drops
+      }
     });
   });
 

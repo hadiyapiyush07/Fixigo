@@ -25,8 +25,8 @@ const userSchema = new mongoose.Schema(
 
     role: {
       type: String,
-      enum: ["customer", "provider", "admin"],
-      default: "customer",
+      enum: ["customer", "provider"],
+      required: true,
     },
 
     profilePhoto:          { type: String, default: null },  // Cloudinary URL

@@ -38,7 +38,7 @@ const providerSchema = new mongoose.Schema(
 
     // Admin must approve before provider can receive jobs
     isVerified: { type: Boolean, default: false },
-    verificationStatus: { type: String, enum: ["pending", "verified", "rejected"], default: "pending" },
+    verificationStatus: { type: String, enum: ["pending", "verified", "rejected", "suspended"], default: "pending" },
 
     // For background heartbeat system
     lastSeen: { type: Date, default: Date.now },

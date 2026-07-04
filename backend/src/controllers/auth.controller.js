@@ -43,15 +43,7 @@ const verifyLoginOtp = asyncHandler(async (req, res) => {
   // 2. Generate Tokens
   const authData = await authService.generateAuthTokens(phone);
 
-  // For admin web panel
-  if (authData.user.role === "admin") {
-    res.cookie("adminToken", authData.accessToken, {
-      httpOnly: true,
-      secure:   process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge:   7 * 24 * 60 * 60 * 1000,
-    });
-  }
+  // Admin authentication is now handled in admin.auth.controller.js
 
   res.status(200).json(new ApiResponse(200, authData, "Login successful."));
 });

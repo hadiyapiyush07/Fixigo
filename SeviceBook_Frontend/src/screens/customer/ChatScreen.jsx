@@ -40,6 +40,9 @@ const ChatScreen = ({ route, navigation }) => {
     socketService.joinBookingRoom(bookingId);
 
     const handleNewMessage = (msg) => {
+      // Ensure the message is for this chat room
+      if (String(msg.bookingId) !== String(bookingId)) return;
+      
       setMessages(prev => {
         // Ignore messages from self to prevent duplicating the local optimistic update
         if (String(msg.sender?._id || msg.sender) === String(user?._id)) return prev;
