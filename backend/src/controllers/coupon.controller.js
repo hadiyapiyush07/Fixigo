@@ -72,7 +72,46 @@ const getActiveCoupons = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, availableCoupons, "Active coupons fetched successfully."));
 });
 
+const getAllCoupons = asyncHandler(async (req, res) => {
+  const coupons = await Coupon.find().sort({ createdAt: -1 });
+  res.status(200).json(new ApiResponse(200, coupons, "Coupons fetched successfully."));
+});
+
+const createCoupon = asyncHandler(async (req, res) => {
+  const { code, discountType, discountValue, description, maxDiscount, expiryDate, isOneTime } = req.body;
+  if (!code || !discountType || !discountValue) {
+    throw new ApiError(400, "Code, discount type, and value are required.");
+  }
+  
+  const existing = await Coupon.findOne({ code: code.toUpperCase() });
+  if (existing) {
+    throw new ApiError(400, "Coupon code already exists.");
+  }
+
+  const coupon = await Coupon.create({
+    code: code.toUpperCase(),
+    discountType: discountType === 'percentage' ? 'percent' : 'flat',
+    discountValue,
+    description,
+    maxDiscount,
+    expiryDate,
+    usageLimitPerUser: isOneTime ? 1 : 100 // enforce one time limit
+  });
+  
+  res.status(201).json(new ApiResponse(201, coupon, "Coupon created successfully."));
+});
+
+const deleteCoupon = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const coupon = await Coupon.findByIdAndDelete(id);
+  if (!coupon) throw new ApiError(404, "Coupon not found");
+  res.status(200).json(new ApiResponse(200, {}, "Coupon deleted successfully."));
+});
+
 module.exports = {
   applyCoupon,
-  getActiveCoupons
+  getActiveCoupons,
+  getAllCoupons,
+  createCoupon,
+  deleteCoupon
 };

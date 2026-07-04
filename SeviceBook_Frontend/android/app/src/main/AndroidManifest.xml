@@ -38,6 +38,7 @@
         android:name="com.asterinet.react.bgactions.RNBackgroundActionsTask"
         android:exported="true"
         android:foregroundServiceType="location"
+        android:stopWithTask="true"
         tools:node="replace" />
     </application>
 </manifest>
