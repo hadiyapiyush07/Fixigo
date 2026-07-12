@@ -34,6 +34,11 @@ const initSocket = (httpServer) => {
     // Server can push to specific user: io.to(userId).emit(...)
     socket.join(socket.userId);
 
+    // Admins join the admin room
+    if (["superadmin", "admin", "operations", "support", "finance"].includes(socket.userRole)) {
+      socket.join("admin_room");
+    }
+
     // Provider sends GPS location every 5-10 seconds while on job
     socket.on("provider:updateLocation", async ({ longitude, latitude, heading, speed, bookingId }) => {
       if (socket.userRole !== "provider") return;
@@ -94,4 +99,9 @@ const emitToAll = (event, data) => {
   if (io) io.emit(event, data);
 };
 
-module.exports = { initSocket, emitToUser, emitToBooking, emitToAll };
+// Push event to all admins
+const emitToAdmins = (event, data) => {
+  if (io) io.to("admin_room").emit(event, data);
+};
+
+module.exports = { initSocket, emitToUser, emitToBooking, emitToAll, emitToAdmins };

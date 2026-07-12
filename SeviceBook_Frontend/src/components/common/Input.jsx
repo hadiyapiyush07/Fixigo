@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import {
   View, TextInput, Text, TouchableOpacity, StyleSheet,
 } from 'react-native';
+import { Eye, EyeOff } from 'lucide-react-native';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../../theme/typography';
 
 const Input = ({
@@ -66,7 +67,7 @@ const Input = ({
             style={styles.rightIcon}
             onPress={() => setIsSecure(!isSecure)}
           >
-            <Text style={styles.eyeIcon}>{isSecure ? '👁' : '🙈'}</Text>
+            {isSecure ? <EyeOff size={20} color={COLORS.textTertiary} /> : <Eye size={20} color={COLORS.textTertiary} />}
           </TouchableOpacity>
         )}
 

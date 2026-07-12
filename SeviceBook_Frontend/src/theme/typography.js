@@ -2,10 +2,10 @@
 // Centralized Design System (Colors, Typography, Spacing, Shadows, etc.)
 
 export const COLORS = {
-  primary:        '#1D6AE5',
-  primaryDark:    '#1455C0',
-  primaryLight:   '#E8F0FD',
-  secondary:      '#00B894',
+  primary:        '#0F766E',
+  primaryDark:    '#0D625A',
+  primaryLight:   '#CCFBF1',
+  secondary:      '#14B8A6',
   secondaryLight: '#E0F7F3',
   success:        '#00B894',
   successLight:   '#E0F7F3',

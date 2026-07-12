@@ -7,11 +7,12 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [timeframe, setTimeframe] = useState('week');
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const res = await adminService.getStats();
+        const res = await adminService.getDashboardStats({ timeframe });
         setStats(res.data.data);
       } catch (error) {
         console.error("Failed to fetch stats", error);
@@ -20,7 +21,7 @@ export default function Dashboard() {
       }
     };
     fetchStats();
-  }, []);
+  }, [timeframe]);
 
   const dummyChartData = [
     { name: 'Mon', bookings: 4 },
@@ -82,9 +83,14 @@ export default function Dashboard() {
         {/* Chart */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 lg:col-span-2">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-slate-900">Weekly Bookings</h2>
-            <select className="text-sm border-slate-200 rounded-lg text-slate-600 focus:ring-primary focus:border-primary">
-              <option>This Week</option>
+            <h2 className="text-lg font-bold text-slate-900">{timeframe === 'month' ? 'Monthly Bookings' : 'Weekly Bookings'}</h2>
+            <select 
+              value={timeframe} 
+              onChange={(e) => setTimeframe(e.target.value)}
+              className="text-sm border-slate-200 rounded-lg text-slate-600 focus:ring-primary focus:border-primary outline-none"
+            >
+              <option value="week">This Week</option>
+              <option value="month">This Month</option>
             </select>
           </div>
           <div className="h-72">

@@ -7,6 +7,7 @@ import { View, Text, StyleSheet, ActivityIndicator, Alert, Vibration } from 'rea
 import { useSelector } from 'react-redux';
 import { showMessage } from 'react-native-flash-message';
 import notifee, { AndroidImportance } from '@notifee/react-native';
+import { Home, CalendarDays, Bell, User, LayoutDashboard, Briefcase, Inbox, Wallet } from 'lucide-react-native';
 import { COLORS, FONT_SIZES } from '../theme/typography';
 
 // Auth screens
@@ -116,14 +117,15 @@ const CustomerTabs = () => {
       tabBarActiveTintColor:   COLORS.primary,
       tabBarInactiveTintColor: COLORS.textTertiary,
       tabBarLabelStyle: styles.tabLabel,
-      tabBarIcon: ({ focused }) => {
-        const icons = {
-          Home:          focused ? '🏠' : '🏡',
-          MyBookings:    focused ? '📋' : '📄',
-          Notifications: focused ? '🔔' : '🔕',
-          Profile:       focused ? '👤' : '👥',
-        };
-        return <Text style={{ fontSize: 22 }}>{icons[route.name] || '📱'}</Text>;
+      tabBarIcon: ({ focused, color, size }) => {
+        const iconSize = size || 24;
+        switch (route.name) {
+          case 'Home': return <Home size={iconSize} color={color} strokeWidth={focused ? 2.5 : 2} />;
+          case 'MyBookings': return <CalendarDays size={iconSize} color={color} strokeWidth={focused ? 2.5 : 2} />;
+          case 'Notifications': return <Bell size={iconSize} color={color} strokeWidth={focused ? 2.5 : 2} />;
+          case 'Profile': return <User size={iconSize} color={color} strokeWidth={focused ? 2.5 : 2} />;
+          default: return <Home size={iconSize} color={color} />;
+        }
       },
     })}
   >
@@ -252,15 +254,16 @@ const ProviderTabs = () => {
         tabBarActiveTintColor:   COLORS.primary,
         tabBarInactiveTintColor: COLORS.textTertiary,
         tabBarLabelStyle: styles.tabLabel,
-        tabBarIcon: ({ focused }) => {
-          const icons = {
-            Dashboard:       focused ? '📊' : '📈',
-            Bookings:        focused ? '📋' : '📄',
-            Requests:        focused ? '📥' : '📤',
-            Earnings:        focused ? '💰' : '💵',
-            ProviderProfile: focused ? '👤' : '👥',
-          };
-          return <Text style={{ fontSize: 22 }}>{icons[route.name] || '📱'}</Text>;
+        tabBarIcon: ({ focused, color, size }) => {
+          const iconSize = size || 24;
+          switch (route.name) {
+            case 'Dashboard': return <LayoutDashboard size={iconSize} color={color} strokeWidth={focused ? 2.5 : 2} />;
+            case 'Bookings': return <Briefcase size={iconSize} color={color} strokeWidth={focused ? 2.5 : 2} />;
+            case 'Requests': return <Inbox size={iconSize} color={color} strokeWidth={focused ? 2.5 : 2} />;
+            case 'Earnings': return <Wallet size={iconSize} color={color} strokeWidth={focused ? 2.5 : 2} />;
+            case 'ProviderProfile': return <User size={iconSize} color={color} strokeWidth={focused ? 2.5 : 2} />;
+            default: return <LayoutDashboard size={iconSize} color={color} />;
+          }
         },
       })}
     >

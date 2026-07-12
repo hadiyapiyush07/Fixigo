@@ -22,6 +22,15 @@ const registerUser = async ({ name, email, phone, password, role }) => {
   // If registering as provider → create their Provider profile automatically
   if (role === "provider") {
     await Provider.create({ userId: user._id });
+    try {
+      const { createAdminNotification } = require("../controllers/adminNotification.controller");
+      await createAdminNotification(
+        "New Provider Registered",
+        `${user.name} has signed up and is pending verification.`,
+        "provider_signup",
+        "/providers"
+      );
+    } catch(e) { console.error("Admin Notification Error", e); }
   }
 
   return {
