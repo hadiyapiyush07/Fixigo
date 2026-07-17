@@ -12,6 +12,7 @@ const { requireRole }  = require("../middleware/role.middleware");
 const { verifyAdminToken, requireAdminRole } = require("../middleware/adminAuth.middleware");
 const { uploadCategoryIcon } = require("../config/cloudinary");
 const sendEmail = require("../utils/sendEmail");
+const { getNotifications, markAsRead, markAllAsRead } = require("../controllers/adminNotification.controller");
 
 // GET /api/categories — public, home screen
 categoryRouter.get("/", asyncHandler(async (req, res) => {
@@ -79,6 +80,15 @@ const { getPagination, paginate } = require("../utils/pagination");
 // All admin routes require admin role
 adminRouter.use(verifyAdminToken, requireAdminRole("superadmin", "admin", "operations", "support", "finance"));
 
+// GET /api/admin/notifications
+adminRouter.get("/notifications", getNotifications);
+
+// PUT /api/admin/notifications/read-all
+adminRouter.put("/notifications/read-all", markAllAsRead);
+
+// PUT /api/admin/notifications/:id/read
+adminRouter.put("/notifications/:id/read", markAsRead);
+
 // GET /api/admin/stats
 adminRouter.get("/stats", asyncHandler(async (req, res) => {
   const [totalCustomers, totalProviders, verifiedProviders,
@@ -106,47 +116,79 @@ adminRouter.get("/stats", asyncHandler(async (req, res) => {
     .sort({ createdAt: -1 })
     .limit(5)
     .populate("customerId", "name")
-    .select("bookingId createdAt status customerId");
+    .select("_id createdAt status customerId");
 
   const recentActivity = recentBookings.map(b => ({
-    id: b.bookingId,
-    action: `New booking #${b.bookingId} from ${b.customerId?.name || 'Customer'}`,
+    id: b._id,
+    action: `New booking #${b._id.toString().slice(-6).toUpperCase()} from ${b.customerId?.name || 'Customer'}`,
     time: b.createdAt
   }));
 
-  // Weekly Bookings Chart Data
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
-  sevenDaysAgo.setHours(0, 0, 0, 0);
-
-  const weeklyData = await Booking.aggregate([
-    { $match: { createdAt: { $gte: sevenDaysAgo } } },
-    { $group: { 
-        _id: { $dayOfWeek: "$createdAt" }, 
-        bookings: { $sum: 1 } 
-      } 
-    }
-  ]);
-
-  const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  // Chart Data (Weekly or Monthly)
+  const timeframe = req.query.timeframe || 'week'; // 'week' or 'month'
   const chartData = [];
-  
-  for (let i = 6; i >= 0; i--) {
-    const d = new Date();
-    d.setDate(d.getDate() - i);
-    const dayIndex = d.getDay();
-    const dayData = weeklyData.find(w => w._id === dayIndex + 1);
-    chartData.push({
-      name: daysOfWeek[dayIndex],
-      bookings: dayData ? dayData.bookings : 0
-    });
+
+  if (timeframe === 'month') {
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 27); // 4 weeks = 28 days
+    thirtyDaysAgo.setHours(0, 0, 0, 0);
+
+    const monthlyData = await Booking.aggregate([
+      { $match: { createdAt: { $gte: thirtyDaysAgo } } },
+      { $group: { 
+          _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } }, 
+          bookings: { $sum: 1 } 
+        } 
+      }
+    ]);
+
+    for (let i = 0; i < 4; i++) {
+      let weekTotal = 0;
+      for (let j = 0; j < 7; j++) {
+        const d = new Date(thirtyDaysAgo);
+        d.setDate(thirtyDaysAgo.getDate() + (i * 7) + j);
+        const dateStr = d.toISOString().split('T')[0];
+        const dayData = monthlyData.find(w => w._id === dateStr);
+        if (dayData) weekTotal += dayData.bookings;
+      }
+      chartData.push({
+        name: `Week ${i + 1}`,
+        bookings: weekTotal
+      });
+    }
+  } else {
+    // Weekly (7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const weeklyData = await Booking.aggregate([
+      { $match: { createdAt: { $gte: sevenDaysAgo } } },
+      { $group: { 
+          _id: { $dayOfWeek: "$createdAt" }, 
+          bookings: { $sum: 1 } 
+        } 
+      }
+    ]);
+
+    const daysOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const dayIndex = d.getDay();
+      const dayData = weeklyData.find(w => w._id === dayIndex + 1);
+      chartData.push({
+        name: daysOfWeek[dayIndex],
+        bookings: dayData ? dayData.bookings : 0
+      });
+    }
   }
 
   res.json(new ApiResponse(200, {
     users:    { total: totalCustomers },
     providers:{ total: totalProviders, verified: verifiedProviders, pending: pendingProviders },
     bookings: { total: totalBookings, completed: completedBookings, cancelled: cancelledBookings, today: todayBookings },
-    finance:  { totalRevenue, platformFees: totalRevenue * 0.1, pendingPayouts: 0 },
+    finance:  { totalRevenue, pendingPayouts: 0 },
     recentActivity,
     chartData
   }));

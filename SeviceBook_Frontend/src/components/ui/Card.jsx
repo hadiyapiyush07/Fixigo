@@ -1,34 +1,38 @@
-import React, { useRef } from 'react';
-import { View, StyleSheet, TouchableWithoutFeedback, Animated } from 'react-native';
+import React from 'react';
+import { View, StyleSheet, TouchableWithoutFeedback } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 
-export const Card = React.memo(({ children, style, onPress, noPadding = false }) => {
-  const scale = useRef(new Animated.Value(1)).current;
+export const Card = React.memo(({ children, style, onPress, noPadding = false, elevation = 'md' }) => {
+  const scale = useSharedValue(1);
 
   const handlePressIn = () => {
     if (!onPress) return;
-    Animated.spring(scale, {
-      toValue: 0.97,
-      useNativeDriver: true,
-    }).start();
+    scale.value = withSpring(0.98, { damping: 15, stiffness: 300 });
   };
 
   const handlePressOut = () => {
     if (!onPress) return;
-    Animated.spring(scale, {
-      toValue: 1,
-      friction: 5,
-      tension: 150,
-      useNativeDriver: true,
-    }).start();
+    scale.value = withSpring(1, { damping: 12, stiffness: 200 });
   };
 
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
+
+  const cardContent = (
+    <View style={[
+      styles.card,
+      noPadding ? { padding: 0 } : { padding: SPACING.lg },
+      SHADOWS[elevation] || SHADOWS.md,
+      style
+    ]}>
+      {children}
+    </View>
+  );
+
   if (!onPress) {
-    return (
-      <View style={[styles.card, noPadding ? { padding: 0 } : { padding: SPACING.md }, style]}>
-        {children}
-      </View>
-    );
+    return cardContent;
   }
 
   return (
@@ -37,15 +41,8 @@ export const Card = React.memo(({ children, style, onPress, noPadding = false })
       onPressOut={handlePressOut}
       onPress={onPress}
     >
-      <Animated.View
-        style={[
-          styles.card,
-          noPadding ? { padding: 0 } : { padding: SPACING.md },
-          style,
-          { transform: [{ scale }] }
-        ]}
-      >
-        {children}
+      <Animated.View style={animatedStyle}>
+        {cardContent}
       </Animated.View>
     </TouchableWithoutFeedback>
   );
@@ -54,10 +51,9 @@ export const Card = React.memo(({ children, style, onPress, noPadding = false })
 const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: BORDER_RADIUS.xxl, // 24px strict requirement
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: 'rgba(229, 231, 235, 0.5)', // Extremely subtle border for glass effect
     marginBottom: SPACING.md,
-    ...SHADOWS.sm,
-  }
+  },
 });

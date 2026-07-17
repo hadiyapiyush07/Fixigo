@@ -18,15 +18,18 @@ export const StatusChip = ({ status, style, textStyle }) => {
 
 const styles = StyleSheet.create({
   chip: {
-    paddingVertical: 4,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: BORDER_RADIUS.md,
+    paddingVertical: 6,
+    paddingHorizontal: SPACING.md,
+    borderRadius: BORDER_RADIUS.round, // 9999 for pill shape
     borderWidth: 1,
     alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   text: {
-    fontSize: FONT_SIZES.xs,
-    fontWeight: '800',
+    fontSize: FONT_SIZES.sm,
+    fontWeight: '700',
     letterSpacing: 0.5,
   }
 });

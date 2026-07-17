@@ -184,6 +184,17 @@ const createBooking = async (customerId, bookingData) => {
   try {
     booking = await Booking.create(bookingDoc);
     console.log("✅ [booking.service] Booking created with _id:", String(booking._id));
+    
+    // Trigger Admin Notification
+    try {
+      const { createAdminNotification } = require("../controllers/adminNotification.controller");
+      createAdminNotification(
+        "New Booking Created",
+        `A new booking #${String(booking._id).slice(-6).toUpperCase()} has been placed.`,
+        "new_booking",
+        "/bookings"
+      );
+    } catch (e) { console.error("Admin Notification Error", e); }
   } catch (err) {
     console.error("❌ [booking.service] Booking.create() FAILED!");
     console.error("   Error name   :", err.name);

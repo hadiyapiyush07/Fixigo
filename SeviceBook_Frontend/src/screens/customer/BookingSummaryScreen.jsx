@@ -1,24 +1,20 @@
-// src/screens/customer/BookingSummaryScreen.jsx
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Alert, ActivityIndicator, SafeAreaView, Image
+  Alert, ActivityIndicator, SafeAreaView, Image, Platform
 } from 'react-native';
+import Animated, { FadeInUp, FadeInDown, Layout } from 'react-native-reanimated';
 import { bookingAPI } from '../../api/booking.api';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
+import { ChevronLeft, Zap, CheckCircle2, TicketPercent, Wallet, MapPin, AlignLeft, Image as ImageIcon } from 'lucide-react-native';
+import { PrimaryButton } from '../../components/ui/PrimaryButton';
+import { Card } from '../../components/ui/Card';
+import { SectionHeader } from '../../components/ui/SectionHeader';
 
 const BookingSummaryScreen = ({ navigation, route }) => {
   const {
-    categoryId,
-    categoryName,
-    subService,
-    subServices,
-    // scheduledDate and scheduledTime are NOT passed — instant booking, backend auto-sets them
-    notes,
-    address,
-    couponCode,
-    images,
-    pricing
+    categoryId, categoryName, subService, subServices,
+    notes, address, couponCode, images, pricing
   } = route.params;
 
   const [submitting, setSubmitting] = useState(false);
@@ -27,20 +23,9 @@ const BookingSummaryScreen = ({ navigation, route }) => {
   const handleConfirm = async () => {
     try {
       setSubmitting(true);
+      const selectedSubServices = (subServices && subServices.length > 0) ? subServices : (subService ? [subService] : []);
+      if (selectedSubServices.length === 0) return Alert.alert('Error', 'No service selected. Please go back.');
 
-      // ── Build sub-services array from whatever was selected ─────────────────
-      // subServices array takes priority (multi-select flow)
-      // subService (legacy single) is a fallback for old flows
-      const selectedSubServices = (subServices && subServices.length > 0)
-        ? subServices
-        : (subService ? [subService] : []);
-
-      if (selectedSubServices.length === 0) {
-        Alert.alert('Error', 'No service selected. Please go back and select at least one service.');
-        return;
-      }
-
-      // Build the legacy subService summary (needed by backend for backward compat)
       const subServiceSummary = {
         name:     selectedSubServices.map(s => s.name).join(', '),
         price:    selectedSubServices.reduce((acc, s) => acc + (Number(s.price) || 0), 0),
@@ -48,311 +33,246 @@ const BookingSummaryScreen = ({ navigation, route }) => {
       };
 
       const payload = {
-        categoryId,
-        // Instant booking — no scheduledDate/scheduledTime from frontend
-        // backend auto-fills them
-        address,
-        description: notes || '',
-        subService:  subServiceSummary,
-        subServices: selectedSubServices.map(s => ({
-          name:     s.name,
-          price:    Number(s.price) || 0,
-          duration: Number(s.duration) || 60,
-        })),
+        categoryId, address, description: notes || '', subService: subServiceSummary,
+        subServices: selectedSubServices.map(s => ({ name: s.name, price: Number(s.price) || 0, duration: Number(s.duration) || 60 })),
         pricing: {
-          baseAmount:    pricing?.baseAmount    || 0,
-          convenienceFee: pricing?.convenienceFee || 0,
-          discount:      pricing?.discount      || 0,
-          totalAmount:   pricing?.totalAmount   || 0,
+          baseAmount: pricing?.baseAmount || 0, convenienceFee: pricing?.convenienceFee || 0,
+          discount: pricing?.discount || 0, totalAmount: pricing?.totalAmount || 0,
         },
         images: images || [],
       };
 
-      console.log('[BookingSummaryScreen] Sending booking payload:', JSON.stringify(payload, null, 2));
-
       const res = await bookingAPI.create(payload);
-      const booking = res?.data?.data || res?.data;
-      const bookingId = booking?._id;
-
-      console.log('[BookingSummaryScreen] Booking response:', JSON.stringify(res?.data, null, 2));
-
-      if (!bookingId) {
-        throw new Error('Booking ID was not returned from the server. Response: ' + JSON.stringify(res?.data));
-      }
+      const bookingId = res?.data?.data?._id || res?.data?._id;
+      if (!bookingId) throw new Error('Booking ID missing from server.');
 
       Alert.alert(
         '🎉 Booking Confirmed!',
         'Your booking has been created successfully. We are now searching for nearby professionals.',
-        [{
-          text: 'Track Booking',
-          onPress: () => navigation.navigate('BookingTrack', { bookingId }),
-        }]
+        [{ text: 'Track Booking', onPress: () => navigation.reset({ index: 0, routes: [{ name: 'CustomerTabs', params: { screen: 'MyBookings' } }, { name: 'BookingTrack', params: { bookingId } }] }) }]
       );
     } catch (e) {
-      console.error('[BookingSummaryScreen] Booking creation FAILED!');
-      console.error('  error name   :', e?.name);
-      console.error('  error message:', e?.message);
-      console.error('  error stack  :', e?.stack);
-      console.error('  response data:', JSON.stringify(e?.response?.data));
-
-      // Show human-readable message — never show minified bundle stack
-      const apiMsg   = e?.response?.data?.message;
-      const userMsg  = apiMsg || e?.message || 'Failed to create booking. Please check your connection and try again.';
-      Alert.alert('Booking Failed', userMsg);
+      Alert.alert('Booking Failed', e?.response?.data?.message || e?.message || 'Failed to create booking.');
     } finally {
       setSubmitting(false);
     }
   };
 
-  const formatDate = (dateStr) => {
-    try {
-      const d = new Date(dateStr);
-      return d.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
-    } catch (e) {
-      return dateStr;
-    }
-  };
-
   return (
     <SafeAreaView style={styles.safe}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <ChevronLeft size={28} color={COLORS.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Review Booking</Text>
+        <View style={{ width: 44 }} />
+      </View>
+
       <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
         
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-            <Text style={styles.backIcon}>‹</Text>
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Booking Summary</Text>
-        </View>
-
-        {/* Info Card */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>🛠️ Service Details</Text>
-          <View style={styles.detailRow}>
-            <Text style={styles.label}>Category</Text>
-            <Text style={styles.value}>{categoryName}</Text>
+        {/* Instant Booking Banner */}
+        <Animated.View entering={FadeInUp.delay(100).springify()}>
+          <View style={styles.instantBanner}>
+            <Zap size={20} color={COLORS.primary} />
+            <View style={{ marginLeft: SPACING.sm, flex: 1 }}>
+              <Text style={styles.instantTitle}>Instant Booking</Text>
+              <Text style={styles.instantSub}>A provider will be assigned immediately</Text>
+            </View>
           </View>
-          <View style={{ height: 1, backgroundColor: COLORS.border, marginVertical: SPACING.md }} />
-          <Text style={{ fontSize: FONT_SIZES.xs, fontWeight: '700', color: COLORS.textSecondary, marginBottom: 8 }}>SELECTED SERVICES:</Text>
-          {(subServices && subServices.length > 0) ? (
-            subServices.map((item, idx) => (
-              <View key={idx} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-                <Text style={{ fontSize: FONT_SIZES.sm, color: COLORS.textPrimary }}>• {item.name}</Text>
-                <Text style={{ fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, fontWeight: '500' }}>₹{item.price}</Text>
+        </Animated.View>
+
+        {/* Services Card */}
+        <Animated.View entering={FadeInUp.delay(150).springify()}>
+          <SectionHeader title="Service Details" />
+          <Card style={styles.card} noPadding>
+            <View style={styles.serviceHeaderRow}>
+              <Text style={styles.catName}>{categoryName}</Text>
+            </View>
+            <View style={styles.subServicesList}>
+              {(subServices && subServices.length > 0) ? (
+                subServices.map((item, idx) => (
+                  <View key={idx} style={styles.serviceRow}>
+                    <View style={styles.serviceRowLeft}>
+                      <CheckCircle2 size={16} color={COLORS.success} />
+                      <Text style={styles.serviceItemName}>{item.name}</Text>
+                    </View>
+                    <Text style={styles.serviceItemPrice}>₹{item.price}</Text>
+                  </View>
+                ))
+              ) : subService ? (
+                <View style={styles.serviceRow}>
+                  <View style={styles.serviceRowLeft}>
+                    <CheckCircle2 size={16} color={COLORS.success} />
+                    <Text style={styles.serviceItemName}>{subService?.name || '—'}</Text>
+                  </View>
+                  <Text style={styles.serviceItemPrice}>₹{subService?.price || 0}</Text>
+                </View>
+              ) : (
+                <Text style={styles.emptyText}>No service selected</Text>
+              )}
+            </View>
+          </Card>
+        </Animated.View>
+
+        {/* Location & Details Card */}
+        <Animated.View entering={FadeInUp.delay(200).springify()}>
+          <SectionHeader title="Location & Notes" />
+          <Card style={styles.card}>
+            <View style={styles.infoRow}>
+              <MapPin size={20} color={COLORS.textSecondary} />
+              <View style={styles.infoTextContainer}>
+                <Text style={styles.infoTitle}>Service Address</Text>
+                <Text style={styles.infoSub}>{address.addressLine}, {address.city} - {address.pincode}</Text>
               </View>
-            ))
-          ) : subService ? (
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 }}>
-              <Text style={{ fontSize: FONT_SIZES.sm, color: COLORS.textPrimary }}>• {subService?.name || '—'}</Text>
-              <Text style={{ fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, fontWeight: '500' }}>₹{subService?.price || 0}</Text>
             </View>
-          ) : (
-            <Text style={{ fontSize: FONT_SIZES.sm, color: COLORS.textSecondary }}>No service selected</Text>
-          )}
-          <View style={{ height: 1, backgroundColor: COLORS.border, marginVertical: SPACING.md }} />
-          <View style={styles.detailRow}>
-            <Text style={styles.label}>Total Duration</Text>
-            <Text style={styles.value}>
-              ⏱ {
-                (subServices && subServices.length > 0)
-                  ? subServices.reduce((acc, s) => acc + (Number(s.duration) || 60), 0)
-                  : (subService?.duration || 60)
-              } mins
-            </Text>
-          </View>
-        </View>
 
-        {/* Instant Booking Notice */}
-        <View style={{ backgroundColor: '#EFF6FF', borderRadius: BORDER_RADIUS.md, padding: SPACING.md, marginBottom: SPACING.md, flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#BFDBFE' }}>
-          <Text style={{ fontSize: 18, marginRight: SPACING.sm }}>⚡</Text>
-          <View style={{ flex: 1 }}>
-            <Text style={{ fontSize: FONT_SIZES.sm, fontWeight: '700', color: '#1D4ED8' }}>Instant Booking</Text>
-            <Text style={{ fontSize: FONT_SIZES.xs, color: '#3B82F6', marginTop: 2 }}>Your request is sent immediately. A provider will be assigned in real-time.</Text>
-          </View>
-        </View>
+            {notes ? (
+              <>
+                <View style={styles.divider} />
+                <View style={styles.infoRow}>
+                  <AlignLeft size={20} color={COLORS.textSecondary} />
+                  <View style={styles.infoTextContainer}>
+                    <Text style={styles.infoTitle}>Instructions</Text>
+                    <Text style={styles.infoSub}>{notes}</Text>
+                  </View>
+                </View>
+              </>
+            ) : null}
 
-
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>📍 Service Address</Text>
-          <Text style={styles.addressText}>{address.addressLine}</Text>
-          <Text style={styles.addressText}>{address.city} - {address.pincode}</Text>
-        </View>
-
-        {/* Optional Notes Card */}
-        {notes ? (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>📝 Special Instructions</Text>
-            <Text style={styles.notesText}>{notes}</Text>
-          </View>
-        ) : null}
-
-        {/* Optional Images Card */}
-        {images && images.length > 0 ? (
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>📸 Attached Images ({images.length})</Text>
-            <View style={styles.imageGrid}>
-              {images.map((img, idx) => (
-                <Image key={idx} source={{ uri: img }} style={styles.thumbnail} />
-              ))}
-            </View>
-          </View>
-        ) : null}
-
-        {/* Coupon Applied Card */}
-        {couponCode ? (
-          <View style={[styles.card, styles.couponCard]}>
-            <Text style={styles.couponTitle}>🏷 Coupon Applied</Text>
-            <View style={styles.couponRow}>
-              <Text style={styles.couponCode}>{couponCode}</Text>
-              <Text style={styles.couponDiscount}>-₹{pricing.discount}</Text>
-            </View>
-          </View>
-        ) : null}
+            {images && images.length > 0 && (
+              <>
+                <View style={styles.divider} />
+                <View style={styles.infoRow}>
+                  <ImageIcon size={20} color={COLORS.textSecondary} />
+                  <View style={styles.infoTextContainer}>
+                    <Text style={styles.infoTitle}>Attached Images ({images.length})</Text>
+                    <View style={styles.imageGrid}>
+                      {images.map((img, idx) => <Image key={idx} source={{ uri: img }} style={styles.thumbnail} />)}
+                    </View>
+                  </View>
+                </View>
+              </>
+            )}
+          </Card>
+        </Animated.View>
 
         {/* Pricing Card */}
-        <View style={styles.card}>
-          <Text style={styles.sectionTitle}>💰 Price Breakdown</Text>
-          
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Base Amount</Text>
-            <Text style={styles.priceValue}>{fmtINR(pricing?.baseAmount)}</Text>
-          </View>
-
-          <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Convenience Fee</Text>
-            <Text style={styles.priceValue}>{fmtINR(pricing?.convenienceFee)}</Text>
-          </View>
-
-          {pricing.discount > 0 && (
+        <Animated.View entering={FadeInUp.delay(250).springify()}>
+          <SectionHeader title="Payment Details" />
+          <Card style={styles.card}>
             <View style={styles.priceRow}>
-              <Text style={[styles.priceLabel, { color: COLORS.success }]}>Promo Discount</Text>
-              <Text style={[styles.priceValue, { color: COLORS.success }]}>-₹{pricing.discount}</Text>
+              <Text style={styles.priceLabel}>Item Total</Text>
+              <Text style={styles.priceValue}>{fmtINR(pricing?.baseAmount)}</Text>
             </View>
-          )}
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Taxes & Fees</Text>
+              <Text style={styles.priceValue}>{fmtINR(pricing?.convenienceFee)}</Text>
+            </View>
 
-          <View style={styles.divider} />
-          
-          <View style={styles.priceRow}>
-            <Text style={styles.totalLabel}>Total Payable Amount</Text>
-            <Text style={styles.totalValue}>₹{pricing.totalAmount}</Text>
-          </View>
-          
-          <Text style={styles.payNote}>💵 Pay cash or online after the service is completed</Text>
-        </View>
+            {pricing.discount > 0 && (
+              <View style={styles.priceRow}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <TicketPercent size={16} color={COLORS.success} style={{ marginRight: 6 }} />
+                  <Text style={[styles.priceLabel, { color: COLORS.success }]}>Promo Discount ({couponCode})</Text>
+                </View>
+                <Text style={[styles.priceValue, { color: COLORS.success }]}>-{fmtINR(pricing.discount)}</Text>
+              </View>
+            )}
 
-        {/* Space */}
-        <View style={{ height: 100 }} />
+            <View style={styles.dividerDashed} />
+            
+            <View style={styles.totalRow}>
+              <Text style={styles.totalLabel}>Total Payable</Text>
+              <Text style={styles.totalValue}>{fmtINR(pricing.totalAmount)}</Text>
+            </View>
+
+            <View style={styles.payNoteBox}>
+              <Wallet size={16} color={COLORS.primary} />
+              <Text style={styles.payNoteTxt}>Pay cash or online after the service is completed</Text>
+            </View>
+          </Card>
+        </Animated.View>
+
+        <View style={{ height: 120 }} />
       </ScrollView>
 
-      {/* Bottom Panel */}
-      <View style={styles.bottomPanel}>
+      {/* Bottom Sticky CTA */}
+      <Animated.View entering={FadeInDown.delay(300).springify()} style={styles.bottomPanel}>
         <View style={styles.bottomInfo}>
-          <Text style={styles.bottomLabel}>Total Payable</Text>
-          <Text style={styles.bottomPrice}>₹{pricing.totalAmount}</Text>
+          <Text style={styles.bottomTotalLabel}>Total Amount</Text>
+          <Text style={styles.bottomTotalValue}>{fmtINR(pricing.totalAmount)}</Text>
         </View>
-        <TouchableOpacity
-          style={[styles.confirmBtn, submitting && { opacity: 0.7 }]}
+        <PrimaryButton 
+          title="Confirm Booking" 
           onPress={handleConfirm}
-          disabled={submitting}
-          activeOpacity={0.85}
-          accessible={true}
-          accessibilityRole="button"
-          accessibilityLabel="Confirm Booking"
-          accessibilityHint="Submits your booking request and navigates to the tracking screen"
-        >
-          {submitting ? (
-            <ActivityIndicator color={COLORS.white} />
-          ) : (
-            <Text style={styles.confirmBtnText}>Confirm Booking</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+          loading={submitting}
+          style={styles.confirmBtn}
+        />
+      </Animated.View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
-  scroll: { padding: SPACING.lg },
-  
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.lg,
-    paddingTop: 10,
+  header: { 
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', 
+    paddingHorizontal: SPACING.lg, paddingTop: Platform.OS === 'ios' ? 60 : SPACING.xl, paddingBottom: SPACING.md 
   },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-    ...SHADOWS.sm
-  },
-  backIcon: { fontSize: 26, color: COLORS.textPrimary, fontWeight: '300', lineHeight: 28, textAlign: 'center' },
+  backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center', ...SHADOWS.sm },
   headerTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.textPrimary },
+  scroll: { padding: SPACING.lg, paddingTop: 0 },
 
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: BORDER_RADIUS.lg,
-    padding: SPACING.lg,
-    marginBottom: SPACING.md,
-    ...SHADOWS.sm
+  instantBanner: { 
+    flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primaryLight, 
+    borderRadius: BORDER_RADIUS.xl, padding: SPACING.md, marginBottom: SPACING.lg,
+    borderWidth: 1, borderColor: COLORS.border
   },
-  sectionTitle: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary, marginBottom: SPACING.md },
+  instantTitle: { fontSize: FONT_SIZES.md, fontWeight: '800', color: COLORS.primaryDark },
+  instantSub: { fontSize: FONT_SIZES.sm, color: COLORS.primary, marginTop: 2, fontWeight: '500' },
 
-  detailRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.sm },
-  label: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
-  value: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textPrimary },
+  card: { padding: SPACING.lg, marginBottom: SPACING.lg },
+  serviceHeaderRow: { padding: SPACING.lg, backgroundColor: COLORS.surface, borderBottomWidth: 1, borderBottomColor: COLORS.divider },
+  catName: { fontSize: FONT_SIZES.lg, fontWeight: '800', color: COLORS.textPrimary },
+  subServicesList: { padding: SPACING.lg },
+  serviceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SPACING.md },
+  serviceRowLeft: { flexDirection: 'row', alignItems: 'flex-start', flex: 1, marginRight: SPACING.md },
+  serviceItemName: { fontSize: FONT_SIZES.md, color: COLORS.textPrimary, marginLeft: SPACING.sm, fontWeight: '600' },
+  serviceItemPrice: { fontSize: FONT_SIZES.md, fontWeight: '800', color: COLORS.textPrimary },
+  emptyText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, fontStyle: 'italic' },
 
-  addressText: { fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, lineHeight: 20 },
-  notesText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, fontStyle: 'italic', lineHeight: 20 },
+  infoRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  infoTextContainer: { flex: 1, marginLeft: SPACING.md },
+  infoTitle: { fontSize: FONT_SIZES.sm, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 4 },
+  infoSub: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, lineHeight: 20 },
+  divider: { height: 1, backgroundColor: COLORS.divider, marginVertical: SPACING.md },
 
-  imageGrid: { flexDirection: 'row', gap: SPACING.md, marginTop: 4 },
-  thumbnail: { width: 60, height: 60, borderRadius: BORDER_RADIUS.sm },
+  imageGrid: { flexDirection: 'row', gap: SPACING.sm, marginTop: SPACING.sm },
+  thumbnail: { width: 60, height: 60, borderRadius: BORDER_RADIUS.md },
 
-  couponCard: { borderColor: COLORS.success, borderWidth: 1, backgroundColor: COLORS.successLight },
-  couponTitle: { fontSize: FONT_SIZES.sm, fontWeight: '700', color: COLORS.success, marginBottom: 6 },
-  couponRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  couponCode: { fontSize: FONT_SIZES.md, fontWeight: '800', color: COLORS.success },
-  couponDiscount: { fontSize: FONT_SIZES.md, fontWeight: '800', color: COLORS.success },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.sm },
+  priceLabel: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, fontWeight: '500' },
+  priceValue: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary },
+  dividerDashed: { height: 1, borderBottomWidth: 1, borderColor: COLORS.divider, borderStyle: 'dashed', marginVertical: SPACING.md },
+  
+  totalRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
+  totalLabel: { fontSize: FONT_SIZES.lg, fontWeight: '800', color: COLORS.textPrimary },
+  totalValue: { fontSize: FONT_SIZES.xl, fontWeight: '900', color: COLORS.primary },
 
-  priceRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 },
-  priceLabel: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
-  priceValue: { fontSize: FONT_SIZES.sm, fontWeight: '500', color: COLORS.textPrimary },
-  divider: { height: 1, backgroundColor: COLORS.border, marginVertical: SPACING.md },
-  totalLabel: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary },
-  totalValue: { fontSize: FONT_SIZES.lg, fontWeight: '800', color: COLORS.primary },
-  payNote: { fontSize: FONT_SIZES.xs, color: COLORS.success, textAlign: 'center', marginTop: SPACING.md, fontWeight: '500' },
+  payNoteBox: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.primaryLight, padding: SPACING.sm, borderRadius: BORDER_RADIUS.md, gap: SPACING.sm },
+  payNoteTxt: { fontSize: 13, color: COLORS.primaryDark, fontWeight: '600', flex: 1 },
 
-  bottomPanel: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.lg,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    ...SHADOWS.lg
+  bottomPanel: { 
+    position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: COLORS.surface,
+    borderTopLeftRadius: BORDER_RADIUS.xxl, borderTopRightRadius: BORDER_RADIUS.xxl, 
+    paddingHorizontal: SPACING.xl, paddingVertical: SPACING.lg, paddingBottom: Platform.OS === 'ios' ? 32 : SPACING.lg, 
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', ...SHADOWS.lg 
   },
   bottomInfo: { flex: 1 },
-  bottomLabel: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, fontWeight: '500' },
-  bottomPrice: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.textPrimary },
-  confirmBtn: {
-    backgroundColor: COLORS.primary,
-    paddingHorizontal: SPACING.xxl,
-    paddingVertical: 14,
-    borderRadius: BORDER_RADIUS.lg,
-    ...SHADOWS.md
-  },
-  confirmBtnText: { color: COLORS.white, fontSize: FONT_SIZES.md, fontWeight: '700' },
+  bottomTotalLabel: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, fontWeight: '600' },
+  bottomTotalValue: { fontSize: FONT_SIZES.xxl, fontWeight: '900', color: COLORS.textPrimary },
+  confirmBtn: { width: 180 }
 });
 
 export default BookingSummaryScreen;

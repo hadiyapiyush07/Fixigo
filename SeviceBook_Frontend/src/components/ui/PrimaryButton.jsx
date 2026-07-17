@@ -1,6 +1,8 @@
-import React, { useRef } from 'react';
-import { TouchableWithoutFeedback, Animated, Text, ActivityIndicator, StyleSheet } from 'react-native';
-import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES } from '../../theme/typography';
+import React from 'react';
+import { TouchableWithoutFeedback, Text, ActivityIndicator, StyleSheet, View } from 'react-native';
+import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import LinearGradient from 'react-native-linear-gradient';
+import { COLORS, SPACING, BORDER_RADIUS, FONT_SIZES, SHADOWS } from '../../theme/typography';
 
 export const PrimaryButton = React.memo(({ 
   title, 
@@ -9,45 +11,56 @@ export const PrimaryButton = React.memo(({
   disabled = false, 
   style, 
   textStyle,
-  variant = 'primary' // primary, secondary, outline, danger
+  variant = 'primary', // primary, secondary, outline, danger
+  icon,
 }) => {
-  const scale = useRef(new Animated.Value(1)).current;
+  const scale = useSharedValue(1);
 
   const handlePressIn = () => {
     if (disabled || loading) return;
-    Animated.spring(scale, {
-      toValue: 0.95,
-      useNativeDriver: true,
-    }).start();
+    scale.value = withSpring(0.96, { damping: 12, stiffness: 300 });
   };
 
   const handlePressOut = () => {
     if (disabled || loading) return;
-    Animated.spring(scale, {
-      toValue: 1,
-      friction: 4,
-      tension: 120,
-      useNativeDriver: true,
-    }).start();
+    scale.value = withSpring(1, { damping: 10, stiffness: 200 });
   };
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+  }));
 
   const getBgColor = () => {
     if (disabled) return COLORS.textDisabled;
     if (variant === 'secondary') return COLORS.secondary;
-    if (variant === 'danger') return COLORS.error;
+    if (variant === 'danger') return COLORS.danger;
     if (variant === 'outline') return 'transparent';
-    return COLORS.primary;
+    return 'transparent'; // Handled by gradient for primary
   };
 
   const getTextColor = () => {
     if (variant === 'outline') return COLORS.primary;
+    if (disabled) return COLORS.textSecondary;
     return COLORS.white;
   };
 
   const getBorder = () => {
-    if (variant === 'outline') return { borderWidth: 1, borderColor: COLORS.primary };
+    if (variant === 'outline') return { borderWidth: 1.5, borderColor: COLORS.border };
     return {};
   };
+
+  const content = (
+    <>
+      {loading ? (
+        <ActivityIndicator color={getTextColor()} style={{ marginRight: SPACING.sm }} />
+      ) : icon ? (
+        <View style={{ marginRight: SPACING.sm }}>{icon}</View>
+      ) : null}
+      <Text style={[styles.text, { color: getTextColor() }, textStyle]}>
+        {loading ? 'Please wait...' : title}
+      </Text>
+    </>
+  );
 
   return (
     <TouchableWithoutFeedback
@@ -58,19 +71,27 @@ export const PrimaryButton = React.memo(({
     >
       <Animated.View
         style={[
-          styles.btn, 
-          { backgroundColor: getBgColor() }, 
+          styles.container,
           getBorder(),
-          style,
-          { transform: [{ scale }] }
+          { backgroundColor: getBgColor() },
+          variant === 'primary' && !disabled ? SHADOWS.md : {},
+          animatedStyle,
+          style
         ]}
       >
-        {loading ? (
-          <ActivityIndicator color={getTextColor()} />
+        {variant === 'primary' && !disabled ? (
+          <LinearGradient
+            colors={[COLORS.primary, COLORS.secondary]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.gradient}
+          >
+            {content}
+          </LinearGradient>
         ) : (
-          <Text style={[styles.txt, { color: getTextColor() }, textStyle]}>
-            {title}
-          </Text>
+          <View style={styles.contentContainer}>
+            {content}
+          </View>
         )}
       </Animated.View>
     </TouchableWithoutFeedback>
@@ -78,16 +99,29 @@ export const PrimaryButton = React.memo(({
 });
 
 const styles = StyleSheet.create({
-  btn: {
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: BORDER_RADIUS.md,
+  container: {
+    width: '100%',
+    height: 56, // Enforced 56px height
+    borderRadius: BORDER_RADIUS.xl, // 18px radius
+    overflow: 'hidden', // to keep gradient inside borders
+  },
+  gradient: {
+    flex: 1,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
+    paddingHorizontal: SPACING.lg,
   },
-  txt: {
-    fontSize: FONT_SIZES.md,
-    fontWeight: '700',
+  contentContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: SPACING.lg,
+  },
+  text: {
+    fontSize: FONT_SIZES.lg,
+    fontWeight: '600',
+    letterSpacing: 0.3,
   }
 });

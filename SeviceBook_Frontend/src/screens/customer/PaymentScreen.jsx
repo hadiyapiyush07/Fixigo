@@ -1,14 +1,18 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
-  TouchableOpacity, Alert, ActivityIndicator,
+  TouchableOpacity, Alert, ActivityIndicator, Platform
 } from 'react-native';
-import { COLORS, FONT_SIZES, SPACING } from '../../theme/typography';
+import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
+import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
+import { ChevronLeft, CreditCard, Smartphone, Banknote, ShieldCheck } from 'lucide-react-native';
+import { Card } from '../../components/ui/Card';
+import { PrimaryButton } from '../../components/ui/PrimaryButton';
 
 const PAYMENT_METHODS = [
-  { id: 'upi',  icon: '📲', label: 'UPI',          sublabel: 'PhonePe, GPay, Paytm' },
-  { id: 'card', icon: '💳', label: 'Credit / Debit Card', sublabel: 'Visa, Mastercard, RuPay' },
-  { id: 'cod',  icon: '💵', label: 'Cash on Delivery', sublabel: 'Pay after service' },
+  { id: 'upi',  icon: <Smartphone size={24} color={COLORS.primary} />, label: 'UPI', sublabel: 'PhonePe, GPay, Paytm' },
+  { id: 'card', icon: <CreditCard size={24} color={COLORS.primary} />, label: 'Credit / Debit Card', sublabel: 'Visa, Mastercard, RuPay' },
+  { id: 'cod',  icon: <Banknote size={24} color={COLORS.primary} />, label: 'Cash on Delivery', sublabel: 'Pay after service' },
 ];
 
 const PaymentScreen = ({ route, navigation }) => {
@@ -20,7 +24,6 @@ const PaymentScreen = ({ route, navigation }) => {
 
   const handlePay = async () => {
     setLoading(true);
-    // Simulate payment processing
     await new Promise(r => setTimeout(r, 1500));
     setLoading(false);
 
@@ -39,169 +42,140 @@ const PaymentScreen = ({ route, navigation }) => {
     <View style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backIcon}>
-          <Text style={{ fontSize: 22 }}>‹</Text>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <ChevronLeft size={28} color={COLORS.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Payment</Text>
+        <View style={{ width: 44 }} />
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.content}>
         {/* Order Summary */}
-        <View style={styles.summaryCard}>
-          <Text style={styles.summaryLabel}>Order Summary</Text>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryKey}>{booking?.categoryId?.name || 'Service'}</Text>
-            <Text style={styles.summaryVal}>₹{booking?.pricing?.basePrice || totalAmount}</Text>
-          </View>
-          {booking?.pricing?.platformFee > 0 && (
+        <Animated.View entering={FadeInUp.delay(100).springify()}>
+          <Card style={styles.summaryCard}>
+            <Text style={styles.summaryLabel}>Order Summary</Text>
             <View style={styles.summaryRow}>
-              <Text style={styles.summaryKey}>Platform Fee</Text>
-              <Text style={styles.summaryVal}>₹{booking.pricing.platformFee}</Text>
+              <Text style={styles.summaryKey}>{booking?.categoryId?.name || 'Service'}</Text>
+              <Text style={styles.summaryVal}>₹{booking?.pricing?.basePrice || totalAmount}</Text>
             </View>
-          )}
-          <View style={[styles.summaryRow, styles.totalRow]}>
-            <Text style={styles.totalKey}>Total</Text>
-            <Text style={styles.totalVal}>₹{totalAmount}</Text>
-          </View>
-        </View>
+            {booking?.pricing?.platformFee > 0 && (
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryKey}>Platform Fee</Text>
+                <Text style={styles.summaryVal}>₹{booking.pricing.platformFee}</Text>
+              </View>
+            )}
+            <View style={styles.dividerDashed} />
+            <View style={styles.totalRow}>
+              <Text style={styles.totalKey}>Total</Text>
+              <Text style={styles.totalVal}>₹{totalAmount}</Text>
+            </View>
+          </Card>
+        </Animated.View>
 
         {/* Payment Methods */}
-        <Text style={styles.sectionTitle}>Select Payment Method</Text>
-        {PAYMENT_METHODS.map(method => (
-          <TouchableOpacity
-            key={method.id}
-            style={[styles.methodCard, selected === method.id && styles.methodCardSelected]}
-            onPress={() => setSelected(method.id)}
-            activeOpacity={0.8}
-          >
-            <View style={styles.methodIcon}>
-              <Text style={{ fontSize: 24 }}>{method.icon}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.methodLabel, selected === method.id && { color: COLORS.primary }]}>
-                {method.label}
-              </Text>
-              <Text style={styles.methodSub}>{method.sublabel}</Text>
-            </View>
-            <View style={[styles.radio, selected === method.id && styles.radioSelected]}>
-              {selected === method.id && <View style={styles.radioDot} />}
-            </View>
-          </TouchableOpacity>
-        ))}
+        <Animated.View entering={FadeInUp.delay(200).springify()}>
+          <Text style={styles.sectionTitle}>Select Payment Method</Text>
+          <View style={styles.methodsContainer}>
+            {PAYMENT_METHODS.map(method => (
+              <TouchableOpacity
+                key={method.id}
+                style={[styles.methodCard, selected === method.id && styles.methodCardSelected]}
+                onPress={() => setSelected(method.id)}
+                activeOpacity={0.8}
+              >
+                <View style={[styles.methodIconBox, selected === method.id && styles.methodIconBoxSelected]}>
+                  {method.icon}
+                </View>
+                <View style={{ flex: 1, marginLeft: SPACING.md }}>
+                  <Text style={[styles.methodLabel, selected === method.id && { color: COLORS.primaryDark }]}>
+                    {method.label}
+                  </Text>
+                  <Text style={styles.methodSub}>{method.sublabel}</Text>
+                </View>
+                <View style={[styles.radio, selected === method.id && styles.radioSelected]}>
+                  {selected === method.id && <View style={styles.radioDot} />}
+                </View>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </Animated.View>
 
         {/* Safe Payment Note */}
-        <View style={styles.safeNote}>
-          <Text style={styles.safeNoteText}>🔒  All payments are 100% safe & encrypted</Text>
-        </View>
+        <Animated.View entering={FadeInUp.delay(300).springify()} style={styles.safeNote}>
+          <ShieldCheck size={20} color={COLORS.success} />
+          <Text style={styles.safeNoteText}>All payments are 100% safe & encrypted</Text>
+        </Animated.View>
+
+        <View style={{ height: 120 }} />
       </ScrollView>
 
       {/* Pay Button */}
-      <View style={styles.bottomBar}>
+      <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.bottomBar}>
         <View style={styles.bottomAmount}>
           <Text style={styles.bottomAmountLabel}>Amount to Pay</Text>
           <Text style={styles.bottomAmountValue}>₹{totalAmount}</Text>
         </View>
-        <TouchableOpacity
-          style={[styles.payBtn, loading && { opacity: 0.7 }]}
-          onPress={handlePay}
-          disabled={loading}
-        >
-          {loading
-            ? <ActivityIndicator color="#FFF" size="small" />
-            : <Text style={styles.payBtnText}>
-                {selected === 'cod' ? '✅  Confirm Booking' : `💳  Pay ₹${totalAmount}`}
-              </Text>}
-        </TouchableOpacity>
-      </View>
+        <PrimaryButton 
+          title={selected === 'cod' ? 'Confirm Booking' : `Pay ₹${totalAmount}`} 
+          onPress={handlePay} 
+          loading={loading}
+          style={{ minWidth: 160 }}
+        />
+      </Animated.View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F7FA' },
-
-  header: {
-    flexDirection:     'row',
-    alignItems:        'center',
-    paddingHorizontal: SPACING.xl,
-    paddingTop:        SPACING.xl + SPACING.lg,
-    paddingBottom:     SPACING.md,
-    backgroundColor:   '#FFFFFF',
-    gap:               SPACING.md,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 4,
+  container: { flex: 1, backgroundColor: COLORS.background },
+  header: { 
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', 
+    paddingHorizontal: SPACING.lg, paddingTop: Platform.OS === 'ios' ? 60 : SPACING.xxl, paddingBottom: SPACING.md 
   },
-  backIcon:    { padding: 4 },
-  headerTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: '#111827' },
+  backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center', ...SHADOWS.sm },
+  headerTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.textPrimary },
+  
+  content: { padding: SPACING.xl },
 
-  summaryCard: {
-    margin:           SPACING.xl,
-    backgroundColor:  '#FFFFFF',
-    borderRadius:     16,
-    padding:          SPACING.lg,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 3,
-  },
-  summaryLabel: { fontSize: FONT_SIZES.md, fontWeight: '700', color: '#111827', marginBottom: SPACING.md },
-  summaryRow:   { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  summaryKey:   { fontSize: FONT_SIZES.sm, color: '#6B7280' },
-  summaryVal:   { fontSize: FONT_SIZES.sm, color: '#111827', fontWeight: '500' },
-  totalRow:     { borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingTop: SPACING.md, marginTop: SPACING.sm, marginBottom: 0 },
-  totalKey:     { fontSize: FONT_SIZES.md, fontWeight: '700', color: '#111827' },
-  totalVal:     { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.primary },
+  summaryCard: { padding: SPACING.xl, marginBottom: SPACING.xl },
+  summaryLabel: { fontSize: FONT_SIZES.md, fontWeight: '800', color: COLORS.textPrimary, marginBottom: SPACING.lg },
+  summaryRow:   { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.sm },
+  summaryKey:   { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, fontWeight: '500' },
+  summaryVal:   { fontSize: FONT_SIZES.md, color: COLORS.textPrimary, fontWeight: '700' },
+  dividerDashed: { height: 1, borderBottomWidth: 1, borderColor: COLORS.divider, borderStyle: 'dashed', marginVertical: SPACING.md },
+  totalRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  totalKey:     { fontSize: FONT_SIZES.lg, fontWeight: '800', color: COLORS.textPrimary },
+  totalVal:     { fontSize: FONT_SIZES.xl, fontWeight: '900', color: COLORS.primary },
 
-  sectionTitle: { fontSize: FONT_SIZES.md, fontWeight: '700', color: '#111827', paddingHorizontal: SPACING.xl, marginBottom: SPACING.md },
-
+  sectionTitle: { fontSize: FONT_SIZES.md, fontWeight: '800', color: COLORS.textPrimary, marginBottom: SPACING.md, marginLeft: SPACING.xs },
+  
+  methodsContainer: { gap: SPACING.md },
   methodCard: {
-    flexDirection:    'row',
-    alignItems:       'center',
-    backgroundColor:  '#FFFFFF',
-    marginHorizontal: SPACING.xl,
-    marginBottom:     SPACING.md,
-    borderRadius:     14,
-    padding:          SPACING.lg,
-    borderWidth:      1.5,
-    borderColor:      '#E5E7EB',
-    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 1,
+    flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface,
+    padding: SPACING.lg, borderRadius: BORDER_RADIUS.lg, borderWidth: 1.5, borderColor: COLORS.border,
+    ...SHADOWS.sm
   },
-  methodCardSelected: { borderColor: COLORS.primary, backgroundColor: '#EEF2FF' },
-  methodIcon:  { width: 48, height: 48, borderRadius: 12, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center', marginRight: SPACING.md },
-  methodLabel: { fontSize: FONT_SIZES.md, fontWeight: '600', color: '#111827' },
-  methodSub:   { fontSize: FONT_SIZES.xs, color: '#9CA3AF', marginTop: 2 },
-  radio:       { width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' },
-  radioSelected: { borderColor: COLORS.primary },
-  radioDot:    { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.primary },
+  methodCardSelected: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
+  methodIconBox:  { width: 48, height: 48, borderRadius: BORDER_RADIUS.md, backgroundColor: COLORS.background, alignItems: 'center', justifyContent: 'center' },
+  methodIconBoxSelected: { backgroundColor: COLORS.white },
+  methodLabel: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary },
+  methodSub:   { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2, fontWeight: '500' },
+  
+  radio: { width: 24, height: 24, borderRadius: 12, borderWidth: 2, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.surface },
+  radioSelected: { borderColor: COLORS.primary, backgroundColor: COLORS.primary },
+  radioDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.white },
 
-  safeNote: {
-    marginHorizontal: SPACING.xl,
-    marginTop:        SPACING.sm,
-    alignItems:       'center',
-    padding:          SPACING.md,
-    backgroundColor:  '#ECFDF5',
-    borderRadius:     10,
-  },
-  safeNoteText: { fontSize: FONT_SIZES.xs, color: '#065F46', fontWeight: '500' },
+  safeNote: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.successLight, padding: SPACING.md, borderRadius: BORDER_RADIUS.md, marginTop: SPACING.xl, gap: SPACING.sm },
+  safeNoteText: { fontSize: FONT_SIZES.sm, color: COLORS.success, fontWeight: '700' },
 
-  bottomBar: {
-    position:        'absolute',
-    bottom: 0, left: 0, right: 0,
-    backgroundColor: '#FFFFFF',
-    padding:         SPACING.xl,
-    paddingBottom:   SPACING.xl + 4,
-    borderTopWidth:  1,
-    borderTopColor:  '#E5E7EB',
-    shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 6,
-    flexDirection:   'row',
-    alignItems:      'center',
-    gap:             SPACING.md,
+  bottomBar: { 
+    position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: COLORS.surface, 
+    padding: SPACING.lg, paddingBottom: Platform.OS === 'ios' ? 32 : SPACING.lg, 
+    flexDirection: 'row', alignItems: 'center', ...SHADOWS.lg 
   },
-  bottomAmount:      { flex: 1 },
-  bottomAmountLabel: { fontSize: FONT_SIZES.xs, color: '#9CA3AF' },
-  bottomAmountValue: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: '#111827' },
-  payBtn:     { backgroundColor: COLORS.primary, paddingVertical: 15, paddingHorizontal: SPACING.xl, borderRadius: 14 },
-  payBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: FONT_SIZES.md },
+  bottomAmount: { flex: 1 },
+  bottomAmountLabel: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, fontWeight: '600' },
+  bottomAmountValue: { fontSize: FONT_SIZES.xxl, fontWeight: '900', color: COLORS.textPrimary },
 });
 
 export default PaymentScreen;

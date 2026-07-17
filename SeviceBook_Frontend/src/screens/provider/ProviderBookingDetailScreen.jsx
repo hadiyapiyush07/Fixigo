@@ -5,13 +5,14 @@ import {
 } from 'react-native';
 import Reanimated, { FadeInUp } from 'react-native-reanimated';
 import { useFocusEffect } from '@react-navigation/native';
+import { Phone, MessageCircle, Navigation, MapPin, Receipt, Navigation2, CheckCircle2 } from 'lucide-react-native';
 import { bookingAPI } from '../../api/booking.api';
 import { socketService } from '../../services/socket.service';
 import { useLocation } from '../../hooks/useLocation';
 import { calculateDistance, formatDistance } from '../../utils/distance';
 import Skeleton from '../../components/Skeleton';
 
-import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../../theme/typography';
+import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 import { Card } from '../../components/ui/Card';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -29,7 +30,6 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
 
   const [error, setError] = useState(null);
 
-  // Start tracking when booking is loaded and not completed
   const isActive = booking && !['completed', 'cancelled', 'rejected'].includes(booking.status);
   const { location } = useLocation({ isActiveBooking: isActive });
 
@@ -41,7 +41,6 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
       setBooking(res.data.data);
     } catch (err) {
       if (showLoad) setError('Failed to load booking. Please check your internet connection.');
-      console.log('Error fetching booking detail:', err);
     } finally {
       if (showLoad) setLoading(false);
     }
@@ -53,17 +52,14 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
     useCallback(() => {
       const interval = setInterval(() => {
         fetchBooking(false);
-      }, 5000); // 5s polling for MVP fallback
-
+      }, 5000);
       return () => clearInterval(interval);
     }, [fetchBooking])
   );
 
   useEffect(() => {
     fetchBooking();
-
     const handleNewMsg = () => setHasNewMessage(true);
-
     socketService.joinBookingRoom(bookingId);
     socketService.on('booking:status_update', handleSocketUpdate);
     socketService.on('newMessage', handleNewMsg);
@@ -200,17 +196,9 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
           </View>
           <Skeleton width={80} height={24} borderRadius={12} />
         </View>
-
-        <Skeleton width="100%" height={60} borderRadius={16} style={{ marginBottom: 30 }} />
-        
-        <Skeleton width={140} height={20} style={{ marginBottom: 16 }} />
-        <Skeleton width="100%" height={120} borderRadius={16} style={{ marginBottom: 30 }} />
-
-        <Skeleton width={140} height={20} style={{ marginBottom: 16 }} />
-        <Skeleton width="100%" height={80} borderRadius={16} style={{ marginBottom: 30 }} />
-
-        <Skeleton width={140} height={20} style={{ marginBottom: 16 }} />
-        <Skeleton width="100%" height={120} borderRadius={16} />
+        <Skeleton width="100%" height={120} borderRadius={BORDER_RADIUS.xxl} style={{ marginBottom: 30 }} />
+        <Skeleton width="100%" height={120} borderRadius={BORDER_RADIUS.xxl} style={{ marginBottom: 30 }} />
+        <Skeleton width="100%" height={120} borderRadius={BORDER_RADIUS.xxl} />
       </View>
     );
   }
@@ -225,13 +213,7 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
     );
   }
 
-  if (!booking) {
-    return (
-      <View style={[styles.safe, { justifyContent: 'center', alignItems: 'center' }]}>
-        <Text style={{ fontSize: FONT_SIZES.lg, color: COLORS.textSecondary }}>Booking not found</Text>
-      </View>
-    );
-  }
+  if (!booking) return null;
 
   const customerName = booking.customerId?.name || 'Customer';
   const cPhone = booking.customerId?.phone || '';
@@ -247,96 +229,122 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
   return (
     <View style={styles.safe}>
       <ScrollView contentContainerStyle={styles.scroll}>
+        
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.bookingId}>ID: {booking._id.slice(-6).toUpperCase()}</Text>
+            <Text style={styles.bookingId}>ID: #{booking._id.slice(-6).toUpperCase()}</Text>
             <Text style={styles.serviceName}>{serviceName}</Text>
           </View>
           <StatusBadge status={booking.status} />
         </View>
 
-        {/* Action Timeline (Simplified for MVP) */}
+        {/* Customer Details */}
         <Reanimated.View entering={FadeInUp.delay(100).springify()}>
-          <Card style={styles.timelineCard}>
-            <Text style={styles.timelineTxt}>Service Status: <Text style={{fontWeight: 'bold', color: COLORS.primary}}>{booking.status.replace(/_/g, ' ').toUpperCase()}</Text></Text>
-          </Card>
-        </Reanimated.View>
-
-        {/* Customer Info */}
-        <Reanimated.View entering={FadeInUp.delay(200).springify()}>
           <SectionHeader title="Customer Details" />
-          <Card style={styles.premiumCard}>
+          <Card>
             <View style={styles.customerRow}>
-              <Avatar name={customerName} size={50} />
+              <View style={styles.avatarContainer}>
+                <Avatar name={customerName} size={56} />
+              </View>
               <View style={styles.customerInfo}>
                 <Text style={styles.customerName}>{customerName}</Text>
                 {cPhone ? <Text style={styles.customerPhone}>{cPhone}</Text> : null}
               </View>
             </View>
-            <View style={styles.actionRow}>
-              <PrimaryButton title="Call" variant="secondary" style={styles.actionBtn} onPress={handleCall} />
-              <View style={{ flex: 1, marginHorizontal: SPACING.sm }}>
-                <PrimaryButton title="Chat" variant="secondary" style={{ width: '100%' }} onPress={handleChat} />
-                {hasNewMessage && (
-                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: '#EF4444', position: 'absolute', top: -2, right: -2, elevation: 5, zIndex: 5 }} />
-                )}
-              </View>
-              <PrimaryButton title="Nav" variant="primary" style={styles.actionBtn} onPress={handleNavigate} />
+            
+            <View style={styles.circularActionRow}>
+              <TouchableOpacity style={styles.circleBtn} onPress={handleCall}>
+                <Phone size={24} color={COLORS.primary} />
+                <Text style={styles.circleBtnTxt}>Call</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={styles.circleBtn} onPress={handleChat}>
+                <View>
+                  <MessageCircle size={24} color={COLORS.primary} />
+                  {hasNewMessage && <View style={styles.notificationDot} />}
+                </View>
+                <Text style={styles.circleBtnTxt}>Chat</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.circleBtn} onPress={handleNavigate}>
+                <Navigation2 size={24} color={COLORS.primary} />
+                <Text style={styles.circleBtnTxt}>Nav</Text>
+              </TouchableOpacity>
             </View>
           </Card>
         </Reanimated.View>
 
-        {/* Address Card */}
-        <Reanimated.View entering={FadeInUp.delay(300).springify()}>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+        {/* Service Location */}
+        <Reanimated.View entering={FadeInUp.delay(200).springify()}>
+          <View style={styles.sectionHeaderRow}>
             <SectionHeader title="Service Location" />
             {displayDistance && (
-              <Text style={{ fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: '700', marginBottom: SPACING.md }}>
-                📍 {displayDistance}
-              </Text>
+              <Text style={styles.distanceTxt}>📍 {displayDistance}</Text>
             )}
           </View>
-          <Card style={styles.premiumCard}>
-            <Text style={styles.addressTxt}>{booking.address?.addressLine || 'Address not provided'}</Text>
-            {booking.address?.landmark && <Text style={styles.landmark}>Landmark: {booking.address.landmark}</Text>}
+          <Card>
+            <View style={styles.locationRow}>
+              <View style={styles.mapPinContainer}>
+                <MapPin size={24} color={COLORS.secondary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.addressTxt}>{booking.address?.addressLine || 'Address not provided'}</Text>
+                {booking.address?.landmark && <Text style={styles.landmark}>Landmark: {booking.address.landmark}</Text>}
+              </View>
+            </View>
+            <View style={styles.divider} />
+            <TouchableOpacity style={styles.openMapBtn} onPress={handleNavigate}>
+              <Navigation size={18} color={COLORS.primary} />
+              <Text style={styles.openMapTxt}>Open in Maps</Text>
+            </TouchableOpacity>
           </Card>
         </Reanimated.View>
 
         {/* Payment Summary */}
-        <Reanimated.View entering={FadeInUp.delay(400).springify()}>
+        <Reanimated.View entering={FadeInUp.delay(300).springify()}>
           <SectionHeader title="Payment Details" />
-          <Card style={styles.premiumCard}>
+          <Card>
             <View style={styles.payRow}>
-              <Text style={styles.payLabel}>Total Amount</Text>
-              <Text style={styles.payVal}>₹ {booking.pricing?.totalAmount || booking.totalAmount || 0}</Text>
+              <View style={styles.payLabelRow}>
+                <Receipt size={20} color={COLORS.textSecondary} />
+                <Text style={styles.payLabel}>Total Amount</Text>
+              </View>
+              <Text style={styles.payValBig}>₹ {booking.pricing?.totalAmount || booking.totalAmount || 0}</Text>
             </View>
+            
+            <View style={styles.divider} />
+            
             <View style={styles.payRow}>
-              <Text style={styles.payLabel}>Payment Method</Text>
-              <Text style={styles.payVal}>{booking.paymentMethod?.toUpperCase() || 'COD'}</Text>
+              <Text style={styles.payLabel}>Method</Text>
+              <View style={styles.methodBadge}>
+                <Text style={styles.methodBadgeTxt}>{booking.paymentMethod?.toUpperCase() || 'COD'}</Text>
+              </View>
             </View>
-            <View style={styles.payRow}>
-              <Text style={styles.payLabel}>Payment Status</Text>
-              <Text style={styles.payVal}>{booking.paymentStatus?.toUpperCase() || 'PENDING'}</Text>
+            <View style={[styles.payRow, { marginBottom: 0 }]}>
+              <Text style={styles.payLabel}>Status</Text>
+              <StatusBadge status={booking.status === 'completed' ? 'completed' : (booking.paymentStatus || 'pending')} />
             </View>
           </Card>
         </Reanimated.View>
 
         {booking.status !== 'completed' && booking.status !== 'cancelled' && (
-          <TouchableOpacity 
-            style={[{ backgroundColor: '#FEE2E2', padding: 16, borderRadius: BORDER_RADIUS.md, marginTop: SPACING.xl, alignItems: 'center' }, actionLoading && { opacity: 0.5 }]}
-            onPress={handleCancelBooking}
-            disabled={actionLoading}
-          >
-            {actionLoading ? (
-               <ActivityIndicator color="#EF4444" size="small" />
-            ) : (
-               <Text style={{ color: '#EF4444', fontWeight: 'bold', fontSize: 16 }}>Cancel Booking</Text>
-            )}
-          </TouchableOpacity>
+          <Reanimated.View entering={FadeInUp.delay(400).springify()}>
+            <TouchableOpacity 
+              style={[styles.cancelBtn, actionLoading && { opacity: 0.5 }]}
+              onPress={handleCancelBooking}
+              disabled={actionLoading}
+            >
+              {actionLoading ? (
+                 <ActivityIndicator color={COLORS.danger} size="small" />
+              ) : (
+                 <Text style={styles.cancelBtnTxt}>Cancel Booking</Text>
+              )}
+            </TouchableOpacity>
+          </Reanimated.View>
         )}
 
-        <View style={{ height: 100 }} />
+        <View style={{ height: 120 }} />
       </ScrollView>
 
       {/* Floating Action Button */}
@@ -350,11 +358,15 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
         </View>
       )}
 
+      {/* OTP Modal */}
       <Modal visible={otpModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
+            <View style={styles.modalIconBox}>
+              <CheckCircle2 size={32} color={COLORS.primary} />
+            </View>
             <Text style={styles.modalTitle}>Enter OTP</Text>
-            <Text style={styles.modalSub}>Ask the customer for the 4-digit OTP to start the service.</Text>
+            <Text style={styles.modalSub}>Ask the customer for the 4-digit OTP to start the service securely.</Text>
             <TextInput
               style={styles.otpInput}
               keyboardType="number-pad"
@@ -362,9 +374,10 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
               value={otpInput}
               onChangeText={setOtpInput}
               placeholder="0000"
+              placeholderTextColor={COLORS.textDisabled}
             />
             <View style={styles.modalActions}>
-              <PrimaryButton title="Cancel" variant="outline" onPress={() => setOtpModalVisible(false)} style={{ flex: 1, marginRight: SPACING.sm }} />
+              <PrimaryButton title="Cancel" variant="outline" onPress={() => setOtpModalVisible(false)} style={{ flex: 1, marginRight: SPACING.md }} />
               <PrimaryButton title="Verify" onPress={submitOtp} loading={actionLoading} style={{ flex: 1 }} />
             </View>
           </View>
@@ -378,43 +391,60 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
   scroll: { padding: SPACING.lg },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: SPACING.xl },
-  bookingId: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, fontWeight: '600' },
-  serviceName: { fontSize: FONT_SIZES.xxl, fontWeight: '800', color: COLORS.textPrimary, marginTop: 4 },
-  
-  timelineCard: { backgroundColor: COLORS.primaryLight, borderColor: COLORS.primaryLight, padding: SPACING.lg, borderRadius: 16 },
-  timelineTxt: { fontSize: FONT_SIZES.md, color: COLORS.textPrimary },
-  premiumCard: { borderRadius: 16, padding: SPACING.lg, shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.04, shadowRadius: 10, elevation: 2, borderWidth: 0, backgroundColor: COLORS.white },
+  bookingId: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, fontWeight: '700', letterSpacing: 0.5 },
+  serviceName: { fontSize: FONT_SIZES.xxl, fontWeight: '800', color: COLORS.textPrimary, marginTop: 4, letterSpacing: -0.5 },
   
   customerRow: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.lg },
+  avatarContainer: { ...SHADOWS.sm, borderRadius: 28 },
   customerInfo: { marginLeft: SPACING.md, flex: 1 },
-  customerName: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary },
-  customerPhone: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, marginTop: 4 },
+  customerName: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 2 },
+  customerPhone: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, fontWeight: '500' },
   
-  actionRow: { flexDirection: 'row', gap: SPACING.md },
-  actionBtn: { flex: 1, paddingVertical: SPACING.sm },
+  circularActionRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: SPACING.sm, paddingTop: SPACING.md, borderTopWidth: 1, borderTopColor: COLORS.divider },
+  circleBtn: { alignItems: 'center', justifyContent: 'center' },
+  circleBtnTxt: { fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, fontWeight: '600', marginTop: SPACING.xs },
+  notificationDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.danger, position: 'absolute', top: -2, right: -2, borderWidth: 2, borderColor: COLORS.surface },
 
-  addressTxt: { fontSize: FONT_SIZES.md, color: COLORS.textPrimary, lineHeight: 22 },
+  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  distanceTxt: { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: '700', marginBottom: SPACING.md },
+  
+  locationRow: { flexDirection: 'row', alignItems: 'center' },
+  mapPinContainer: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primaryLight, justifyContent: 'center', alignItems: 'center', marginRight: SPACING.md },
+  addressTxt: { fontSize: FONT_SIZES.md, color: COLORS.textPrimary, fontWeight: '500', lineHeight: 22 },
   landmark: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: SPACING.xs },
+  openMapBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: SPACING.sm },
+  openMapTxt: { fontSize: FONT_SIZES.md, color: COLORS.primary, fontWeight: '700', marginLeft: SPACING.xs },
 
-  payRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.sm },
-  payLabel: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary },
-  payVal: { fontSize: FONT_SIZES.md, color: COLORS.textPrimary, fontWeight: '700' },
+  divider: { height: 1, backgroundColor: COLORS.divider, marginVertical: SPACING.md },
+
+  payRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SPACING.md },
+  payLabelRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.sm },
+  payLabel: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, fontWeight: '500' },
+  payValBig: { fontSize: FONT_SIZES.xxl, color: COLORS.textPrimary, fontWeight: '800' },
+  methodBadge: { backgroundColor: COLORS.divider, paddingHorizontal: SPACING.md, paddingVertical: SPACING.xs, borderRadius: BORDER_RADIUS.md },
+  methodBadgeTxt: { fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, fontWeight: '700' },
+
+  cancelBtn: { backgroundColor: COLORS.errorLight, padding: 18, borderRadius: BORDER_RADIUS.xl, marginTop: SPACING.xl, alignItems: 'center', borderWidth: 1, borderColor: COLORS.errorLight },
+  cancelBtnTxt: { color: COLORS.danger, fontWeight: '700', fontSize: FONT_SIZES.lg },
 
   bottomBar: {
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
     backgroundColor: COLORS.surface,
     padding: SPACING.lg,
-    borderTopWidth: 1,
-    borderColor: COLORS.border,
-    elevation: 10,
+    paddingBottom: Platform.OS === 'ios' ? 32 : SPACING.lg,
+    borderTopLeftRadius: BORDER_RADIUS.xxl,
+    borderTopRightRadius: BORDER_RADIUS.xxl,
+    ...SHADOWS.lg,
   },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: SPACING.lg },
-  modalContent: { backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg, padding: SPACING.xl, width: '100%', maxWidth: 400 },
-  modalTitle: { fontSize: FONT_SIZES.xl, fontWeight: '700', color: COLORS.textPrimary, marginBottom: SPACING.xs },
-  modalSub: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginBottom: SPACING.lg },
-  otpInput: { borderWidth: 1, borderColor: COLORS.border, borderRadius: BORDER_RADIUS.md, padding: SPACING.lg, fontSize: 24, textAlign: 'center', letterSpacing: 8, marginBottom: SPACING.lg },
-  modalActions: { flexDirection: 'row' }
+  
+  modalOverlay: { flex: 1, backgroundColor: COLORS.overlay, justifyContent: 'center', alignItems: 'center', padding: SPACING.lg },
+  modalContent: { backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.xxl, padding: SPACING.xl, width: '100%', maxWidth: 400, alignItems: 'center', ...SHADOWS.lg },
+  modalIconBox: { width: 64, height: 64, borderRadius: 32, backgroundColor: COLORS.primaryLight, justifyContent: 'center', alignItems: 'center', marginBottom: SPACING.md },
+  modalTitle: { fontSize: FONT_SIZES.xxxl, fontWeight: '800', color: COLORS.textPrimary, marginBottom: SPACING.xs },
+  modalSub: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, marginBottom: SPACING.xl, textAlign: 'center', lineHeight: 22 },
+  otpInput: { width: '100%', borderWidth: 2, borderColor: COLORS.border, borderRadius: BORDER_RADIUS.xl, padding: SPACING.lg, fontSize: 32, fontWeight: '800', textAlign: 'center', letterSpacing: 12, marginBottom: SPACING.xl, color: COLORS.textPrimary },
+  modalActions: { flexDirection: 'row', width: '100%' }
 });
 
 export default ProviderBookingDetailScreen;
