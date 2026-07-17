@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { logoutUser } from '../../store/slices/authSlice';
 import { providerAPI } from '../../api/provider.api';
@@ -9,6 +9,7 @@ import { Avatar } from '../../components/ui/Avatar';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { SectionHeader } from '../../components/ui/SectionHeader';
 import { LoadingSkeleton } from '../../components/ui/LoadingSkeleton';
+import { LogOut } from 'lucide-react-native';
 
 const ProviderProfileScreen = ({ navigation }) => {
   const dispatch = useDispatch();
@@ -107,7 +108,10 @@ const ProviderProfileScreen = ({ navigation }) => {
           <PrimaryButton title="Edit Profile" variant="primary" style={{ marginBottom: SPACING.md }} onPress={() => navigation.navigate('EditProviderProfile')} />
           <PrimaryButton title="Change Password" variant="outline" style={{ marginBottom: SPACING.md }} onPress={() => navigation.navigate('ChangePassword')} />
           <PrimaryButton title="Support" variant="secondary" style={{ marginBottom: SPACING.md }} />
-          <PrimaryButton title="Logout" variant="danger" onPress={handleLogout} />
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
+            <LogOut size={20} color={COLORS.danger} style={{ marginRight: SPACING.sm }} />
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
         </View>
       </ScrollView>
     </View>
@@ -132,7 +136,10 @@ const styles = StyleSheet.create({
   infoVal: { fontSize: FONT_SIZES.md, color: COLORS.textPrimary, fontWeight: '500' },
   divider: { height: 1, backgroundColor: COLORS.border, marginBottom: SPACING.md },
 
-  btnGroup: { marginTop: SPACING.xl }
+  btnGroup: { marginTop: SPACING.xl },
+  
+  logoutBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.errorLight, padding: SPACING.lg, borderRadius: 18, borderWidth: 1, borderColor: COLORS.error },
+  logoutText: { fontSize: FONT_SIZES.md, fontWeight: '800', color: COLORS.danger },
 });
 
 export default ProviderProfileScreen;

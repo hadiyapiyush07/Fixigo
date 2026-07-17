@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Vibration, Platform, ActivityIndicator } from 'react-native';
 import Modal from 'react-native-modal';
+import { Bell, MapPin, Wrench, IndianRupee, X } from 'lucide-react-native';
 import { COLORS, FONT_SIZES, SPACING, SHADOWS, BORDER_RADIUS } from '../../theme/typography';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { bookingAPI } from '../../api/booking.api';
+import { Card } from '../ui/Card';
 
 const IncomingRequestModal = ({ isVisible, requestData, onAccept, onDecline }) => {
   const [timeLeft, setTimeLeft] = useState(30);
@@ -29,7 +31,7 @@ const IncomingRequestModal = ({ isVisible, requestData, onAccept, onDecline }) =
       };
       fetchFull();
       
-      // Vibrate pattern: wait 0, vibrate 1s, pause 1s
+      // Vibrate pattern
       Vibration.vibrate([0, 1000, 1000], true);
 
       timer = setInterval(() => {
@@ -37,7 +39,7 @@ const IncomingRequestModal = ({ isVisible, requestData, onAccept, onDecline }) =
           if (prev <= 1) {
             clearInterval(timer);
             Vibration.cancel();
-            onDecline(requestData?.bookingId || requestData?._id); // Auto-decline if timeout
+            onDecline(requestData?.bookingId || requestData?._id); 
             return 0;
           }
           return prev - 1;
@@ -66,11 +68,13 @@ const IncomingRequestModal = ({ isVisible, requestData, onAccept, onDecline }) =
   if (!requestData) return null;
   
   const displayData = fullData || requestData;
+  const progressPercent = (timeLeft / 30) * 100;
 
   return (
     <Modal
       isVisible={isVisible}
-      backdropOpacity={0.8}
+      backdropOpacity={COLORS.overlay ? 0.6 : 0.8}
+      backdropColor="#111827"
       animationIn="slideInUp"
       animationOut="slideOutDown"
       style={styles.modal}
@@ -80,49 +84,63 @@ const IncomingRequestModal = ({ isVisible, requestData, onAccept, onDecline }) =
       <View style={styles.container}>
         {/* Close/Reject cross button */}
         <TouchableOpacity style={styles.closeBtn} onPress={handleDecline}>
-          <Text style={{ fontSize: 24, color: COLORS.textSecondary }}>✖</Text>
+          <X size={24} color={COLORS.textTertiary} />
         </TouchableOpacity>
 
-        {/* Pulsing Bell Icon (or any Icon) */}
-        <View style={styles.iconContainer}>
-          <Text style={{ fontSize: 36 }}>🔔</Text>
+        <View style={styles.header}>
+          <View style={styles.iconContainer}>
+            <Bell size={32} color={COLORS.white} />
+          </View>
+          <Text style={styles.title}>New Service Request!</Text>
         </View>
-
-        <Text style={styles.title}>New Service Request!</Text>
         
-        {/* Distance/Address Info */}
-        <View style={styles.card}>
+        {/* Distance/Address Info inside Premium Card */}
+        <Card style={styles.infoCard} noPadding>
           {loadingData ? (
-            <ActivityIndicator size="small" color={COLORS.primary} style={{ marginVertical: SPACING.md }} />
+            <View style={styles.loaderContainer}>
+              <ActivityIndicator size="small" color={COLORS.primary} />
+            </View>
           ) : (
-            <>
+            <View style={styles.infoContent}>
               <View style={styles.row}>
-                <Text style={{ fontSize: 20 }}>📍</Text>
+                <View style={styles.iconBox}>
+                  <MapPin size={20} color={COLORS.primary} />
+                </View>
                 <Text style={styles.infoText} numberOfLines={2}>
                   {displayData?.address?.addressLine || displayData?.address?.city || 'Address not specified'}
                 </Text>
               </View>
-              <View style={[styles.row, { marginTop: SPACING.md }]}>
-                <Text style={{ fontSize: 20 }}>🛠️</Text>
+              <View style={styles.divider} />
+              
+              <View style={styles.row}>
+                <View style={styles.iconBox}>
+                  <Wrench size={20} color={COLORS.secondary} />
+                </View>
                 <Text style={styles.infoText}>
                   {displayData?.categoryId?.name 
                     ? `${displayData.categoryId.name} (${displayData?.subService?.name || 'General'})`
                     : displayData?.category || 'Service required'}
                 </Text>
               </View>
-              <View style={[styles.row, { marginTop: SPACING.md }]}>
-                <Text style={{ fontSize: 20 }}>💵</Text>
-                <Text style={[styles.infoText, { fontWeight: 'bold' }]}>
+              <View style={styles.divider} />
+
+              <View style={styles.row}>
+                <View style={styles.iconBox}>
+                  <IndianRupee size={20} color={COLORS.success} />
+                </View>
+                <Text style={styles.priceText}>
                   ₹{displayData?.pricing?.totalAmount || displayData?.totalAmount || 0}
                 </Text>
               </View>
-            </>
+            </View>
           )}
-        </View>
+        </Card>
 
-        {/* Circular Countdown Timer */}
-        <View style={styles.timerContainer}>
-          <Text style={styles.timerText}>{timeLeft}s</Text>
+        {/* Minimalist Countdown Timer */}
+        <View style={styles.timerWrapper}>
+          <View style={[styles.timerContainer, { borderColor: timeLeft > 10 ? COLORS.primary : COLORS.danger }]}>
+            <Text style={[styles.timerText, { color: timeLeft > 10 ? COLORS.primary : COLORS.danger }]}>{timeLeft}s</Text>
+          </View>
         </View>
 
         {/* Action Buttons */}
@@ -131,15 +149,15 @@ const IncomingRequestModal = ({ isVisible, requestData, onAccept, onDecline }) =
             title="Decline"
             variant="outline"
             onPress={handleDecline}
-            style={styles.btn}
+            style={styles.btnOutline}
             textStyle={{ color: COLORS.textSecondary }}
           />
           <View style={{ width: SPACING.md }} />
           <PrimaryButton
-            title="Accept"
+            title="Accept Request"
             variant="primary"
             onPress={handleAccept}
-            style={[styles.btn, { backgroundColor: COLORS.success, borderColor: COLORS.success }]}
+            style={styles.btnPrimary}
           />
         </View>
       </View>
@@ -153,13 +171,13 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   container: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    backgroundColor: COLORS.surface,
+    borderTopLeftRadius: BORDER_RADIUS.xxl,
+    borderTopRightRadius: BORDER_RADIUS.xxl,
     padding: SPACING.xl,
     paddingBottom: Platform.OS === 'ios' ? 40 : SPACING.xl,
     alignItems: 'center',
-    ...SHADOWS.large,
+    ...SHADOWS.lg,
   },
   closeBtn: {
     position: 'absolute',
@@ -167,64 +185,107 @@ const styles = StyleSheet.create({
     right: SPACING.lg,
     padding: SPACING.sm,
     zIndex: 10,
+    backgroundColor: COLORS.background,
+    borderRadius: BORDER_RADIUS.round,
+  },
+  header: {
+    alignItems: 'center',
+    marginBottom: SPACING.lg,
+    marginTop: SPACING.sm,
   },
   iconContainer: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: SPACING.md,
-    ...SHADOWS.medium,
+    ...SHADOWS.md,
   },
   title: {
-    fontSize: FONT_SIZES.xxl,
-    fontWeight: 'bold',
+    fontSize: FONT_SIZES.xxxl,
+    fontWeight: '700',
     color: COLORS.textPrimary,
-    marginBottom: SPACING.lg,
+    letterSpacing: -0.5,
   },
-  card: {
+  infoCard: {
     width: '100%',
     backgroundColor: COLORS.background,
-    borderRadius: BORDER_RADIUS.md,
-    padding: SPACING.md,
-    marginBottom: SPACING.lg,
+    borderWidth: 0,
+    marginBottom: SPACING.xl,
     minHeight: 120,
-    justifyContent: 'center'
+  },
+  infoContent: {
+    padding: SPACING.lg,
+  },
+  loaderContainer: {
+    height: 120,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  infoText: {
-    fontSize: FONT_SIZES.md,
-    color: COLORS.textPrimary,
-    marginLeft: SPACING.sm,
-    flex: 1,
-  },
-  timerContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    borderWidth: 3,
-    borderColor: COLORS.danger,
+  iconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.surface,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    marginRight: SPACING.md,
+    ...SHADOWS.sm,
+  },
+  infoText: {
+    fontSize: FONT_SIZES.lg,
+    color: COLORS.textSecondary,
+    flex: 1,
+    fontWeight: '500',
+  },
+  priceText: {
+    fontSize: FONT_SIZES.xxl,
+    color: COLORS.textPrimary,
+    fontWeight: '700',
+    flex: 1,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: COLORS.divider,
+    marginVertical: SPACING.md,
+    marginLeft: 52, // Align with text
+  },
+  timerWrapper: {
+    marginBottom: SPACING.xl,
+    alignItems: 'center',
+  },
+  timerContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    borderWidth: 4,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+    ...SHADOWS.sm,
   },
   timerText: {
-    fontSize: FONT_SIZES.lg,
-    fontWeight: 'bold',
-    color: COLORS.danger,
+    fontSize: FONT_SIZES.xxl,
+    fontWeight: '800',
   },
   actionRow: {
     flexDirection: 'row',
     width: '100%',
   },
-  btn: {
+  btnOutline: {
     flex: 1,
-    height: 56,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+  },
+  btnPrimary: {
+    flex: 1.5,
   },
 });
 

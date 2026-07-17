@@ -20,7 +20,7 @@ import Config from 'react-native-config';
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 // Loaded from .env.development or .env.emulator via react-native-config
-const BASE_URL = Config.API_URL || 'http://10.91.153.85:5000/api';
+const BASE_URL = Config.API_URL || 'http://10.113.245.85:5000/api';
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,

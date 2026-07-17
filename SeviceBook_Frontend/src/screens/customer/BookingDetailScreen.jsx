@@ -1,24 +1,32 @@
-// src/screens/customer/BookingDetailScreen.jsx
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, Alert, RefreshControl,
 } from 'react-native';
+import Animated, { FadeInUp, FadeInDown } from 'react-native-reanimated';
 import { bookingAPI } from '../../api/booking.api';
 import { socketService } from '../../services/socket.service';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 import { StatusBadge } from '../../components/ui/StatusBadge';
+import { Card } from '../../components/ui/Card';
+import { PrimaryButton } from '../../components/ui/PrimaryButton';
+import { SectionHeader } from '../../components/ui/SectionHeader';
+import { Avatar } from '../../components/ui/Avatar';
+import { 
+  FileText, Handshake, CheckCircle2, Car, MapPin, Key, Wrench, 
+  Receipt, Star, XCircle, Phone, MessageCircle, Navigation, ChevronLeft, ChevronRight, Clock, Calendar
+} from 'lucide-react-native';
 
 const STATUS_STEPS = [
-  { key: 'pending',             label: 'Booking Placed',     icon: '📋' },
-  { key: 'accepted',            label: 'Provider Accepted',  icon: '🤝' },
-  { key: 'confirmed',           label: 'Job Confirmed',      icon: '✅' },
-  { key: 'provider_on_the_way', label: 'Provider On Way',    icon: '🚗' },
-  { key: 'arrived',             label: 'Provider Arrived',   icon: '📍' },
-  { key: 'otp_verification',    label: 'OTP Verification',   icon: '🔑' },
-  { key: 'in_progress',         label: 'Work In Progress',   icon: '🔧' },
-  { key: 'payment_pending',     label: 'Payment Pending',    icon: '💵' },
-  { key: 'completed',           label: 'Completed',          icon: '🎉' },
+  { key: 'pending',             label: 'Booking Placed',     icon: <FileText size={20} color={COLORS.white} /> },
+  { key: 'accepted',            label: 'Provider Accepted',  icon: <Handshake size={20} color={COLORS.white} /> },
+  { key: 'confirmed',           label: 'Job Confirmed',      icon: <CheckCircle2 size={20} color={COLORS.white} /> },
+  { key: 'provider_on_the_way', label: 'Provider On Way',    icon: <Car size={20} color={COLORS.white} /> },
+  { key: 'arrived',             label: 'Provider Arrived',   icon: <MapPin size={20} color={COLORS.white} /> },
+  { key: 'otp_verification',    label: 'OTP Verification',   icon: <Key size={20} color={COLORS.white} /> },
+  { key: 'in_progress',         label: 'Work In Progress',   icon: <Wrench size={20} color={COLORS.white} /> },
+  { key: 'payment_pending',     label: 'Payment Pending',    icon: <Receipt size={20} color={COLORS.white} /> },
+  { key: 'completed',           label: 'Completed',          icon: <Star size={20} color={COLORS.white} /> },
 ];
 
 const STATUS_ORDER = ['pending', 'accepted', 'confirmed', 'provider_on_the_way', 'arrived', 'otp_verification', 'in_progress', 'payment_pending', 'completed'];
@@ -31,7 +39,6 @@ const BookingDetailScreen = ({ navigation, route }) => {
 
   const loadBooking = useCallback(async () => {
     if (!bookingId) {
-      Alert.alert('Error', 'Booking ID missing');
       setLoading(false);
       return;
     }
@@ -39,7 +46,7 @@ const BookingDetailScreen = ({ navigation, route }) => {
       const res = await bookingAPI.getById(bookingId);
       setBooking(res?.data?.data || res?.data || null);
     } catch (e) {
-      Alert.alert('Error', e?.response?.data?.message || 'Could not load booking');
+      console.log('Error', e?.response?.data?.message || 'Could not load booking');
     } finally {
       setLoading(false);
     }
@@ -47,12 +54,10 @@ const BookingDetailScreen = ({ navigation, route }) => {
 
   useEffect(() => { 
     loadBooking(); 
-
     if (bookingId) {
       socketService.joinBookingRoom(bookingId);
       const handleUpdate = () => loadBooking();
       socketService.on('booking:status_update', handleUpdate);
-
       return () => {
         socketService.leaveBookingRoom(bookingId);
         socketService.off('booking:status_update', handleUpdate);
@@ -78,11 +83,9 @@ const BookingDetailScreen = ({ navigation, route }) => {
   if (!booking) {
     return (
       <View style={styles.loaderBox}>
-        <Text style={styles.emptyIcon}>📋</Text>
+        <XCircle size={64} color={COLORS.textTertiary} style={{ marginBottom: SPACING.md }} />
         <Text style={styles.emptyText}>Booking not found</Text>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backBtnText}>Go Back</Text>
-        </TouchableOpacity>
+        <PrimaryButton title="Go Back" onPress={() => navigation.goBack()} style={{ marginTop: SPACING.lg, minWidth: 160 }} />
       </View>
     );
   }
@@ -95,237 +98,247 @@ const BookingDetailScreen = ({ navigation, route }) => {
   const canRate      = isCompleted && !booking.isRated;
 
   const handleCancel = () => {
-    Alert.alert('Cancel Booking', 'Are you sure you want to cancel?', [
+    Alert.alert('Cancel Booking', 'Are you sure you want to cancel this booking?', [
       { text: 'No', style: 'cancel' },
-      {
-        text: 'Yes, Cancel',
-        style: 'destructive',
-        onPress: async () => {
+      { text: 'Yes, Cancel', style: 'destructive', onPress: async () => {
           try {
             await bookingAPI.cancel(bookingId, 'Cancelled by customer');
             loadBooking();
-          } catch (e) {
-            Alert.alert('Error', e?.response?.data?.message || 'Could not cancel');
-          }
-        },
+          } catch (e) { Alert.alert('Error', e?.response?.data?.message || 'Could not cancel'); }
+        }
       },
     ]);
   };
 
   return (
     <View style={styles.container}>
+      <View style={styles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
+          <ChevronLeft size={28} color={COLORS.textPrimary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Booking #{bookingId?.slice(-6).toUpperCase()}</Text>
+        <View style={{ width: 44 }} />
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.primary]} />}
         contentContainerStyle={styles.content}
       >
-        {/* Status Header */}
-        <View style={[styles.statusHeader, isCancelled && { backgroundColor: COLORS.error }]}>
-          <Text style={styles.statusIcon}>
-            {isCancelled ? '❌' : isCompleted ? '🎉' : '📋'}
-          </Text>
-          <Text style={styles.statusTitle}>
-            {isCancelled ? 'Booking Cancelled' : isCompleted ? 'Service Completed!' : 'Booking Active'}
-          </Text>
-          <StatusBadge status={booking.status} style={{ marginTop: SPACING.sm }} />
-        </View>
-
-        {/* Progress Tracker */}
-        {!isCancelled && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📍 Booking Progress</Text>
-            {STATUS_STEPS.map((step, index) => {
-              const isDone    = index <= currentStatusIndex;
-              const isCurrent = index === currentStatusIndex;
-              const isLast    = index === STATUS_STEPS.length - 1;
-              return (
-                <View key={step.key} style={styles.stepRow}>
-                  <View style={styles.stepLeft}>
-                    <View style={[
-                      styles.stepDot,
-                      isDone    && styles.stepDotDone,
-                      isCurrent && styles.stepDotCurrent,
-                    ]}>
-                      <Text style={styles.stepDotText}>{isDone ? '✓' : index + 1}</Text>
-                    </View>
-                    {!isLast && (
-                      <View style={[styles.stepLine, isDone && styles.stepLineDone]} />
-                    )}
-                  </View>
-                  <View style={styles.stepContent}>
-                    <Text style={[styles.stepLabel, isDone && styles.stepLabelDone]}>
-                      {step.icon} {step.label}
-                    </Text>
-                    {isCurrent && (
-                      <Text style={styles.stepCurrent}>Current status</Text>
-                    )}
-                  </View>
-                </View>
-              );
-            })}
-          </View>
-        )}
-
-        {/* Booking Info */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>🔧 Service Details</Text>
-          <InfoRow label="Category"   value={booking.categoryId?.name || 'Service'} />
-          <InfoRow label="Sub Service" value={booking.subService?.name || 'General'} />
-          <InfoRow label="Date"       value={new Date(booking.scheduledDate).toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} />
-          <InfoRow label="Time"       value={booking.scheduledTime} />
-        </View>
-
-        {/* Address */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>📍 Service Address</Text>
-          <Text style={styles.addressText}>
-            {booking.address?.addressLine}{'\n'}
-            {booking.address?.city} - {booking.address?.pincode}
-          </Text>
-        </View>
-
-        {/* Provider Info */}
-        {booking.providerId && (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>👤 Provider</Text>
-            <View style={styles.providerRow}>
-              <View style={styles.providerAvatar}>
-                <Text style={styles.providerAvatarText}>
-                  {booking.providerId?.userId?.name?.[0]?.toUpperCase() || 'P'}
-                </Text>
+        {/* Status Card */}
+        <Animated.View entering={FadeInUp.delay(100).springify()}>
+          <Card style={[styles.statusCard, isCancelled && { backgroundColor: COLORS.errorLight }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              <View style={[styles.statusIconBox, isCancelled && { backgroundColor: COLORS.error }]}>
+                {isCancelled ? <XCircle size={32} color={COLORS.white} /> : isCompleted ? <Star size={32} color={COLORS.white} /> : <FileText size={32} color={COLORS.white} />}
               </View>
-              <View>
-                <Text style={styles.providerName}>{booking.providerId?.userId?.name || 'Provider'}</Text>
-                <Text style={styles.providerPhone}>📱 {booking.providerId?.userId?.phone || ''}</Text>
+              <View style={{ flex: 1, marginLeft: SPACING.md }}>
+                <Text style={[styles.statusTitle, isCancelled && { color: COLORS.danger }]}>
+                  {isCancelled ? 'Cancelled' : isCompleted ? 'Service Completed!' : 'Active Booking'}
+                </Text>
+                <StatusBadge status={booking.status} style={{ alignSelf: 'flex-start', marginTop: 8 }} />
               </View>
             </View>
-          </View>
+          </Card>
+        </Animated.View>
+
+        {/* Progress Timeline */}
+        {!isCancelled && (
+          <Animated.View entering={FadeInUp.delay(150).springify()}>
+            <SectionHeader title="Timeline" />
+            <Card style={{ paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md }}>
+              {STATUS_STEPS.map((step, index) => {
+                const isDone    = index <= currentStatusIndex;
+                const isCurrent = index === currentStatusIndex;
+                const isLast    = index === STATUS_STEPS.length - 1;
+                return (
+                  <View key={step.key} style={styles.stepRow}>
+                    <View style={styles.stepLeft}>
+                      <View style={[styles.stepDot, isDone && styles.stepDotDone, isCurrent && styles.stepDotCurrent]}>
+                        {isDone ? <CheckCircle2 size={16} color={COLORS.white} /> : <Text style={styles.stepDotText}>{index + 1}</Text>}
+                      </View>
+                      {!isLast && <View style={[styles.stepLine, isDone && styles.stepLineDone]} />}
+                    </View>
+                    <View style={styles.stepContent}>
+                      <Text style={[styles.stepLabel, isDone && styles.stepLabelDone, isCurrent && styles.stepLabelCurrent]}>
+                        {step.label}
+                      </Text>
+                      {isCurrent && <Text style={styles.stepCurrent}>Current status</Text>}
+                    </View>
+                  </View>
+                );
+              })}
+            </Card>
+          </Animated.View>
+        )}
+
+        {/* Service Details */}
+        <Animated.View entering={FadeInUp.delay(200).springify()}>
+          <SectionHeader title="Service Details" />
+          <Card style={{ padding: SPACING.lg }}>
+            <Text style={styles.catName}>{booking.categoryId?.name || 'Service'}</Text>
+            <Text style={styles.subCatName}>{booking.subService?.name || 'General'}</Text>
+            <View style={styles.divider} />
+            <View style={styles.dateRow}>
+              <View style={styles.dateItem}>
+                <Calendar size={18} color={COLORS.textSecondary} />
+                <Text style={styles.dateText}>{new Date(booking.scheduledDate).toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}</Text>
+              </View>
+              <View style={styles.dateItem}>
+                <Clock size={18} color={COLORS.textSecondary} />
+                <Text style={styles.dateText}>{booking.scheduledTime}</Text>
+              </View>
+            </View>
+          </Card>
+        </Animated.View>
+
+        {/* Provider Details */}
+        {booking.providerId && (
+          <Animated.View entering={FadeInUp.delay(250).springify()}>
+            <SectionHeader title="Provider" />
+            <Card style={styles.providerCard}>
+              <View style={styles.providerRow}>
+                <Avatar name={booking.providerId?.userId?.name || 'Provider'} size={56} />
+                <View style={{ flex: 1, marginLeft: SPACING.md }}>
+                  <Text style={styles.providerName}>{booking.providerId?.userId?.name || 'Provider'}</Text>
+                  <Text style={styles.providerPhone}>📱 {booking.providerId?.userId?.phone || ''}</Text>
+                </View>
+              </View>
+              {canTrack && (
+                <View style={styles.providerActions}>
+                  <TouchableOpacity style={styles.provBtn}>
+                    <Phone size={18} color={COLORS.primary} />
+                    <Text style={styles.provBtnText}>Call</Text>
+                  </TouchableOpacity>
+                  <View style={{ width: SPACING.sm }} />
+                  <TouchableOpacity style={styles.provBtn}>
+                    <MessageCircle size={18} color={COLORS.primary} />
+                    <Text style={styles.provBtnText}>Chat</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </Card>
+          </Animated.View>
         )}
 
         {/* Payment */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>💰 Payment</Text>
-          <InfoRow label="Base Amount"      value={`₹${booking.pricing?.baseAmount || 0}`} />
-          <InfoRow label="Convenience Fee"  value={`₹${booking.pricing?.convenienceFee || 0}`} />
-          <View style={styles.divider} />
-          <View style={styles.totalRow}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>₹{booking.pricing?.totalAmount || 0}</Text>
-          </View>
-          <View style={[styles.paymentBadge, { backgroundColor: booking.paymentStatus === 'paid' ? COLORS.successLight : COLORS.warningLight }]}>
-            <Text style={[styles.paymentBadgeText, { color: booking.paymentStatus === 'paid' ? COLORS.success : '#B7770D' }]}>
-              {booking.paymentStatus === 'paid' ? '✅ Paid' : '⏳ Payment Pending'}
-            </Text>
-          </View>
-        </View>
+        <Animated.View entering={FadeInUp.delay(300).springify()}>
+          <SectionHeader title="Payment Breakdown" />
+          <Card style={{ padding: SPACING.lg }}>
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Base Amount</Text>
+              <Text style={styles.priceValue}>₹{booking.pricing?.baseAmount || 0}</Text>
+            </View>
+            <View style={styles.priceRow}>
+              <Text style={styles.priceLabel}>Convenience Fee</Text>
+              <Text style={styles.priceValue}>₹{booking.pricing?.convenienceFee || 0}</Text>
+            </View>
+            <View style={styles.dividerDashed} />
+            <View style={styles.priceRow}>
+              <Text style={styles.totalLabel}>Total Paid</Text>
+              <Text style={styles.totalValue}>₹{booking.pricing?.totalAmount || 0}</Text>
+            </View>
+            <View style={[styles.paymentBadge, { backgroundColor: (booking.paymentStatus === 'paid' || booking.status === 'completed') ? COLORS.successLight : COLORS.warningLight }]}>
+              <CheckCircle2 size={16} color={(booking.paymentStatus === 'paid' || booking.status === 'completed') ? COLORS.success : '#B7770D'} style={{ marginRight: 6 }} />
+              <Text style={[styles.paymentBadgeText, { color: (booking.paymentStatus === 'paid' || booking.status === 'completed') ? COLORS.success : '#B7770D' }]}>
+                {(booking.paymentStatus === 'paid' || booking.status === 'completed') ? 'Paid' : 'Payment Pending'}
+              </Text>
+            </View>
+          </Card>
+        </Animated.View>
 
-        {/* Notes */}
-        {booking.description ? (
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>📝 Notes</Text>
-            <Text style={styles.notesText}>{booking.description}</Text>
-          </View>
-        ) : null}
-
-        {/* Actions */}
-        <View style={styles.actionsBox}>
-          {canTrack && (
-            <TouchableOpacity
-              style={styles.trackBtn}
-              onPress={() => navigation.navigate('BookingTrack', { bookingId })}
-            >
-              <Text style={styles.trackBtnText}>🗺️ Track Provider</Text>
-            </TouchableOpacity>
-          )}
-          {canRate && (
-            <TouchableOpacity
-              style={styles.rateBtn}
-              onPress={() => navigation.navigate('Review', { bookingId, providerId: booking.providerId?._id })}
-            >
-              <Text style={styles.rateBtnText}>⭐ Rate Service</Text>
-            </TouchableOpacity>
-          )}
-          {canCancel && (
-            <TouchableOpacity style={styles.cancelBtn} onPress={handleCancel}>
-              <Text style={styles.cancelBtnText}>Cancel Booking</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        <View style={{ height: 120 }} />
       </ScrollView>
+
+      {/* Action Buttons */}
+      <Animated.View entering={FadeInDown.delay(400).springify()} style={styles.bottomPanel}>
+        {canTrack && (
+          <PrimaryButton 
+            title="Track Provider" 
+            icon={<Navigation size={18} color={COLORS.white} />}
+            onPress={() => navigation.navigate('BookingTrack', { bookingId })} 
+            style={{ flex: 1, marginBottom: canCancel ? SPACING.sm : 0 }} 
+          />
+        )}
+        {canRate && (
+          <PrimaryButton 
+            title="Rate Service" 
+            icon={<Star size={18} color={COLORS.white} />}
+            onPress={() => navigation.navigate('Review', { bookingId, providerId: booking.providerId?._id })} 
+            style={{ flex: 1 }} 
+          />
+        )}
+        {canCancel && (
+          <PrimaryButton 
+            title="Cancel Booking" 
+            variant="outline" 
+            onPress={handleCancel} 
+            style={{ flex: 1 }}
+            textStyle={{ color: COLORS.danger }}
+          />
+        )}
+      </Animated.View>
     </View>
   );
 };
 
-const InfoRow = ({ label, value }) => (
-  <View style={styles.infoRow}>
-    <Text style={styles.infoLabel}>{label}</Text>
-    <Text style={styles.infoValue}>{value}</Text>
-  </View>
-);
-
 const styles = StyleSheet.create({
   container:  { flex: 1, backgroundColor: COLORS.background },
-  content:    { paddingBottom: SPACING.xxxl },
+  content:    { padding: SPACING.lg, paddingTop: 0 },
   loaderBox:  { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  loaderText: { marginTop: SPACING.md, color: COLORS.textSecondary },
-  emptyIcon:  { fontSize: 52, marginBottom: SPACING.lg },
-  emptyText:  { fontSize: FONT_SIZES.lg, color: COLORS.textPrimary, fontWeight: '600' },
-  backBtn:    { marginTop: SPACING.lg, backgroundColor: COLORS.primary, paddingHorizontal: SPACING.xl, paddingVertical: SPACING.md, borderRadius: BORDER_RADIUS.lg },
-  backBtnText:{ color: COLORS.white, fontWeight: '700' },
-
-  statusHeader: {
-    backgroundColor: COLORS.primary,
-    alignItems:      'center',
-    paddingVertical: SPACING.xxxl,
-    paddingHorizontal: SPACING.xl,
+  loaderText: { marginTop: SPACING.md, color: COLORS.textSecondary, fontSize: FONT_SIZES.md },
+  emptyText:  { fontSize: FONT_SIZES.xl, color: COLORS.textPrimary, fontWeight: '800' },
+  
+  header: { 
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', 
+    paddingHorizontal: SPACING.lg, paddingTop: 60, paddingBottom: SPACING.md 
   },
-  statusIcon:  { fontSize: 52, marginBottom: SPACING.sm },
+  backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center', ...SHADOWS.sm },
+  headerTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.textPrimary },
+
+  statusCard: { backgroundColor: COLORS.primaryDark, padding: SPACING.lg, marginBottom: SPACING.lg },
+  statusIconBox: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   statusTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.white },
 
-  section:      { backgroundColor: COLORS.white, marginHorizontal: SPACING.xl, marginTop: SPACING.lg, borderRadius: BORDER_RADIUS.lg, padding: SPACING.lg, ...SHADOWS.sm },
-  sectionTitle: { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary, marginBottom: SPACING.md },
+  stepRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  stepLeft: { alignItems: 'center', marginRight: SPACING.md },
+  stepDot: { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.surface, borderWidth: 2, borderColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
+  stepDotDone: { backgroundColor: COLORS.success, borderColor: COLORS.success },
+  stepDotCurrent: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  stepDotText: { color: COLORS.textTertiary, fontSize: 12, fontWeight: '700' },
+  stepLine: { width: 2, flex: 1, minHeight: 30, backgroundColor: COLORS.border, marginVertical: 4 },
+  stepLineDone: { backgroundColor: COLORS.success },
+  stepContent: { flex: 1, paddingBottom: SPACING.lg },
+  stepLabel: { fontSize: FONT_SIZES.md, color: COLORS.textTertiary, fontWeight: '500' },
+  stepLabelDone: { color: COLORS.textPrimary, fontWeight: '700' },
+  stepLabelCurrent: { color: COLORS.primary, fontWeight: '800' },
+  stepCurrent: { fontSize: FONT_SIZES.xs, color: COLORS.primary, marginTop: 4, fontWeight: '600' },
 
-  stepRow:         { flexDirection: 'row', marginBottom: 0 },
-  stepLeft:        { alignItems: 'center', marginRight: SPACING.md },
-  stepDot:         { width: 28, height: 28, borderRadius: 14, backgroundColor: COLORS.border, alignItems: 'center', justifyContent: 'center' },
-  stepDotDone:     { backgroundColor: COLORS.success },
-  stepDotCurrent:  { backgroundColor: COLORS.primary },
-  stepDotText:     { color: COLORS.white, fontSize: FONT_SIZES.xs, fontWeight: '700' },
-  stepLine:        { width: 2, height: 30, backgroundColor: COLORS.border, marginVertical: 2 },
-  stepLineDone:    { backgroundColor: COLORS.success },
-  stepContent:     { flex: 1, paddingTop: 4, paddingBottom: 20 },
-  stepLabel:       { fontSize: FONT_SIZES.sm, color: COLORS.textTertiary, fontWeight: '500' },
-  stepLabelDone:   { color: COLORS.textPrimary, fontWeight: '700' },
-  stepCurrent:     { fontSize: FONT_SIZES.xs, color: COLORS.primary, marginTop: 2 },
+  catName: { fontSize: FONT_SIZES.lg, fontWeight: '800', color: COLORS.textPrimary },
+  subCatName: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: 4 },
+  divider: { height: 1, backgroundColor: COLORS.divider, marginVertical: SPACING.md },
+  dateRow: { flexDirection: 'row', gap: SPACING.xl },
+  dateItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dateText: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textPrimary },
 
-  infoRow:   { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: SPACING.sm, borderBottomWidth: 1, borderBottomColor: COLORS.divider },
-  infoLabel: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary },
-  infoValue: { fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, fontWeight: '600', maxWidth: '60%', textAlign: 'right' },
+  providerCard: { padding: SPACING.lg },
+  providerRow: { flexDirection: 'row', alignItems: 'center' },
+  providerName: { fontSize: FONT_SIZES.lg, fontWeight: '800', color: COLORS.textPrimary },
+  providerPhone: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, marginTop: 2 },
+  providerActions: { flexDirection: 'row', marginTop: SPACING.lg },
+  provBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: BORDER_RADIUS.md, backgroundColor: COLORS.primaryLight, gap: 8 },
+  provBtnText: { color: COLORS.primaryDark, fontWeight: '700', fontSize: FONT_SIZES.md },
 
-  addressText:  { fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, lineHeight: 22 },
-
-  providerRow:        { flexDirection: 'row', alignItems: 'center', gap: SPACING.md },
-  providerAvatar:     { width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.primaryLight, alignItems: 'center', justifyContent: 'center' },
-  providerAvatarText: { fontSize: FONT_SIZES.xl, fontWeight: '700', color: COLORS.primary },
-  providerName:       { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary },
-  providerPhone:      { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
-
-  divider:       { height: 1, backgroundColor: COLORS.border, marginVertical: SPACING.sm },
-  totalRow:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.md },
-  totalLabel:    { fontSize: FONT_SIZES.md, fontWeight: '700', color: COLORS.textPrimary },
-  totalValue:    { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.primary },
-  paymentBadge:  { borderRadius: BORDER_RADIUS.round, paddingHorizontal: SPACING.lg, paddingVertical: SPACING.xs, alignSelf: 'flex-start' },
+  priceRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.sm },
+  priceLabel: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary },
+  priceValue: { fontSize: FONT_SIZES.md, fontWeight: '600', color: COLORS.textPrimary },
+  dividerDashed: { height: 1, borderBottomWidth: 1, borderColor: COLORS.divider, borderStyle: 'dashed', marginVertical: SPACING.md },
+  totalLabel: { fontSize: FONT_SIZES.lg, fontWeight: '800', color: COLORS.textPrimary },
+  totalValue: { fontSize: FONT_SIZES.xl, fontWeight: '900', color: COLORS.textPrimary },
+  paymentBadge: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', marginTop: SPACING.md, paddingHorizontal: 12, paddingVertical: 6, borderRadius: BORDER_RADIUS.round },
   paymentBadgeText: { fontSize: FONT_SIZES.sm, fontWeight: '700' },
 
-  notesText: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, lineHeight: 22 },
-
-  actionsBox: { marginHorizontal: SPACING.xl, marginTop: SPACING.lg, gap: SPACING.md },
-  trackBtn:   { backgroundColor: COLORS.primary, paddingVertical: SPACING.lg, borderRadius: BORDER_RADIUS.lg, alignItems: 'center' },
-  trackBtnText: { color: COLORS.white, fontWeight: '700', fontSize: FONT_SIZES.md },
-  rateBtn:    { backgroundColor: '#FFF3CD', paddingVertical: SPACING.lg, borderRadius: BORDER_RADIUS.lg, alignItems: 'center', borderWidth: 1, borderColor: '#F39C12' },
-  rateBtnText: { color: '#B7770D', fontWeight: '700', fontSize: FONT_SIZES.md },
-  cancelBtn:  { paddingVertical: SPACING.lg, borderRadius: BORDER_RADIUS.lg, alignItems: 'center', borderWidth: 1.5, borderColor: COLORS.error },
-  cancelBtnText: { color: COLORS.error, fontWeight: '700', fontSize: FONT_SIZES.md },
+  bottomPanel: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: COLORS.surface, padding: SPACING.lg, paddingBottom: 32, ...SHADOWS.lg },
 });
 
 export default BookingDetailScreen;
