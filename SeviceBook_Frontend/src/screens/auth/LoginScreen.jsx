@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
@@ -11,6 +12,9 @@ import Input  from '../../components/common/Input';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../../theme/typography';
 
 const LoginScreen = ({ navigation }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const dispatch = useDispatch();
   const { isLoading, isLoggedIn } = useSelector(s => s.auth);
 
@@ -106,7 +110,7 @@ const LoginScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.white },
   content: { padding: SPACING.xl, paddingBottom: SPACING.xxl * 2, justifyContent: 'center', minHeight: '100%' },
   header: { marginBottom: SPACING.xxl },

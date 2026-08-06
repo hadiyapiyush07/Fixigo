@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
@@ -25,6 +26,9 @@ const getPasswordStrength = (pass) => {
 };
 
 const RegisterScreen = ({ navigation }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const dispatch = useDispatch();
   const { isLoading } = useSelector(s => s.auth);
 
@@ -131,7 +135,7 @@ const RegisterScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.white },
   content: { padding: SPACING.xl, paddingBottom: SPACING.xxl * 2 },
   header: { marginBottom: SPACING.xl, marginTop: Platform.OS === 'ios' ? 40 : 20 },

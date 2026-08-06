@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
@@ -32,6 +33,9 @@ const QUICK_REVIEWS = [
 ];
 
 const ReviewScreen = ({ route, navigation }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const bookingId  = route?.params?.bookingId;
   const providerId = route?.params?.providerId;
 
@@ -163,7 +167,7 @@ const ReviewScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   header: { 
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', 
     paddingHorizontal: SPACING.lg, paddingTop: Platform.OS === 'ios' ? 60 : SPACING.xxl, paddingBottom: SPACING.md 

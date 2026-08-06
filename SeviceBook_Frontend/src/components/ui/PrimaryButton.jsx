@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React from 'react';
 import { TouchableWithoutFeedback, Text, ActivityIndicator, StyleSheet, View } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
@@ -14,6 +15,9 @@ export const PrimaryButton = React.memo(({
   variant = 'primary', // primary, secondary, outline, danger
   icon,
 }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const scale = useSharedValue(1);
 
   const handlePressIn = () => {
@@ -98,7 +102,7 @@ export const PrimaryButton = React.memo(({
   );
 });
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container: {
     width: '100%',
     height: 56, // Enforced 56px height

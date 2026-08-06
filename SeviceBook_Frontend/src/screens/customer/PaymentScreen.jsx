@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
@@ -16,6 +17,9 @@ const PAYMENT_METHODS = [
 ];
 
 const PaymentScreen = ({ route, navigation }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const { booking, amount } = route.params || {};
   const [selected, setSelected] = useState('upi');
   const [loading, setLoading]   = useState(false);
@@ -126,7 +130,7 @@ const PaymentScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: { 
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', 

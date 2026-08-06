@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { STATUS_COLORS, FONT_SIZES, BORDER_RADIUS, SPACING } from '../../theme/typography';
@@ -5,6 +6,9 @@ import { STATUS_COLORS, FONT_SIZES, BORDER_RADIUS, SPACING } from '../../theme/t
 const formatStatus = (s) => s.replace(/_/g, ' ').toUpperCase();
 
 export const StatusChip = ({ status, style, textStyle }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const theme = STATUS_COLORS[status] || STATUS_COLORS.pending;
   
   return (
@@ -16,7 +20,7 @@ export const StatusChip = ({ status, style, textStyle }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   chip: {
     paddingVertical: 6,
     paddingHorizontal: SPACING.md,

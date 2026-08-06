@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 // src/screens/provider/ProviderBookingsHistoryScreen.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import {
@@ -5,7 +6,7 @@ import {
   RefreshControl, ActivityIndicator, Platform
 } from 'react-native';
 import { bookingAPI } from '../../api/booking.api';
-import { StatusBadge } from '../../components/common/StatusBadge';
+import { StatusBadge } from '../../components/ui/StatusBadge';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 
 const FILTER_TABS = [
@@ -17,6 +18,9 @@ const FILTER_TABS = [
 ];
 
 const BookingCard = React.memo(({ item, onPressDetail }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   return (
     <TouchableOpacity
       style={styles.card}
@@ -58,6 +62,9 @@ const BookingCard = React.memo(({ item, onPressDetail }) => {
 });
 
 const ProviderBookingsHistoryScreen = ({ navigation }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const [bookings,    setBookings]    = useState([]);
   const [loading,     setLoading]     = useState(false);
   const [refreshing,  setRefreshing]  = useState(false);
@@ -181,7 +188,7 @@ const ProviderBookingsHistoryScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F9FAFB' },
   header: {
     paddingHorizontal: SPACING.xl, paddingTop: Platform.OS === 'ios' ? 60 : 40, paddingBottom: SPACING.lg,

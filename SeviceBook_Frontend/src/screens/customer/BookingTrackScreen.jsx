@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
@@ -12,7 +13,7 @@ import {
 import { bookingAPI } from '../../api/booking.api';
 import { socketService } from '../../services/socket.service';
 import LiveTrackingMap from '../../components/LiveTrackingMap';
-import Skeleton from '../../components/Skeleton';
+import { LoadingSkeleton as Skeleton } from '../../components/ui/LoadingSkeleton';
 import { calculateDistance, calculateETA } from '../../utils/distance';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 import { Card } from '../../components/ui/Card';
@@ -50,6 +51,9 @@ const TIMELINE_STEPS = [
 const TERMINAL_STATUSES = new Set(['completed', 'cancelled', 'rejected']);
 
 const BookingTrackScreen = ({ route, navigation }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const bookingId = route?.params?.bookingId;
 
   const [booking,    setBooking]    = useState(null);
@@ -481,7 +485,7 @@ const BookingTrackScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container:  { flex: 1, backgroundColor: COLORS.background },
   safe:       { flex: 1, backgroundColor: COLORS.background },
   content:    { padding: SPACING.lg, paddingBottom: SPACING.xxxl },

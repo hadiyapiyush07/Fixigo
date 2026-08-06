@@ -1,8 +1,12 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme/typography';
 
 export const SectionHeader = ({ title, subtitle, actionText, onAction }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   return (
     <View style={styles.container}>
       <View style={styles.left}>
@@ -18,7 +22,7 @@ export const SectionHeader = ({ title, subtitle, actionText, onAction }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',

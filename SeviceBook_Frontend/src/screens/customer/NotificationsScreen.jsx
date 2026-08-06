@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, FlatList,
@@ -10,7 +11,7 @@ import { Bell, CheckCircle2, XCircle, CreditCard, Calendar, Star, Trash2, Check,
 import { notificationAPI } from '../../api/notification.api';
 import { socketService } from '../../services/socket.service';
 import { useFocusEffect } from '@react-navigation/native';
-import Skeleton from '../../components/Skeleton';
+import { LoadingSkeleton as Skeleton } from '../../components/ui/LoadingSkeleton';
 import { Card } from '../../components/ui/Card';
 
 const getIconForType = (type, read) => {
@@ -35,6 +36,9 @@ const getTimeAgo = (dateStr) => {
 };
 
 const NotificationsScreen = ({ navigation }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const [notifications, setNotifications] = useState([]);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -91,6 +95,9 @@ const NotificationsScreen = ({ navigation }) => {
   };
 
   const NotifItem = ({ item, index }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
     const styleInfo = getIconForType(item.type, item.read);
     
     return (
@@ -194,7 +201,7 @@ const NotificationsScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container:   { flex: 1, backgroundColor: COLORS.background },
   header: { 
     flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', 

@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl, Animated, PermissionsAndroid, Platform, Alert } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -44,6 +45,9 @@ const getDistance = (coord1, coord2) => {
 };
 
 const DashboardScreen = ({ navigation }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const { user } = useSelector(s => s.auth);
 
   const [isOnline, setIsOnline] = useState(false);
@@ -139,13 +143,13 @@ const DashboardScreen = ({ navigation }) => {
   useEffect(() => {
     Animated.spring(toggleAnim, {
       toValue: isOnline ? 1 : 0,
-      useNativeDriver: false,
+      useNativeDriver: true,
       friction: 6,
       tension: 80,
     }).start();
   }, [isOnline, toggleAnim]);
 
-  const handleToggleOnline = async (newValue) => {
+  const handleToggleOnline = (newValue) => {
     if (providerProfile && !providerProfile.isVerified) {
       Alert.alert('Verification Required', 'Your profile is pending verification.');
       return;
@@ -155,60 +159,68 @@ const DashboardScreen = ({ navigation }) => {
       return;
     }
     
-    if (togglingOnline) return;
+    if (togglingOnlineRef.current) return;
     setTogglingOnline(true);
     togglingOnlineRef.current = true;
-    setIsOnline(newValue);
+    setIsOnline(newValue); // Optimistic UI update
 
-    try {
-      if (Platform.OS === 'android') {
-        if (Platform.Version >= 33) {
-          await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
-        }
-        const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
-        if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          Alert.alert('Permission Denied', 'Location access is required.');
-          setIsOnline(!newValue);
+    setTimeout(async () => {
+      try {
+        // If going OFFLINE, we don't need to fetch location. Just stop background service and update backend.
+        if (!newValue) {
+          await BackgroundLocationService.stop();
+          await providerAPI.toggleOnline({ isOnline: false });
+          await loadDashboard(false);
           setTogglingOnline(false);
           togglingOnlineRef.current = false;
           return;
         }
-      }
 
-      Geolocation.getCurrentPosition(
-        async ({ coords: { latitude, longitude } }) => {
-          try {
-            if (newValue) {
-              await BatteryOptimizationService.checkAndPrompt();
-              await BackgroundLocationService.start();
-            } else {
-              await BackgroundLocationService.stop();
-            }
-            
-            await providerAPI.toggleOnline({ isOnline: newValue, latitude, longitude });
-            await loadDashboard(false);
-          } catch (e) {
-            console.log("Toggle Error", e);
+        // If going ONLINE, we need location permissions and current coordinates
+        if (Platform.OS === 'android') {
+          if (Platform.Version >= 33) {
+            await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS);
+          }
+          const granted = await PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION);
+          if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
+            Alert.alert('Permission Denied', 'Location access is required to go online.');
             setIsOnline(!newValue);
-            if (newValue) await BackgroundLocationService.stop();
-          } finally {
             setTogglingOnline(false);
             togglingOnlineRef.current = false;
+            return;
           }
-        },
-        () => {
-          setIsOnline(!newValue);
-          setTogglingOnline(false);
-          togglingOnlineRef.current = false;
-          Alert.alert('Location Error', 'Could not fetch your location.');
-        },
-        { enableHighAccuracy: false, timeout: 20000, maximumAge: 10000 }
-      );
-    } catch (error) {
-      setIsOnline(!newValue);
-      setTogglingOnline(false);
-      togglingOnlineRef.current = false;
-    }
+        }
+
+        Geolocation.getCurrentPosition(
+          async ({ coords: { latitude, longitude } }) => {
+            try {
+              await BatteryOptimizationService.checkAndPrompt();
+              await BackgroundLocationService.start();
+              await providerAPI.toggleOnline({ isOnline: true, latitude, longitude });
+              await loadDashboard(false);
+            } catch (e) {
+              console.log("Toggle Error", e);
+              setIsOnline(!newValue);
+              await BackgroundLocationService.stop();
+            } finally {
+              setTogglingOnline(false);
+              togglingOnlineRef.current = false;
+            }
+          },
+          () => {
+            setIsOnline(!newValue);
+            setTogglingOnline(false);
+            togglingOnlineRef.current = false;
+            Alert.alert('Location Error', 'Could not fetch your location. Please check your GPS.');
+          },
+          { enableHighAccuracy: false, timeout: 20000, maximumAge: 10000 }
+        );
+      } catch (error) {
+        setIsOnline(!newValue);
+        setTogglingOnline(false);
+        togglingOnlineRef.current = false;
+      }
+    }, 150);
   };
 
   const pendingRequests = bookings.filter(b => b.status === 'pending');
@@ -300,7 +312,7 @@ const DashboardScreen = ({ navigation }) => {
               <Text style={styles.toggleSub}>{isOnline ? 'Waiting for job requests' : 'Go online to receive jobs'}</Text>
             </View>
             <TouchableOpacity 
-              activeOpacity={0.9} 
+              activeOpacity={1} // Prevents opacity flash on click
               onPress={() => handleToggleOnline(!isOnline)}
               disabled={togglingOnline}
               style={styles.switchBox}
@@ -394,7 +406,7 @@ const DashboardScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
   header: { padding: SPACING.lg, paddingBottom: 0 },
   headerTop: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -421,7 +433,7 @@ const styles = StyleSheet.create({
   activeRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   activeService: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.textPrimary },
   activeCustomer: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginTop: 2 },
-  divider: { height: 1, backgroundColor: COLORS.border, my: SPACING.md, marginVertical: SPACING.md },
+  divider: { height: 1, backgroundColor: COLORS.border, marginVertical: SPACING.md },
   activeMeta: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.lg },
   metaTxt: { fontSize: FONT_SIZES.sm, fontWeight: '600', color: COLORS.textPrimary },
   manageBtn: { backgroundColor: COLORS.primary, padding: SPACING.md, borderRadius: BORDER_RADIUS.md, alignItems: 'center' },

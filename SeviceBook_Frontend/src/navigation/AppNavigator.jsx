@@ -3,12 +3,13 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { bookingAPI } from '../api/booking.api';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { View, Text, StyleSheet, ActivityIndicator, Alert, Vibration } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Alert, Vibration, Platform } from 'react-native';
 import { useSelector } from 'react-redux';
 import { showMessage } from 'react-native-flash-message';
 import notifee, { AndroidImportance } from '@notifee/react-native';
 import { Home, CalendarDays, Bell, User, LayoutDashboard, Briefcase, Inbox, Wallet } from 'lucide-react-native';
 import { COLORS, FONT_SIZES } from '../theme/typography';
+import { ThemeProvider, useTheme } from '../theme/ThemeContext';
 
 // Auth screens
 import SplashScreen   from '../screens/auth/SplashScreen';
@@ -50,19 +51,26 @@ import ProviderBookingsHistoryScreen from '../screens/provider/ProviderBookingsH
 import EditProviderProfileScreen from '../screens/provider/EditProviderProfileScreen';
 
 // Placeholder for unbuilt screens
-const PlaceholderScreen = ({ route }) => (
-  <View style={styles.placeholder}>
-    <Text style={styles.phIcon}>🚧</Text>
-    <Text style={styles.phTitle}>{route.name}</Text>
-    <Text style={styles.phSub}>Coming soon...</Text>
-  </View>
-);
+const PlaceholderScreen = ({ route }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+  return (
+    <View style={styles.placeholder}>
+      <Text style={styles.phIcon}>🚧</Text>
+      <Text style={styles.phTitle}>{route.name}</Text>
+      <Text style={styles.phSub}>Coming soon...</Text>
+    </View>
+  );
+};
 
 const Stack = createNativeStackNavigator();
 const Tab   = createBottomTabNavigator();
 
 // ── Customer Bottom Tabs ──────────────────────────────────────────────────
 const CustomerTabs = () => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   useEffect(() => {
     const setupChannels = async () => {
       if (Platform.OS === 'android') {
@@ -141,6 +149,9 @@ const CustomerTabs = () => {
 import IncomingRequestModal from '../components/provider/IncomingRequestModal';
 
 const ProviderTabs = () => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const [pendingCount, setPendingCount] = useState(0);
   const [incomingRequest, setIncomingRequest] = useState(null);
   const [isModalVisible, setIsModalVisible] = useState(false);
@@ -373,7 +384,7 @@ const AppNavigator = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   tabBar: {
     backgroundColor: COLORS.white,
     borderTopWidth:  1,

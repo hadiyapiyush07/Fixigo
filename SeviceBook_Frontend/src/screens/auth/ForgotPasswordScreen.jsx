@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, KeyboardAvoidingView, Platform, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { authAPI } from '../../api/auth.api';
@@ -7,6 +8,9 @@ import Input  from '../../components/common/Input';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../../theme/typography';
 
 const ForgotPasswordScreen = ({ navigation }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const [step, setStep] = useState(1); // 1: Phone, 2: OTP & New Password
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
@@ -117,7 +121,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.white },
   content: { padding: SPACING.xl, paddingTop: Platform.OS === 'ios' ? 60 : 40 },
   header: { marginBottom: SPACING.xxl },

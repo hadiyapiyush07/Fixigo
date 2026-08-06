@@ -9,7 +9,6 @@
  */
 
 import React from 'react';
-import { StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { navigationRef } from './src/navigation/RootNavigation';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -20,6 +19,7 @@ import AppNavigator from './src/navigation/AppNavigator';
 import ErrorBoundary from './src/components/common/ErrorBoundary';
 import FlashMessage from 'react-native-flash-message';
 import NotificationService from './src/services/NotificationService';
+import { ThemeProvider } from './src/theme/ThemeContext';
 
 const App = () => {
   React.useEffect(() => {
@@ -27,30 +27,17 @@ const App = () => {
   }, []);
 
   return (
-    // GestureHandlerRootView — required for react-native-gesture-handler
-    // Must wrap everything at the root level
     <GestureHandlerRootView style={{ flex: 1 }}>
-
-      {/* Redux Provider — makes global state available to all screens */}
       <Provider store={store}>
-
-        {/* SafeAreaProvider — handles phone notch, status bar, home indicator */}
         <SafeAreaProvider>
-
-          {/* Status bar — white text on colored background */}
-          <StatusBar
-            barStyle="dark-content"
-            backgroundColor="#FFFFFF"
-            translucent={false}
-          />
-
-          {/* NavigationContainer — required root for all navigation */}
-          <NavigationContainer ref={navigationRef}>
-            <ErrorBoundary>
-              <AppNavigator />
-            </ErrorBoundary>
-          </NavigationContainer>
-          <FlashMessage position="top" />
+          <ThemeProvider>
+            <NavigationContainer ref={navigationRef}>
+              <ErrorBoundary>
+                <AppNavigator />
+              </ErrorBoundary>
+            </NavigationContainer>
+            <FlashMessage position="top" />
+          </ThemeProvider>
         </SafeAreaProvider>
       </Provider> 
     </GestureHandlerRootView>

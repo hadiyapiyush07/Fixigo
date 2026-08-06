@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 // src/components/common/Button.jsx
 import React from 'react';
 import {
@@ -26,6 +27,9 @@ const Button = ({
   textStyle,
   icon,
 }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const isDisabled = disabled || loading;
 
   return (
@@ -66,7 +70,7 @@ const Button = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   base: {
     borderRadius: BORDER_RADIUS.md,
     alignItems: 'center',

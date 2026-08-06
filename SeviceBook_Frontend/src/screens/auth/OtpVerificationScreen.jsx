@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, KeyboardAvoidingView, Platform,
@@ -14,6 +15,9 @@ const OTP_LENGTH = 6;
 const RESEND_TIME = 300; // 5 minutes
 
 const OtpVerificationScreen = ({ navigation, route }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const { phone, mockOtp } = route.params;
   const dispatch = useDispatch();
   const { isLoading } = useSelector(s => s.auth);
@@ -193,7 +197,7 @@ const OtpVerificationScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.white },
   content: { padding: SPACING.xl, paddingTop: Platform.OS === 'ios' ? 60 : 40 },
   header: { marginBottom: SPACING.xxl, alignItems: 'center' },

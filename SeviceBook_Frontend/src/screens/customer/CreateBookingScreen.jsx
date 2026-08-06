@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity,
@@ -18,6 +19,9 @@ import { SectionHeader } from '../../components/ui/SectionHeader';
 const API_URL = 'http://10.0.2.2:5000/api'; // Switched to generic local IP to prevent network errors
 
 const CreateBookingScreen = ({ navigation, route }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const categoryId    = route?.params?.categoryId;
   const categoryName  = route?.params?.categoryName  || 'Service';
   const subService    = route?.params?.subService;
@@ -319,7 +323,7 @@ const CreateBookingScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
   header: { 
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', 

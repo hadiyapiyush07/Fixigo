@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
@@ -26,6 +27,9 @@ const CATEGORY_IMAGES = {
 };
 
 const BookingCard = React.memo(({ item, index, onPressDetail, onPressTrack, onPressReview }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const canTrack = ['confirmed', 'provider_on_the_way', 'in_progress', 'arrived', 'otp_verification'].includes(item.status);
   const catName = item.categoryId?.name || 'Service';
   const imgUrl = CATEGORY_IMAGES[catName] || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=200&auto=format&fit=crop';
@@ -96,6 +100,9 @@ const BookingCard = React.memo(({ item, index, onPressDetail, onPressTrack, onPr
 });
 
 const MyBookingsScreen = ({ navigation }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const [bookings,    setBookings]    = useState([]);
   const [loading,     setLoading]     = useState(false);
   const [refreshing,  setRefreshing]  = useState(false);
@@ -201,7 +208,7 @@ const MyBookingsScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: { 
     paddingHorizontal: SPACING.lg, paddingTop: Platform.OS === 'ios' ? 60 : SPACING.xxl, 

@@ -11,7 +11,7 @@ import { providerAPI } from '../../api/provider.api';
 import { couponAPI } from '../../api/coupon.api';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 import Geolocation from '@react-native-community/geolocation';
-import Skeleton from '../../components/Skeleton';
+import { LoadingSkeleton as Skeleton } from '../../components/ui/LoadingSkeleton';
 import { socketService } from '../../services/socket.service';
 import { Avatar } from '../../components/ui/Avatar';
 import { Card } from '../../components/ui/Card';

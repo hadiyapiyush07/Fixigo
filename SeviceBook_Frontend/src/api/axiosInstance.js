@@ -20,7 +20,7 @@ import Config from 'react-native-config';
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 // Loaded from .env.development or .env.emulator via react-native-config
-const BASE_URL = Config.API_URL || 'http://10.113.245.85:5000/api';
+const BASE_URL = Config.API_URL || 'http://10.0.2.2:5000/api';
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -79,22 +79,29 @@ axiosInstance.interceptors.response.use(
       }
     }
 
-    // Show visual error to help debugging
-    const errorMsg = error?.response?.data?.message || error.message || 'API Request Failed';
-    
-    // Use setTimeout to avoid interfering with current render cycle
-    setTimeout(() => {
-      // Need to import showMessage dynamically or statically
-      try {
-        const { showMessage } = require('react-native-flash-message');
-        showMessage({
-          message: "API Error",
-          description: errorMsg,
-          type: "danger",
-          duration: 4000
-        });
-      } catch (err) {}
-    }, 100);
+    // Only show visual error for unexpected server errors (5xx) or true network failures
+    // 4xx errors (wrong password, validation etc.) are handled by individual screens
+    const status = error?.response?.status;
+    const isNetworkError = !error?.response; // No response = network unreachable
+    const isServerError = status >= 500;     // 5xx = our backend crashed
+
+    if (isNetworkError || isServerError) {
+      const errorMsg = isNetworkError
+        ? 'Cannot reach server. Check your internet connection.'
+        : (error?.response?.data?.message || 'Server error. Please try again.');
+
+      setTimeout(() => {
+        try {
+          const { showMessage } = require('react-native-flash-message');
+          showMessage({
+            message: isNetworkError ? 'Network Error' : 'Server Error',
+            description: errorMsg,
+            type: 'danger',
+            duration: 4000,
+          });
+        } catch (err) {}
+      }, 100);
+    }
 
     return Promise.reject(error);
   }

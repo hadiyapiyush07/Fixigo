@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 // src/components/ui/LoadingSkeleton.jsx
 // Pure React Native animated shimmer — no native dependencies required.
 // Replaces react-native-skeleton-placeholder to avoid RNCMaskedView crash.
@@ -12,6 +13,9 @@ export const LoadingSkeleton = ({
   borderRadius = BORDER_RADIUS.md,
   style,
 }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const opacity = useRef(new Animated.Value(0.3)).current;
 
   useEffect(() => {
@@ -59,7 +63,7 @@ export const SkeletonGroup = ({ count = 3, height = 80, gap = SPACING.md }) => (
   </View>
 );
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container: {
     marginBottom: SPACING.md,
   },

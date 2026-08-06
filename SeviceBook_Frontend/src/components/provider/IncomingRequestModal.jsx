@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Vibration, Platform, ActivityIndicator } from 'react-native';
 import Modal from 'react-native-modal';
@@ -8,6 +9,9 @@ import { bookingAPI } from '../../api/booking.api';
 import { Card } from '../ui/Card';
 
 const IncomingRequestModal = ({ isVisible, requestData, onAccept, onDecline }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const [timeLeft, setTimeLeft] = useState(30);
   const [fullData, setFullData] = useState(null);
   const [loadingData, setLoadingData] = useState(false);
@@ -165,7 +169,7 @@ const IncomingRequestModal = ({ isVisible, requestData, onAccept, onDecline }) =
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   modal: {
     margin: 0,
     justifyContent: 'flex-end',

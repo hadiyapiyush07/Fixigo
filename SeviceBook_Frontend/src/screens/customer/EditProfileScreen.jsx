@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, Alert,
@@ -13,6 +14,9 @@ import { ChevronLeft, User, Mail, Phone } from 'lucide-react-native';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 
 const EditProfileScreen = ({ navigation }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const dispatch = useDispatch();
   const { user } = useSelector(state => state.auth);
 
@@ -141,7 +145,7 @@ const EditProfileScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
   header: { 
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', 

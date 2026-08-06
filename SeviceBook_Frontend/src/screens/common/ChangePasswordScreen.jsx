@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Platform, KeyboardAvoidingView } from 'react-native';
 import { authAPI } from '../../api/auth.api';
@@ -7,6 +8,9 @@ import Input from '../../components/common/Input';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme/typography';
 
 const ChangePasswordScreen = ({ navigation }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -81,7 +85,7 @@ const ChangePasswordScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.white },
   content: { padding: SPACING.xl, paddingTop: Platform.OS === 'ios' ? 60 : 40 },
   header: { marginBottom: SPACING.xxl },

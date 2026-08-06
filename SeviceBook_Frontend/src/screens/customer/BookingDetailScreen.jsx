@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useEffect, useState, useCallback } from 'react';
 import {
   View, Text, StyleSheet, ScrollView,
@@ -32,6 +33,9 @@ const STATUS_STEPS = [
 const STATUS_ORDER = ['pending', 'accepted', 'confirmed', 'provider_on_the_way', 'arrived', 'otp_verification', 'in_progress', 'payment_pending', 'completed'];
 
 const BookingDetailScreen = ({ navigation, route }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const bookingId = route?.params?.bookingId;
   const [booking,    setBooking]    = useState(null);
   const [loading,    setLoading]    = useState(true);
@@ -282,7 +286,7 @@ const BookingDetailScreen = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container:  { flex: 1, backgroundColor: COLORS.background },
   content:    { padding: SPACING.lg, paddingTop: 0 },
   loaderBox:  { flex: 1, justifyContent: 'center', alignItems: 'center' },

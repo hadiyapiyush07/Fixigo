@@ -10,7 +10,7 @@ import { bookingAPI } from '../../api/booking.api';
 import { socketService } from '../../services/socket.service';
 import { useLocation } from '../../hooks/useLocation';
 import { calculateDistance, formatDistance } from '../../utils/distance';
-import Skeleton from '../../components/Skeleton';
+import { LoadingSkeleton as Skeleton } from '../../components/ui/LoadingSkeleton';
 
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 import { Card } from '../../components/ui/Card';

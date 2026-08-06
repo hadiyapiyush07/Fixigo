@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useState, useEffect, useRef } from 'react';
 import { 
   View, Text, TextInput, TouchableOpacity, 
@@ -13,6 +14,9 @@ import { ChevronLeft, Phone, Send, MoreVertical, Image as ImageIcon } from 'luci
 const API_URL = 'http://10.113.245.85:5000/api'; // Switched back to physical IP or emulator IP depending on env
 
 const ChatScreen = ({ route, navigation }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const { bookingId, receiverId, receiverName } = route.params;
   const { accessToken, user } = useSelector(state => state.auth);
   
@@ -163,7 +167,7 @@ const ChatScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row', alignItems: 'center',

@@ -1,38 +1,36 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React from 'react';
 import { View, StyleSheet, TouchableWithoutFeedback } from 'react-native';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
-import { COLORS, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
+import { SPACING, BORDER_RADIUS } from '../../theme/typography';
 
 export const Card = React.memo(({ children, style, onPress, noPadding = false, elevation = 'md' }) => {
+  const { colors: COLORS, shadows: SHADOWS } = useTheme();
+
   const scale = useSharedValue(1);
 
-  const handlePressIn = () => {
-    if (!onPress) return;
-    scale.value = withSpring(0.98, { damping: 15, stiffness: 300 });
-  };
-
-  const handlePressOut = () => {
-    if (!onPress) return;
-    scale.value = withSpring(1, { damping: 12, stiffness: 200 });
-  };
+  const handlePressIn  = () => { if (!onPress) return; scale.value = withSpring(0.98, { damping: 15, stiffness: 300 }); };
+  const handlePressOut = () => { if (!onPress) return; scale.value = withSpring(1,    { damping: 12, stiffness: 200 }); };
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
   }));
 
-  const cardContent = (
-    <View style={[
-      styles.card,
-      noPadding ? { padding: 0 } : { padding: SPACING.lg },
-      SHADOWS[elevation] || SHADOWS.md,
-      style
-    ]}>
-      {children}
-    </View>
-  );
+  const cardStyle = [
+    {
+      backgroundColor: COLORS.surface,
+      borderRadius:    BORDER_RADIUS.xxl,
+      borderWidth:     1,
+      borderColor:     COLORS.border,
+      marginBottom:    SPACING.md,
+    },
+    noPadding ? { padding: 0 } : { padding: SPACING.lg },
+    SHADOWS[elevation] || SHADOWS.md,
+    style,
+  ];
 
   if (!onPress) {
-    return cardContent;
+    return <View style={cardStyle}>{children}</View>;
   }
 
   return (
@@ -42,18 +40,8 @@ export const Card = React.memo(({ children, style, onPress, noPadding = false, e
       onPress={onPress}
     >
       <Animated.View style={animatedStyle}>
-        {cardContent}
+        <View style={cardStyle}>{children}</View>
       </Animated.View>
     </TouchableWithoutFeedback>
   );
-});
-
-const styles = StyleSheet.create({
-  card: {
-    backgroundColor: COLORS.surface,
-    borderRadius: BORDER_RADIUS.xxl, // 24px strict requirement
-    borderWidth: 1,
-    borderColor: 'rgba(229, 231, 235, 0.5)', // Extremely subtle border for glass effect
-    marginBottom: SPACING.md,
-  },
 });

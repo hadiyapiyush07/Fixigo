@@ -1,3 +1,4 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useState, useEffect, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, RefreshControl, Alert, Platform } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
@@ -11,6 +12,9 @@ import { LoadingSkeleton } from '../../components/ui/LoadingSkeleton';
 import { formatDistance, calculateDistance } from '../../utils/distance';
 
 const RequestItem = React.memo(({ item, onAccept, onDecline, currentLocation }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   let displayDistance = 'Distance unknown';
   
   if (currentLocation && item.location?.coordinates && item.location.coordinates.length === 2) {
@@ -65,6 +69,9 @@ import { socketService } from '../../services/socket.service';
 import { useLocation } from '../../hooks/useLocation';
 
 const RequestsScreen = ({ navigation }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -160,7 +167,7 @@ const RequestsScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
   list: { padding: SPACING.lg },
   reqHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },

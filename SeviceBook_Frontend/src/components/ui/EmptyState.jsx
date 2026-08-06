@@ -1,8 +1,12 @@
+import { useTheme } from '../../theme/ThemeContext';
 import React, { useEffect, useRef } from 'react';
 import { Animated, Text, StyleSheet } from 'react-native';
 import { COLORS, FONT_SIZES, SPACING } from '../../theme/typography';
 
 export const EmptyState = ({ icon = '📦', title, subtitle, style }) => {
+  const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
+  const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(15)).current;
 
@@ -31,7 +35,7 @@ export const EmptyState = ({ icon = '📦', title, subtitle, style }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container: {
     padding: SPACING.xxxl,
     alignItems: 'center',
