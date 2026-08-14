@@ -16,7 +16,7 @@ import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { Card } from '../../components/ui/Card';
 import { SectionHeader } from '../../components/ui/SectionHeader';
 
-const API_URL = 'http://10.0.2.2:5000/api'; // Switched to generic local IP to prevent network errors
+const API_URL = 'https://fixigo-backend-hnxs.onrender.com/api'; // Switched to production URL
 
 const CreateBookingScreen = ({ navigation, route }) => {
   const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();

@@ -20,7 +20,7 @@ import Config from 'react-native-config';
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 // Loaded from .env.development or .env.emulator via react-native-config
-const BASE_URL = Config.API_URL || 'http://10.0.2.2:5000/api';
+const BASE_URL = Config.API_URL || 'https://fixigo-backend-hnxs.onrender.com/api';
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
