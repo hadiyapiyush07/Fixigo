@@ -78,16 +78,15 @@ export default function ProviderModal({ provider, onClose }) {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl border border-slate-200">
                   <p className="text-sm font-medium text-slate-700 mb-2">Aadhaar Card / ID Proof</p>
-                  {provider.aadhaar || provider.idProof ? (
-                    (provider.aadhaar?.startsWith('http') || provider.idProof?.startsWith('http')) ? (
-                      <a href={provider.aadhaar || provider.idProof} target="_blank" rel="noreferrer" className="text-primary text-sm hover:underline cursor-pointer">
-                        View Document
-                      </a>
-                    ) : (
-                      <p className="text-sm font-medium text-slate-900">{provider.aadhaar || provider.idProof}</p>
-                    )
+                  {provider.aadhaar && (
+                    <p className="text-sm font-medium text-slate-900 mb-1">{provider.aadhaar}</p>
+                  )}
+                  {provider.idProof ? (
+                    <a href={provider.idProof} target="_blank" rel="noreferrer" className="text-primary text-sm hover:underline cursor-pointer">
+                      View Document
+                    </a>
                   ) : (
-                    <p className="text-sm text-slate-400">Not provided</p>
+                    !provider.aadhaar && <p className="text-sm text-slate-400">Not provided</p>
                   )}
                 </div>
                 <div className="p-4 rounded-xl border border-slate-200">
