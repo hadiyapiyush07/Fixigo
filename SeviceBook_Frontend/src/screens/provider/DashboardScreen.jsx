@@ -141,11 +141,10 @@ const DashboardScreen = ({ navigation }) => {
   }, [handleSocketUpdate]);
 
   useEffect(() => {
-    Animated.spring(toggleAnim, {
+    Animated.timing(toggleAnim, {
       toValue: isOnline ? 1 : 0,
+      duration: 150,
       useNativeDriver: true,
-      friction: 6,
-      tension: 80,
     }).start();
   }, [isOnline, toggleAnim]);
 
@@ -164,8 +163,11 @@ const DashboardScreen = ({ navigation }) => {
     togglingOnlineRef.current = true;
     setIsOnline(newValue); // Optimistic UI update
 
-    setTimeout(async () => {
-      try {
+    // Wait for the fast UI animation to complete before running heavy API calls
+    import('react-native').then(({ InteractionManager }) => {
+      InteractionManager.runAfterInteractions(() => {
+        setTimeout(async () => {
+          try {
         // If going OFFLINE, we don't need to fetch location. Just stop background service and update backend.
         if (!newValue) {
           await BackgroundLocationService.stop();
@@ -221,6 +223,8 @@ const DashboardScreen = ({ navigation }) => {
         togglingOnlineRef.current = false;
       }
     }, 150);
+      });
+    });
   };
 
   const pendingRequests = bookings.filter(b => b.status === 'pending');
