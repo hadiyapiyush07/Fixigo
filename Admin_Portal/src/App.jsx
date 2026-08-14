@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { Loader2 } from 'lucide-react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
 import { Toaster } from 'react-hot-toast';
@@ -38,7 +39,11 @@ function App() {
   }, [dispatch]);
 
   if (isInitializing) {
-    return <div className="min-h-screen flex items-center justify-center bg-slate-50">Loading...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <Loader2 className="w-8 h-8 text-primary animate-spin" />
+      </div>
+    );
   }
 
   return (
