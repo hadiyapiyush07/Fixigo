@@ -19,22 +19,23 @@ import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { 
   Zap, Wrench, Snowflake, Sparkles, PaintBucket, Hammer, 
   PenTool, Bug, Scissors, Monitor, Search, MapPin, TicketPercent, 
-  ChevronDown, Star, CheckCircle2, Navigation
+  ChevronDown, Star, CheckCircle2, Navigation,
+  WashingMachine, Refrigerator, Pipe, Droplets, Paintbrush, Cctv, BrushCleaning
 } from 'lucide-react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
 const CATEGORY_ICONS = {
-  'Electrician':      <Zap size={28} color={COLORS.primary} />,
-  'Plumber':          <Wrench size={28} color={COLORS.primary} />,
-  'AC Repair':        <Snowflake size={28} color={COLORS.primary} />,
-  'Home Cleaning':    <Sparkles size={28} color={COLORS.primary} />,
-  'Painter':          <PaintBucket size={28} color={COLORS.primary} />,
-  'Carpenter':        <Hammer size={28} color={COLORS.primary} />,
-  'Appliance Repair': <PenTool size={28} color={COLORS.primary} />,
-  'Pest Control':     <Bug size={28} color={COLORS.primary} />,
-  'Salon':            <Scissors size={28} color={COLORS.primary} />,
-  'Washing Machine':  <Monitor size={28} color={COLORS.primary} />,
-  'Refrigerator':     <Snowflake size={28} color={COLORS.primary} />,
+  'AC Repair':              <Snowflake size={28} color={COLORS.primary} />,
+  'Washing Machine Repair': <WashingMachine size={28} color={COLORS.primary} />,
+  'Refrigerator Repair':    <Refrigerator size={28} color={COLORS.primary} />,
+  'Electrician':            <Zap size={28} color={COLORS.primary} />,
+  'Plumber':                <Pipe size={28} color={COLORS.primary} />,
+  'Carpenter':              <Hammer size={28} color={COLORS.primary} />,
+  'RO Service':             <Droplets size={28} color={COLORS.primary} />,
+  'Painting':               <Paintbrush size={28} color={COLORS.primary} />,
+  'Home Cleaning':          <BrushCleaning size={28} color={COLORS.primary} />,
+  'CCTV Installation':      <Cctv size={28} color={COLORS.primary} />,
+  'Water Purifier Service': <Droplets size={28} color={COLORS.primary} />,
 };
 
 const HomeScreen = ({ navigation }) => {

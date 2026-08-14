@@ -11,37 +11,17 @@ const ThemeContext = createContext();
 
 export const ThemeProvider = ({ children }) => {
   const deviceTheme = useColorScheme();
-  const [themeMode, setThemeMode] = useState('system'); // 'light', 'dark', 'system'
-  const [isDark, setIsDark] = useState(deviceTheme === 'dark');
+  const [themeMode, setThemeMode] = useState('light');
+  const isDark = false;
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const loadTheme = async () => {
-      try {
-        const storedTheme = await AsyncStorage.getItem('app_theme');
-        if (storedTheme) {
-          setThemeMode(storedTheme);
-        }
-      } catch (error) {
-        console.error('Error loading theme:', error);
-      } finally {
-        setIsReady(true);
-      }
-    };
-    loadTheme();
+    // Just set ready to true, bypass async storage for theme preference
+    setIsReady(true);
   }, []);
 
-  useEffect(() => {
-    if (themeMode === 'system') {
-      setIsDark(deviceTheme === 'dark');
-    } else {
-      setIsDark(themeMode === 'dark');
-    }
-  }, [themeMode, deviceTheme]);
-
   const toggleTheme = async (mode) => {
-    setThemeMode(mode);
-    await AsyncStorage.setItem('app_theme', mode);
+    // Disabled to strictly enforce light theme
   };
 
   const colors = isDark ? darkColors : lightColors;

@@ -11,17 +11,20 @@ import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { Card } from '../../components/ui/Card';
 
 const CATEGORY_IMAGES = {
-  electrician: 'https://images.pexels.com/photos/8853503/pexels-photo-8853503.jpeg?auto=compress&cs=tinysrgb&w=800',
+  electrician: 'https://images.pexels.com/photos/5691588/pexels-photo-5691588.jpeg',
   plumb: 'https://images.pexels.com/photos/6419128/pexels-photo-6419128.jpeg?auto=compress&cs=tinysrgb&w=800',
-  ac: 'https://images.pexels.com/photos/3680454/pexels-photo-3680454.jpeg?auto=compress&cs=tinysrgb&w=800',
+  ac: 'https://images.pexels.com/photos/7347538/pexels-photo-7347538.jpeg',
   clean: 'https://images.pexels.com/photos/4108715/pexels-photo-4108715.jpeg?auto=compress&cs=tinysrgb&w=800',
   paint: 'https://images.pexels.com/photos/1669754/pexels-photo-1669754.jpeg?auto=compress&cs=tinysrgb&w=800',
-  carpent: 'https://images.pexels.com/photos/1260968/pexels-photo-1260968.jpeg?auto=compress&cs=tinysrgb&w=800',
+  carpent: 'https://images.pexels.com/photos/36866655/pexels-photo-36866655.jpeg',
   appliance: 'https://images.pexels.com/photos/2251247/pexels-photo-2251247.jpeg?auto=compress&cs=tinysrgb&w=800',
   salon: 'https://images.pexels.com/photos/3951881/pexels-photo-3951881.jpeg?auto=compress&cs=tinysrgb&w=800',
-  washing: 'https://images.pexels.com/photos/5591460/pexels-photo-5591460.jpeg?auto=compress&cs=tinysrgb&w=800',
-  refrigerat: 'https://images.pexels.com/photos/2103445/pexels-photo-2103445.jpeg?auto=compress&cs=tinysrgb&w=800',
+  washing: 'https://images.pexels.com/photos/8774642/pexels-photo-8774642.jpeg',
+  refrigerat: 'https://images.pexels.com/photos/9551373/pexels-photo-9551373.jpeg',
   pest: 'https://images.pexels.com/photos/7365020/pexels-photo-7365020.jpeg?auto=compress&cs=tinysrgb&w=800',
+  purifier: 'https://images.pexels.com/photos/36847822/pexels-photo-36847822.jpeg', // handled water purifier -> RO
+  ro: 'https://images.pexels.com/photos/36847822/pexels-photo-36847822.jpeg',
+  cctv: 'https://images.pexels.com/photos/5966513/pexels-photo-5966513.jpeg',
 };
 
 const CATEGORY_METADATA = {
@@ -170,73 +173,32 @@ const ServiceOptionsScreen = ({ navigation, route }) => {
         <View style={styles.heroContainer}>
           <Image source={{ uri: meta.image }} style={styles.heroImage} />
           <View style={styles.heroOverlay}>
-            <Animated.View entering={FadeInUp.delay(100).springify()}>
+            <View>
               <Text style={styles.heroTitle}>{category?.name}</Text>
               <View style={styles.heroMetaRow}>
-                <View style={styles.heroBadge}>
-                  <Star size={14} color={COLORS.star} fill={COLORS.star} />
-                  <Text style={styles.heroBadgeTxt}>4.8 (12k reviews)</Text>
-                </View>
                 <View style={styles.heroBadge}>
                   <ShieldCheck size={14} color={COLORS.primary} />
                   <Text style={[styles.heroBadgeTxt, { color: COLORS.primary }]}>Verified Professionals</Text>
                 </View>
               </View>
-            </Animated.View>
+            </View>
           </View>
         </View>
-
-        {/* What's Included Card */}
-        <Animated.View entering={FadeInUp.delay(200).springify()}>
-          <Card style={styles.infoCard}>
-            <Text style={styles.infoTitle}>About {category?.name} Service</Text>
-            <Text style={styles.infoDesc}>{meta.description}</Text>
-            
-            <View style={styles.divider} />
-            
-            <Text style={styles.listTitle}>What's Included</Text>
-            {meta.included.map((item, index) => (
-              <View key={index} style={styles.listItem}>
-                <CheckCircle2 size={16} color={COLORS.success} />
-                <Text style={styles.listText}>{item}</Text>
-              </View>
-            ))}
-
-            <View style={{ height: SPACING.sm }} />
-            <Text style={styles.listTitle}>What's Not Included</Text>
-            {meta.notIncluded.map((item, index) => (
-              <View key={index} style={styles.listItem}>
-                <XCircle size={16} color={COLORS.danger} />
-                <Text style={styles.listText}>{item}</Text>
-              </View>
-            ))}
-          </Card>
-        </Animated.View>
 
         {/* Services Selection Header */}
         <View style={styles.selectionHeader}>
           <Text style={styles.selectionTitle}>Select Services</Text>
-          <View style={styles.searchBox}>
-            <Search size={18} color={COLORS.textTertiary} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Search..."
-              placeholderTextColor={COLORS.textTertiary}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-          </View>
         </View>
 
         {/* Options List */}
         {filteredOptions.length === 0 ? (
-          <Animated.View entering={FadeInUp.delay(300).springify()} style={styles.premiumEmpty}>
+          <View style={styles.premiumEmpty}>
             <View style={styles.emptyIconBox}>
               <Search size={32} color={COLORS.primary} />
             </View>
             <Text style={styles.emptyTitle}>No Services Available</Text>
             <Text style={styles.emptySubtitle}>We couldn't find any specific services for this category right now. Please try again later.</Text>
-          </Animated.View>
+          </View>
         ) : (
           filteredOptions.map((item, index) => {
             const isSelected = selectedOptions.some(opt => opt._id === item._id);
