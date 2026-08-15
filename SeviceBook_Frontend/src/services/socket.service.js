@@ -1,10 +1,15 @@
 // src/services/socket.service.js
 import { io } from 'socket.io-client';
 
-// localhost works on both:
-//   - Physical phone: via `adb reverse tcp:5000 tcp:5000`
-//   - Emulator: via `adb reverse tcp:5000 tcp:5000`
-const SOCKET_URL = 'http://10.113.245.85:5000';
+import Config from 'react-native-config';
+
+// Derive socket URL from API URL (remove /api)
+const getSocketUrl = () => {
+  const apiUrl = Config.API_URL || 'https://fixigo-backend-hnxs.onrender.com/api';
+  return apiUrl.replace(/\/api\/?$/, '');
+};
+
+const SOCKET_URL = getSocketUrl();
 
 class SocketService {
   constructor() {

@@ -481,6 +481,16 @@ const BookingTrackScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         </View>
       )}
+
+      {status === 'rejected' && (
+        <View style={styles.footer}>
+          <PrimaryButton 
+            title="Try Again / View Services" 
+            onPress={() => navigation.navigate('CustomerTabs', { screen: 'Home' })} 
+            style={{ borderRadius: BORDER_RADIUS.xl, height: 56 }}
+          />
+        </View>
+      )}
     </View>
   );
 };
@@ -524,7 +534,7 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
 
   quickActionsRow: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.xl, marginTop: SPACING.md,
   },
   halfBtn: { flex: 1 },
   btnSpacer: { width: SPACING.md },

@@ -33,7 +33,9 @@ const AllProvidersScreen = ({ navigation, route }) => {
       
       // Sort explicitly
       data.sort((a, b) => {
-        if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
+        const aIsOnline = a.status === 'available';
+        const bIsOnline = b.status === 'available';
+        if (aIsOnline !== bIsOnline) return aIsOnline ? -1 : 1;
         const bRating = b.rating?.average || 0;
         const aRating = a.rating?.average || 0;
         return bRating - aRating;
@@ -75,7 +77,7 @@ const AllProvidersScreen = ({ navigation, route }) => {
             <Text style={styles.experience}>{item.experience || 1} years experience</Text>
           </View>
           <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>{item.isOnline ? '🟢 Online' : '⚪ Offline'}</Text>
+            <Text style={styles.statusText}>{item.status === 'available' ? '🟢 Online' : '⚪ Offline'}</Text>
           </View>
         </View>
 

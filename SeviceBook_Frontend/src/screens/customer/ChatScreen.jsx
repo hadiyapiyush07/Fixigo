@@ -122,7 +122,7 @@ const ChatScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView style={styles.chatArea} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.chatArea} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 80}>
         {loading ? (
           <View style={styles.loaderContainer}><ActivityIndicator size="large" color={COLORS.primary} /></View>
         ) : (
