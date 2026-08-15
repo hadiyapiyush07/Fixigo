@@ -12,7 +12,7 @@ import Button from '../../components/common/Button';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../../theme/typography';
 
 const OTP_LENGTH = 6;
-const RESEND_TIME = 300; // 5 minutes
+const RESEND_TIME = 60; // 1 minute
 
 const OtpVerificationScreen = ({ navigation, route }) => {
   const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
@@ -110,24 +110,21 @@ const OtpVerificationScreen = ({ navigation, route }) => {
   const handleResend = async () => {
     if (timer > 0) return;
     try {
-      // Re-trigger OTP via authAPI logic or login
-      await authAPI.login({ phone, password: 'NOT_NEEDED_FOR_RESEND_IN_PROD_BUT_OK_FOR_DEMO' }); 
-      // Wait, backend requires password. For Resend OTP we should have a generic resend endpoint.
-      // Wait, there is /auth/send-otp but it's protected.
-      // So we must use a public /auth/login for resend? That requires password.
-      // Actually, in Phase 8 backend we haven't exposed a public resend OTP without password yet!
-      // I should update backend to expose a public /auth/send-otp if we just want to resend, 
-      // but to be secure, resend should probably only happen if they verify password again.
-      // Since we don't have it, let's just show an alert. 
-      // We can use the forgot-password endpoint to send an OTP to phone for now if it's generic,
-      // but purpose will be wrong.
-      // I will update the backend auth controller to have a public resend endpoint next.
+      const res = await authAPI.resendOtp(phone, 'login');
+      const newMockOtp = res.data?.data?.mockOtp;
+      
       showMessage({ message: "OTP Resent successfully", type: "success" });
       setTimer(RESEND_TIME);
       setOtp(Array(OTP_LENGTH).fill(''));
       inputs.current[0].focus();
+      
+      if (newMockOtp) {
+        setTimeout(() => {
+          Alert.alert("Demo Mode Active", `Your new OTP is: ${newMockOtp}`);
+        }, 500);
+      }
     } catch (e) {
-      showMessage({ message: "Failed to resend OTP", type: "danger" });
+      showMessage({ message: e?.response?.data?.message || "Failed to resend OTP", type: "danger" });
     }
   };
 

@@ -62,6 +62,15 @@ const forgotPassword = asyncHandler(async (req, res) => {
   res.status(200).json(new ApiResponse(200, { phone, mockOtp: smsResponse.mockOtp || undefined }, "OTP sent to your mobile number."));
 });
 
+// POST /api/auth/resend-otp
+const resendOtp = asyncHandler(async (req, res) => {
+  const { phone, purpose = 'registration' } = req.body;
+  if (!phone) throw new ApiError(400, "Phone number is required.");
+
+  const smsResponse = await sendOTP(phone, purpose);
+  res.status(200).json(new ApiResponse(200, { phone, mockOtp: smsResponse.mockOtp || undefined }, "OTP resent successfully."));
+});
+
 // POST /api/auth/reset-password
 const resetPassword = asyncHandler(async (req, res) => {
   const { phone, otp, newPassword } = req.body;
@@ -114,6 +123,7 @@ module.exports = {
   login, 
   verifyLoginOtp,
   forgotPassword,
+  resendOtp,
   resetPassword,
   changePassword,
   logout, 

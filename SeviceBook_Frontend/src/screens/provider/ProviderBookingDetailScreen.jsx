@@ -18,6 +18,7 @@ import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { SectionHeader } from '../../components/ui/SectionHeader';
 import { Avatar } from '../../components/ui/Avatar';
+import { SwipeButton } from '../../components/ui/SwipeButton';
 
 const ProviderBookingDetailScreen = ({ route, navigation }) => {
   const { bookingId } = route.params;
@@ -350,11 +351,19 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
       {/* Floating Action Button */}
       {getActionText() && (
         <View style={styles.bottomBar}>
-          <PrimaryButton 
-            title={getActionText()} 
-            onPress={handleAction} 
-            loading={actionLoading} 
-          />
+          {booking.status === 'payment_pending' ? (
+            <SwipeButton 
+              title={getActionText()} 
+              onSwipeComplete={handleAction} 
+              loading={actionLoading} 
+            />
+          ) : (
+            <PrimaryButton 
+              title={getActionText()} 
+              onPress={handleAction} 
+              loading={actionLoading} 
+            />
+          )}
         </View>
       )}
 

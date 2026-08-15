@@ -5,6 +5,7 @@ const {
   login, 
   verifyLoginOtp,
   forgotPassword,
+  resendOtp,
   resetPassword,
   changePassword,
   logout, 
@@ -20,6 +21,7 @@ router.post("/register",         authLimiter, validateRegister, register);
 router.post("/login",            authLimiter, validateLogin, login);
 router.post("/verify-login-otp", otpLimiter, verifyLoginOtp);
 router.post("/forgot-password",  otpLimiter, forgotPassword);
+router.post("/resend-otp",       otpLimiter, resendOtp);
 router.post("/reset-password",   otpLimiter, resetPassword);
 router.post("/refresh-token",    refreshToken);
 

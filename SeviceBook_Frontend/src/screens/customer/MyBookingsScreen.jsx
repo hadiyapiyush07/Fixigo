@@ -82,7 +82,7 @@ const BookingCard = React.memo(({ item, index, onPressDetail, onPressTrack, onPr
               </TouchableOpacity>
             )}
             {item.status === 'completed' && !item.isRated && (
-              <TouchableOpacity style={styles.rateBtn} onPress={() => onPressReview(item._id)}>
+              <TouchableOpacity style={styles.rateBtn} onPress={() => onPressReview(item)}>
                 <Star size={14} color={COLORS.warning} fill={COLORS.warning} />
                 <Text style={styles.rateBtnText}>Rate Provider</Text>
               </TouchableOpacity>
@@ -150,7 +150,7 @@ const MyBookingsScreen = ({ navigation }) => {
 
   const handlePressDetail = useCallback((bookingId) => navigation.navigate('BookingDetail', { bookingId }), [navigation]);
   const handlePressTrack = useCallback((bookingId) => navigation.navigate('BookingTrack', { bookingId }), [navigation]);
-  const handlePressReview = useCallback((bookingId) => navigation.navigate('Review', { bookingId }), [navigation]);
+  const handlePressReview = useCallback((booking) => navigation.navigate('Review', { bookingId: booking._id, providerId: booking.providerId?._id || booking.providerId }), [navigation]);
 
   return (
     <View style={styles.container}>

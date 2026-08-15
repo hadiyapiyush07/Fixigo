@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
-  RefreshControl, Platform, PermissionsAndroid, TextInput
+  RefreshControl, Platform, PermissionsAndroid, TextInput, ScrollView
 } from 'react-native';
 import Reanimated, { FadeInUp, FadeInDown, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSelector } from 'react-redux';
@@ -20,7 +20,7 @@ import {
   Zap, Wrench, Snowflake, Sparkles, PaintBucket, Hammer, 
   PenTool, Bug, Scissors, Monitor, Search, MapPin, TicketPercent, 
   ChevronDown, Star, CheckCircle2, Navigation,
-  WashingMachine, Refrigerator, Pipe, Droplets, Paintbrush, Cctv, BrushCleaning
+  WashingMachine, Refrigerator, Droplets, Paintbrush, Cctv, BrushCleaning
 } from 'lucide-react-native';
 import LinearGradient from 'react-native-linear-gradient';
 
@@ -29,7 +29,7 @@ const CATEGORY_ICONS = {
   'Washing Machine Repair': <WashingMachine size={28} color={COLORS.primary} />,
   'Refrigerator Repair':    <Refrigerator size={28} color={COLORS.primary} />,
   'Electrician':            <Zap size={28} color={COLORS.primary} />,
-  'Plumber':                <Pipe size={28} color={COLORS.primary} />,
+  'Plumber':                <Wrench size={28} color={COLORS.primary} />,
   'Carpenter':              <Hammer size={28} color={COLORS.primary} />,
   'RO Service':             <Droplets size={28} color={COLORS.primary} />,
   'Painting':               <Paintbrush size={28} color={COLORS.primary} />,
@@ -256,7 +256,7 @@ const HomeScreen = ({ navigation }) => {
 
   if (loading) {
     return (
-      <View style={[styles.container, { padding: SPACING.lg, paddingTop: 60 }]}>
+      <ScrollView style={[styles.container, { padding: SPACING.lg, paddingTop: 60 }]} showsVerticalScrollIndicator={false}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 }}>
           <View>
             <Skeleton width={120} height={24} style={{ marginBottom: 8 }} />
@@ -270,13 +270,19 @@ const HomeScreen = ({ navigation }) => {
           <Skeleton width={300} height={160} borderRadius={BORDER_RADIUS.xxl} />
         </View>
         <Skeleton width={180} height={24} style={{ marginBottom: 20 }} />
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 16, marginBottom: 30 }}>
           <Skeleton width={80} height={100} borderRadius={24} />
           <Skeleton width={80} height={100} borderRadius={24} />
           <Skeleton width={80} height={100} borderRadius={24} />
           <Skeleton width={80} height={100} borderRadius={24} />
         </View>
-      </View>
+        <Skeleton width={200} height={28} style={{ marginBottom: 20 }} />
+        <View style={{ flexDirection: 'row' }}>
+          <Skeleton width={320} height={180} borderRadius={BORDER_RADIUS.xl} style={{ marginRight: 16 }} />
+          <Skeleton width={320} height={180} borderRadius={BORDER_RADIUS.xl} />
+        </View>
+        <View style={{ height: 40 }} />
+      </ScrollView>
     );
   }
 
