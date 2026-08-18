@@ -110,7 +110,6 @@ Fixigo/
 ### Real-Time & Integrations
 *   **Push Notifications:** Firebase Cloud Messaging (FCM) via Firebase Admin
 *   **WebSockets:** Socket.io for live GPS tracking and instant chat
-*   **Payments:** Razorpay (Test Mode)
 
 ---
 
