@@ -107,14 +107,13 @@ const BookingTrackScreen = ({ route, navigation }) => {
   useFocusEffect(
     useCallback(() => {
       loadBooking(true);
-      const iv = setInterval(() => loadBooking(false), 20000);
+      // Polling removed to maximize performance. Relying strictly on Socket updates.
       
       socketService.joinBookingRoom(bookingId);
       const handleNewMessage = () => setHasNewMessage(true);
       socketService.on('newMessage', handleNewMessage);
 
       return () => {
-        clearInterval(iv);
         socketService.leaveBookingRoom(bookingId);
         socketService.off('newMessage', handleNewMessage);
       };
@@ -308,7 +307,6 @@ const BookingTrackScreen = ({ route, navigation }) => {
         </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <Text style={styles.headerTitle}>Track Booking</Text>
-          <Text style={styles.headerSub}>#{bookingId?.slice(-8).toUpperCase()}</Text>
         </View>
         <StatusBadge status={status} />
       </View>
