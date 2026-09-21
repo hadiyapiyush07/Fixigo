@@ -101,9 +101,19 @@ const HomeScreen = ({ navigation }) => {
   };
 
   const getCurrentLocation = () => new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('Location request timed out'));
+    }, 5000);
+
     Geolocation.getCurrentPosition(
-      pos => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-      err => reject(err),
+      pos => {
+        clearTimeout(timeoutId);
+        resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude });
+      },
+      err => {
+        clearTimeout(timeoutId);
+        reject(err);
+      },
       { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
     );
   });
