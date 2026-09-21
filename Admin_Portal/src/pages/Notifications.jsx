@@ -30,6 +30,7 @@ export default function Notifications() {
       await adminService.markAllNotificationsRead();
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       toast.success('All marked as read');
+      window.dispatchEvent(new CustomEvent('notifications-read', { detail: { action: 'all' } }));
     } catch (error) {
       toast.error('Failed to update notifications');
     }
@@ -40,6 +41,7 @@ export default function Notifications() {
       try {
         await adminService.markNotificationRead(notification._id);
         setNotifications(prev => prev.map(n => n._id === notification._id ? { ...n, isRead: true } : n));
+        window.dispatchEvent(new CustomEvent('notifications-read', { detail: { action: 'single' } }));
       } catch (error) {
         console.error(error);
       }
