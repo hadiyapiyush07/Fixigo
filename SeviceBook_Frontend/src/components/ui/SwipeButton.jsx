@@ -1,24 +1,27 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { View, Text, Animated, PanResponder, StyleSheet, ActivityIndicator } from 'react-native';
+import { View, Text, Animated, PanResponder, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
 import { ChevronRight } from 'lucide-react-native';
-import { BORDER_RADIUS, FONT_SIZES, SPACING } from '../../theme/typography';
+import { FONT_SIZES, SPACING } from '../../theme/typography';
 import { useTheme } from '../../theme/ThemeContext';
 
 const BUTTON_HEIGHT = 60;
 const KNOB_SIZE = BUTTON_HEIGHT - 12; // 48
+const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
   const { colors: COLORS } = useTheme();
   const pan = useRef(new Animated.Value(0)).current;
   const [completed, setCompleted] = useState(false);
-  const [containerWidth, setContainerWidth] = useState(0);
+  
+  // Fallback to Dimensions if onLayout fails or is delayed
+  const [containerWidth, setContainerWidth] = useState(SCREEN_WIDTH - (SPACING.lg * 2));
 
   useEffect(() => {
     if (!loading && completed) {
       setCompleted(false);
       Animated.spring(pan, {
         toValue: 0,
-        useNativeDriver: false,
+        useNativeDriver: true,
       }).start();
     }
   }, [loading]);
@@ -27,7 +30,7 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onPanResponderMove: (e, gesture) => {
-        if (completed || loading || containerWidth === 0) return;
+        if (completed || loading) return;
         const maxSwipe = containerWidth - KNOB_SIZE - 12;
         if (gesture.dx > 0 && gesture.dx < maxSwipe) {
           pan.setValue(gesture.dx);
@@ -36,14 +39,14 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
         }
       },
       onPanResponderRelease: (e, gesture) => {
-        if (completed || loading || containerWidth === 0) return;
+        if (completed || loading) return;
         const maxSwipe = containerWidth - KNOB_SIZE - 12;
         if (gesture.dx > (containerWidth * 0.6)) {
           Animated.spring(pan, {
             toValue: maxSwipe,
             tension: 40,
             friction: 5,
-            useNativeDriver: false, // still using false for width interpolation
+            useNativeDriver: true,
           }).start(() => {
             setCompleted(true);
             onSwipeComplete();
@@ -53,25 +56,39 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
             toValue: 0,
             tension: 40,
             friction: 5,
-            useNativeDriver: false,
+            useNativeDriver: true,
           }).start();
         }
       },
     })
   ).current;
 
-  const fillWidth = pan.interpolate({
-    inputRange: [0, containerWidth ? containerWidth - KNOB_SIZE - 12 : 100],
-    outputRange: [KNOB_SIZE + 12, containerWidth ? containerWidth : 100],
-    extrapolate: 'clamp'
+  // Background filler using 60FPS transform instead of layout width
+  const bgTranslateX = pan.interpolate({
+    inputRange: [0, 1000],
+    outputRange: [0, 1000],
+    extrapolate: 'extend'
   });
 
   return (
     <View 
       style={[styles.container, { backgroundColor: COLORS.surface, borderColor: COLORS.primary }]}
-      onLayout={(e) => setContainerWidth(e.nativeEvent.layout.width)}
+      onLayout={(e) => {
+        if (e.nativeEvent.layout.width > 0) {
+          setContainerWidth(e.nativeEvent.layout.width);
+        }
+      }}
     >
-      <Animated.View style={[styles.fillBackground, { width: fillWidth, backgroundColor: COLORS.primary }]} />
+      {/* The background is 2x the width, shifted left. As pan increases, it slides right instantly. */}
+      <Animated.View style={[
+        styles.fillBackground, 
+        { 
+          backgroundColor: COLORS.primary,
+          width: containerWidth,
+          left: -containerWidth + KNOB_SIZE + 12, // Initially only the left part behind the knob is visible
+          transform: [{ translateX: bgTranslateX }]
+        }
+      ]} />
       
       <View style={styles.textContainer}>
         {loading ? (
@@ -105,7 +122,6 @@ const styles = StyleSheet.create({
   },
   fillBackground: {
     position: 'absolute',
-    left: 0,
     top: 0,
     bottom: 0,
     borderRadius: BUTTON_HEIGHT / 2,
@@ -114,7 +130,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingLeft: KNOB_SIZE, // push text to right of knob
+    paddingLeft: KNOB_SIZE, 
     paddingRight: SPACING.md,
     zIndex: 1,
     pointerEvents: 'none',
@@ -134,11 +150,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'absolute',
-    left: 4,
+    left: 6,
     zIndex: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 4,
   },
