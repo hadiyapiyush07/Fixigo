@@ -49,13 +49,7 @@ const HomeScreen = ({ navigation }) => {
   const [coords,      setCoords]      = useState(null);
   const [error, setError] = useState(null);
 
-  // Greeting based on time
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good Morning';
-    if (hour < 18) return 'Good Afternoon';
-    return 'Good Evening';
-  };
+
 
   useEffect(() => { initScreen(); }, []);
 
@@ -317,7 +311,7 @@ const HomeScreen = ({ navigation }) => {
         {/* HEADER */}
         <Reanimated.View entering={FadeInDown.duration(400)} style={styles.header}>
           <View style={{ flex: 1 }}>
-            <Text style={styles.greeting}>{getGreeting()}, {user?.name?.split(' ')[0] || 'User'} 👋</Text>
+            <Text style={styles.greeting}>Hello {user?.name?.split(' ')[0] || 'User'} 👋</Text>
             <TouchableOpacity style={styles.locationSelector}>
               <MapPin size={14} color={COLORS.primary} />
               <Text style={styles.locationTxt} numberOfLines={1}>
