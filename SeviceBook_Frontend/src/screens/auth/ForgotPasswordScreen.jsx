@@ -40,7 +40,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
     } catch (error) {
       showMessage({ message: "Failed", description: error.response?.data?.message || "User not found", type: "danger" });
     }
-    setLoading(false);
+    requestAnimationFrame(() => setLoading(false));
   };
 
   const handleResetPassword = async () => {
@@ -60,7 +60,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
     } catch (error) {
       showMessage({ message: "Failed", description: error.response?.data?.message || "Reset failed", type: "danger" });
     }
-    setLoading(false);
+    requestAnimationFrame(() => setLoading(false));
   };
 
   return (
@@ -133,3 +133,4 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
 });
 
 export default ForgotPasswordScreen;
+

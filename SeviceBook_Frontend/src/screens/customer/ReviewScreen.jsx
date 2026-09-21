@@ -70,7 +70,7 @@ const ReviewScreen = ({ route, navigation }) => {
         navigation.dispatch(CommonActions.reset({ index: 0, routes: [{ name: 'CustomerTabs', params: { screen: 'Home' } }] }));
       }, 2500);
     } finally {
-      setLoading(false);
+      requestAnimationFrame(() => setLoading(false));
     }
   };
 

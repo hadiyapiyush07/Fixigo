@@ -130,7 +130,7 @@ const MyBookingsScreen = ({ navigation }) => {
     } catch (e) {
       console.log('Bookings error:', e.message);
     } finally {
-      setLoading(false);
+      requestAnimationFrame(() => setLoading(false));
     }
   }, [loading, hasNextPage]);
 
@@ -262,3 +262,4 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
 });
 
 export default MyBookingsScreen;
+

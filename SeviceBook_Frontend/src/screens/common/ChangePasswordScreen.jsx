@@ -38,7 +38,7 @@ const ChangePasswordScreen = ({ navigation }) => {
     } catch (error) {
       showMessage({ message: "Update Failed", description: error.response?.data?.message || "Incorrect current password", type: "danger" });
     }
-    setLoading(false);
+    requestAnimationFrame(() => setLoading(false));
   };
 
   return (
@@ -95,3 +95,4 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
 });
 
 export default ChangePasswordScreen;
+

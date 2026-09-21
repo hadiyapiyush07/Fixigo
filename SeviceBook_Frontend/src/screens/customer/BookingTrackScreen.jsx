@@ -86,7 +86,10 @@ const BookingTrackScreen = ({ route, navigation }) => {
   }, [handleBack]);
 
   const loadBooking = useCallback(async (silent = false) => {
-    if (!bookingId) { setLoading(false); return; }
+    if (!bookingId) { 
+      requestAnimationFrame(() => setLoading(false)); 
+      return; 
+    }
     try {
       if (!silent && !booking) setError(null);
       const res = await bookingAPI.getById(bookingId);
@@ -97,8 +100,10 @@ const BookingTrackScreen = ({ route, navigation }) => {
     } catch (e) {
       if (!silent && !booking) setError('Failed to load tracking info. Please check your connection.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setLoading(false));
+        setRefreshing(false);
+      });
     }
   }, [bookingId, booking]);
 
@@ -179,7 +184,7 @@ const BookingTrackScreen = ({ route, navigation }) => {
     } catch (e) {
       Alert.alert('Error', e.response?.data?.message || 'Failed to respond.');
     } finally {
-      setLoading(false);
+      requestAnimationFrame(() => setLoading(false));
     }
   };
 
@@ -545,10 +550,10 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   otpTopRow: { flexDirection: 'row', alignItems: 'center', marginBottom: SPACING.lg },
   otpIconBox: { width: 48, height: 48, borderRadius: 24, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center', ...SHADOWS.sm },
   otpInfo: { flex: 1, marginLeft: SPACING.md },
-  otpTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.primaryDark },
+  otpTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.primary },
   otpSub: { fontSize: FONT_SIZES.sm, color: COLORS.primary, marginTop: 2, lineHeight: 18 },
   otpCodeBox: { backgroundColor: COLORS.surface, borderRadius: BORDER_RADIUS.lg, paddingVertical: SPACING.lg, alignItems: 'center', marginBottom: SPACING.lg, ...SHADOWS.sm },
-  otpCodeTxt: { fontSize: 40, fontWeight: '900', letterSpacing: 12, color: COLORS.primaryDark },
+  otpCodeTxt: { fontSize: 40, fontWeight: '900', letterSpacing: 12, color: COLORS.primary },
 
   timelineRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: SPACING.md },
   timelineLeft: { alignItems: 'center', width: 32, marginRight: SPACING.md },

@@ -43,7 +43,7 @@ const BookingDetailScreen = ({ navigation, route }) => {
 
   const loadBooking = useCallback(async () => {
     if (!bookingId) {
-      setLoading(false);
+      requestAnimationFrame(() => setLoading(false));
       return;
     }
     try {
@@ -52,7 +52,9 @@ const BookingDetailScreen = ({ navigation, route }) => {
     } catch (e) {
       console.log('Error', e?.response?.data?.message || 'Could not load booking');
     } finally {
-      setLoading(false);
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => setLoading(false));
+      });
     }
   }, [bookingId]);
 
@@ -300,7 +302,7 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   backBtn: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.surface, alignItems: 'center', justifyContent: 'center', ...SHADOWS.sm },
   headerTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.textPrimary },
 
-  statusCard: { backgroundColor: COLORS.primaryDark, padding: SPACING.lg, marginBottom: SPACING.lg },
+  statusCard: { backgroundColor: COLORS.primary, padding: SPACING.lg, marginBottom: SPACING.lg },
   statusIconBox: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center' },
   statusTitle: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.white },
 
@@ -331,7 +333,7 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   providerPhone: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, marginTop: 2 },
   providerActions: { flexDirection: 'row', marginTop: SPACING.lg },
   provBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', paddingVertical: 12, borderRadius: BORDER_RADIUS.md, backgroundColor: COLORS.primaryLight, gap: 8 },
-  provBtnText: { color: COLORS.primaryDark, fontWeight: '700', fontSize: FONT_SIZES.md },
+  provBtnText: { color: COLORS.primary, fontWeight: '700', fontSize: FONT_SIZES.md },
 
   priceRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: SPACING.sm },
   priceLabel: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary },

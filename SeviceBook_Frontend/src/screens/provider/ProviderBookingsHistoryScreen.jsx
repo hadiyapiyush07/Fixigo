@@ -93,7 +93,7 @@ const ProviderBookingsHistoryScreen = ({ navigation }) => {
     } catch (e) {
       console.log('Provider Bookings error:', e.message);
     } finally {
-      setLoading(false);
+      requestAnimationFrame(() => setLoading(false));
     }
   }, [hasNextPage]);
 
@@ -232,3 +232,4 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
 });
 
 export default ProviderBookingsHistoryScreen;
+

@@ -39,7 +39,7 @@ const SavedAddressesScreen = ({ navigation }) => {
     } catch (e) {
       console.log('Error fetching addresses:', e);
     } finally {
-      setLoading(false);
+      requestAnimationFrame(() => setLoading(false));
     }
   }, []);
 
@@ -310,3 +310,4 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
 });
 
 export default SavedAddressesScreen;
+

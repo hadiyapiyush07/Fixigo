@@ -47,7 +47,7 @@ const AllProvidersScreen = ({ navigation, route }) => {
     } catch (e) {
       console.warn("Failed to fetch all providers", e);
     } finally {
-      setLoading(false);
+      requestAnimationFrame(() => setLoading(false));
     }
   }, [defaultCategory]);
   
@@ -194,3 +194,4 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
 });
 
 export default AllProvidersScreen;
+

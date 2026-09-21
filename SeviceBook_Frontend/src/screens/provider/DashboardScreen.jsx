@@ -103,7 +103,7 @@ const DashboardScreen = ({ navigation }) => {
       console.log('Dashboard load error:', e);
     } finally {
       requestAnimationFrame(() => {
-        if (showLoading) setLoading(false);
+        if (showLoading) requestAnimationFrame(() => setLoading(false));
         setRefreshing(false);
       });
     }

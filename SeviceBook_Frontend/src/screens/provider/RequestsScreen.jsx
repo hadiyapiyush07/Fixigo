@@ -106,7 +106,7 @@ const RequestsScreen = ({ navigation }) => {
     } catch (e) {
       console.log('Error fetching requests', e);
     } finally {
-      setLoading(false);
+      requestAnimationFrame(() => setLoading(false));
       setRefreshing(false);
     }
   };

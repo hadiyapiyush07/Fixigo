@@ -27,7 +27,7 @@ const EarningsScreen = () => {
     } catch (e) {
       console.log('Error fetching stats', e);
     } finally {
-      setLoading(false);
+      requestAnimationFrame(() => setLoading(false));
       setRefreshing(false);
     }
   };

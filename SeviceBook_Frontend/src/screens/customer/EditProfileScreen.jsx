@@ -55,7 +55,7 @@ const EditProfileScreen = ({ navigation }) => {
       Alert.alert('Success', 'Profile updated locally.');
       navigation.goBack();
     } finally {
-      setLoading(false);
+      requestAnimationFrame(() => setLoading(false));
     }
   };
 
@@ -174,3 +174,4 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
 });
 
 export default EditProfileScreen;
+
