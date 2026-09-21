@@ -1,20 +1,30 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { View, Text, Animated, PanResponder, StyleSheet, ActivityIndicator, Dimensions } from 'react-native';
-import { ChevronRight } from 'lucide-react-native';
+import { ChevronsRight, CheckCircle2 } from 'lucide-react-native';
 import { FONT_SIZES, SPACING } from '../../theme/typography';
 import { useTheme } from '../../theme/ThemeContext';
 
-const BUTTON_HEIGHT = 60;
-const KNOB_SIZE = BUTTON_HEIGHT - 12; // 48
+const BUTTON_HEIGHT = 64;
+const KNOB_SIZE = BUTTON_HEIGHT - 12; 
 const SCREEN_WIDTH = Dimensions.get('window').width;
 
 export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
   const { colors: COLORS } = useTheme();
   const pan = useRef(new Animated.Value(0)).current;
+  const pulseAnim = useRef(new Animated.Value(0.5)).current;
   const [completed, setCompleted] = useState(false);
   
-  // Fallback to Dimensions if onLayout fails or is delayed
   const [containerWidth, setContainerWidth] = useState(SCREEN_WIDTH - (SPACING.lg * 2));
+
+  useEffect(() => {
+    // Pulse animation for the arrows
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 0.5, duration: 800, useNativeDriver: true })
+      ])
+    ).start();
+  }, []);
 
   useEffect(() => {
     if (!loading && completed) {
@@ -63,7 +73,6 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
     })
   ).current;
 
-  // Background filler using 60FPS transform instead of layout width
   const bgTranslateX = pan.interpolate({
     inputRange: [0, 1000],
     outputRange: [0, 1000],
@@ -72,20 +81,25 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
 
   return (
     <View 
-      style={[styles.container, { backgroundColor: COLORS.surface, borderColor: COLORS.primary }]}
+      style={[
+        styles.container, 
+        { 
+          backgroundColor: 'rgba(0,0,0,0.03)', 
+          borderColor: COLORS.primary 
+        }
+      ]}
       onLayout={(e) => {
         if (e.nativeEvent.layout.width > 0) {
           setContainerWidth(e.nativeEvent.layout.width);
         }
       }}
     >
-      {/* The background is 2x the width, shifted left. As pan increases, it slides right instantly. */}
       <Animated.View style={[
         styles.fillBackground, 
         { 
           backgroundColor: COLORS.primary,
           width: containerWidth,
-          left: -containerWidth + KNOB_SIZE + 12, // Initially only the left part behind the knob is visible
+          left: -containerWidth + KNOB_SIZE + 12, 
           transform: [{ translateX: bgTranslateX }]
         }
       ]} />
@@ -93,9 +107,13 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
       <View style={styles.textContainer}>
         {loading || completed ? (
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <ActivityIndicator color={COLORS.white} size="small" style={{ marginRight: SPACING.sm }} />
+            {completed && !loading ? (
+               <CheckCircle2 color={COLORS.white} size={20} style={{ marginRight: SPACING.sm }} />
+            ) : (
+               <ActivityIndicator color={COLORS.white} size="small" style={{ marginRight: SPACING.sm }} />
+            )}
             <Text style={[styles.text, { color: COLORS.white }]}>
-              Updating...
+              {completed && !loading ? 'Done' : 'Updating...'}
             </Text>
           </View>
         ) : (
@@ -109,7 +127,9 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
         {...panResponder.panHandlers}
         style={[styles.knob, { transform: [{ translateX: pan }] }]}
       >
-        <ChevronRight size={24} color={COLORS.primary} style={{ marginLeft: 2 }} />
+        <Animated.View style={{ opacity: completed || loading ? 0.3 : pulseAnim }}>
+          <ChevronsRight size={26} color={COLORS.primary} style={{ marginLeft: 2 }} />
+        </Animated.View>
       </Animated.View>
     </View>
   );
@@ -155,12 +175,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'absolute',
-    left: 6,
+    left: 4,
     zIndex: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 4,
+    shadowOpacity: 0.25,
+    shadowRadius: 5,
+    elevation: 6,
   },
 });
