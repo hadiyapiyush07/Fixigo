@@ -327,12 +327,16 @@ const updateBookingStatus = async (bookingId, status, userId, otp) => {
   if (status === "in_progress") {
     update.startedAt = new Date();
     update.startOtp = null; // Clear OTP once service starts
-    await Provider.findByIdAndUpdate(booking.providerId, { status: "busy" });
+    await Provider.findByIdAndUpdate(booking.providerId, { 
+      status: "busy",
+      lastSeen: new Date()
+    });
   }
   if (status === "completed") {
     update.completedAt = new Date();
     await Provider.findByIdAndUpdate(booking.providerId, { 
       status: "available",
+      lastSeen: new Date(),
       $inc: { completedBookings: 1, totalBookings: 1 } 
     });
     const { emitToAll } = require("../socket/socket");
@@ -340,7 +344,7 @@ const updateBookingStatus = async (bookingId, status, userId, otp) => {
   }
   if (status === "cancelled") {
     if (booking.providerId) {
-      await Provider.findByIdAndUpdate(booking.providerId, { status: "available" });
+      await Provider.findByIdAndUpdate(booking.providerId, { status: "available", lastSeen: new Date() });
       const { emitToAll } = require("../socket/socket");
       emitToAll("providers:status_changed", { providerId: booking.providerId, status: "available" });
     }
@@ -389,7 +393,7 @@ const cancelBooking = async (bookingId, customerUserId, reason) => {
   await booking.save();
 
   if (booking.providerId) {
-    await Provider.findByIdAndUpdate(booking.providerId._id, { status: "available" });
+    await Provider.findByIdAndUpdate(booking.providerId._id, { status: "available", lastSeen: new Date() });
     const { emitToAll } = require("../socket/socket");
     emitToAll("providers:status_changed", { providerId: booking.providerId._id, status: "available" });
     const providerUser = await User.findById(booking.providerId.userId).select("fcmToken");
