@@ -76,9 +76,6 @@ const EditProfileScreen = ({ navigation }) => {
         <Animated.View entering={FadeInUp.delay(100).springify()} style={styles.avatarSection}>
           <View style={styles.avatarWrapper}>
             <Avatar name={name} size={110} />
-            <TouchableOpacity style={styles.editBadge}>
-              <Text style={styles.editBadgeIcon}>✏️</Text>
-            </TouchableOpacity>
           </View>
         </Animated.View>
 
