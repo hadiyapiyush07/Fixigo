@@ -1,6 +1,6 @@
 import { useTheme } from '../../theme/ThemeContext';
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert } from 'react-native';
 import { useDispatch } from 'react-redux';
 import { logoutUser } from '../../store/slices/authSlice';
 import { providerAPI } from '../../api/provider.api';
@@ -38,7 +38,18 @@ const ProviderProfileScreen = ({ navigation }) => {
   };
 
   const handleLogout = () => {
-    dispatch(logoutUser());
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Logout', 
+          style: 'destructive',
+          onPress: () => dispatch(logoutUser()) 
+        }
+      ]
+    );
   };
 
   if (loading) {
