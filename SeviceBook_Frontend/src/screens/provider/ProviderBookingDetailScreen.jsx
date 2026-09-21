@@ -51,10 +51,9 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
 
   useFocusEffect(
     useCallback(() => {
-      const interval = setInterval(() => {
-        fetchBooking(false);
-      }, 5000);
-      return () => clearInterval(interval);
+      // Polling removed for efficiency. Relying entirely on Socket updates.
+      fetchBooking(false);
+      return () => {};
     }, [fetchBooking])
   );
 
@@ -192,7 +191,6 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
       <View style={[styles.safe, { padding: SPACING.lg, paddingTop: 60 }]}>
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 30 }}>
           <View>
-            <Skeleton width={80} height={16} style={{ marginBottom: 8 }} />
             <Skeleton width={150} height={24} />
           </View>
           <Skeleton width={80} height={24} borderRadius={12} />
@@ -234,7 +232,6 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
         {/* Header */}
         <View style={styles.header}>
           <View>
-            <Text style={styles.bookingId}>ID: #{booking._id.slice(-6).toUpperCase()}</Text>
             <Text style={styles.serviceName}>{serviceName}</Text>
           </View>
           <StatusBadge status={booking.status} />
@@ -290,7 +287,7 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
                 <MapPin size={24} color={COLORS.secondary} />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.addressTxt}>{booking.address?.addressLine || 'Address not provided'}</Text>
+                <Text style={styles.addressTxt} numberOfLines={0}>{booking.address?.addressLine || 'Address not provided'}</Text>
                 {booking.address?.landmark && <Text style={styles.landmark}>Landmark: {booking.address.landmark}</Text>}
               </View>
             </View>

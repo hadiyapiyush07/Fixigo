@@ -54,7 +54,17 @@ export default function DashboardLayout() {
       setUnreadCount(prev => prev + 1);
     });
 
+    const handleLocalRead = (e) => {
+      if (e.detail?.action === 'all') {
+        setUnreadCount(0);
+      } else if (e.detail?.action === 'single') {
+        setUnreadCount(prev => Math.max(0, prev - 1));
+      }
+    };
+    window.addEventListener('notifications-read', handleLocalRead);
+
     return () => {
+      window.removeEventListener('notifications-read', handleLocalRead);
       socket.off('admin:notification');
       disconnectSocket();
     };
