@@ -275,12 +275,11 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
 
         {/* Service Location */}
         <Reanimated.View entering={FadeInUp.delay(200).springify()}>
-          <View style={styles.sectionHeaderRow}>
-            <SectionHeader title="Service Location" />
-            {displayDistance && (
-              <Text style={styles.distanceTxt}>📍 {displayDistance}</Text>
-            )}
-          </View>
+          <SectionHeader 
+            title="Service Location" 
+            actionText={displayDistance ? `📍 ${displayDistance}` : undefined} 
+            onAction={() => {}} 
+          />
           <Card>
             <View style={styles.locationRow}>
               <View style={styles.mapPinContainer}>
@@ -411,8 +410,6 @@ const styles = StyleSheet.create({
   circleBtnTxt: { fontSize: FONT_SIZES.sm, color: COLORS.textPrimary, fontWeight: '600', marginTop: SPACING.xs },
   notificationDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: COLORS.danger, position: 'absolute', top: -2, right: -2, borderWidth: 2, borderColor: COLORS.surface },
 
-  sectionHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  distanceTxt: { fontSize: FONT_SIZES.sm, color: COLORS.primary, fontWeight: '700', marginBottom: SPACING.md },
   
   locationRow: { flexDirection: 'row', alignItems: 'center' },
   mapPinContainer: { width: 44, height: 44, borderRadius: 22, backgroundColor: COLORS.primaryLight, justifyContent: 'center', alignItems: 'center', marginRight: SPACING.md },
