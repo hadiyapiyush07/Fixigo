@@ -1,20 +1,26 @@
 import { useTheme } from '../../theme/ThemeContext';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Vibration, Platform, ActivityIndicator } from 'react-native';
 import Modal from 'react-native-modal';
 import { Bell, MapPin, Wrench, IndianRupee, X } from 'lucide-react-native';
+import Sound from 'react-native-sound';
 import { COLORS, FONT_SIZES, SPACING, SHADOWS, BORDER_RADIUS } from '../../theme/typography';
 import { PrimaryButton } from '../ui/PrimaryButton';
 import { bookingAPI } from '../../api/booking.api';
 import { Card } from '../ui/Card';
+
+Sound.setCategory('Playback');
 
 const IncomingRequestModal = ({ isVisible, requestData, onAccept, onDecline }) => {
   const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
   const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
 
   const [timeLeft, setTimeLeft] = useState(30);
+  const [loading, setLoading] = useState(false);
   const [fullData, setFullData] = useState(null);
   const [loadingData, setLoadingData] = useState(false);
+  
+  const soundRef = useRef(null);
 
   useEffect(() => {
     let timer;
@@ -23,25 +29,35 @@ const IncomingRequestModal = ({ isVisible, requestData, onAccept, onDecline }) =
       setFullData(null);
       setLoadingData(true);
       
+      // Initialize and play sound
+      soundRef.current = new Sound('ringtone.mp3', Sound.MAIN_BUNDLE, (error) => {
+        if (!error) {
+          soundRef.current.setNumberOfLoops(-1); // Loop indefinitely
+          soundRef.current.play();
+        }
+      });
+
       const fetchFull = async () => {
         try {
           const res = await bookingAPI.getById(requestData.bookingId || requestData._id);
           setFullData(res.data.data);
         } catch (e) {
-          setFullData(requestData);
+          console.log("Could not fetch full booking details for incoming request", e);
         } finally {
           setLoadingData(false);
         }
       };
       fetchFull();
       
-      // Vibrate pattern
-      Vibration.vibrate([0, 1000, 1000], true);
+      // Vibration pattern
+      const VIBRATION_PATTERN = Platform.OS === 'android' ? [0, 500, 1000, 500] : [0, 500];
+      Vibration.vibrate(VIBRATION_PATTERN, true);
 
       timer = setInterval(() => {
         setTimeLeft((prev) => {
           if (prev <= 1) {
             clearInterval(timer);
+            stopRingtone();
             Vibration.cancel();
             onDecline(requestData?.bookingId || requestData?._id); 
             return 0;
@@ -50,21 +66,37 @@ const IncomingRequestModal = ({ isVisible, requestData, onAccept, onDecline }) =
         });
       }, 1000);
     } else {
+      stopRingtone();
       Vibration.cancel();
+      setTimeLeft(30);
     }
 
     return () => {
       clearInterval(timer);
+      stopRingtone();
       Vibration.cancel();
     };
-  }, [isVisible, requestData]);
+  }, [isVisible, requestData, onDecline]);
 
-  const handleAccept = () => {
+  const stopRingtone = () => {
+    if (soundRef.current) {
+      soundRef.current.stop(() => {
+        soundRef.current.release();
+        soundRef.current = null;
+      });
+    }
+  };
+
+  const handleAccept = async () => {
+    setLoading(true);
+    stopRingtone();
     Vibration.cancel();
-    onAccept(requestData?.bookingId || requestData?._id);
+    await onAccept(requestData?.bookingId || requestData?._id);
+    setLoading(false);
   };
 
   const handleDecline = () => {
+    stopRingtone();
     Vibration.cancel();
     onDecline(requestData?.bookingId || requestData?._id);
   };
@@ -161,6 +193,7 @@ const IncomingRequestModal = ({ isVisible, requestData, onAccept, onDecline }) =
             title="Accept Request"
             variant="primary"
             onPress={handleAccept}
+            loading={loading}
             style={styles.btnPrimary}
           />
         </View>
