@@ -351,7 +351,7 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
       {/* Floating Action Button */}
       {getActionText() && (
         <View style={styles.bottomBar}>
-          {booking.status === 'payment_pending' ? (
+          {(booking.status === 'payment_pending' || booking.status === 'in_progress') ? (
             <SwipeButton 
               title={getActionText()} 
               onSwipeComplete={handleAction} 
