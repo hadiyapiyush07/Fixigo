@@ -66,7 +66,7 @@ const HomeScreen = ({ navigation }) => {
               const bOnline = b.status === 'available';
               if (aOnline !== bOnline) return aOnline ? -1 : 1;
               if ((b.aggregateRating || 0) !== (a.aggregateRating || 0)) return (b.aggregateRating || 0) - (a.aggregateRating || 0);
-              return (b.completedJobs || 0) - (a.completedJobs || 0);
+              return (b.completedBookings || 0) - (a.completedBookings || 0);
             });
             setProviders(pData.slice(0, 5));
           }
@@ -139,7 +139,7 @@ const HomeScreen = ({ navigation }) => {
           const bOnline = b.status === 'available';
           if (aOnline !== bOnline) return aOnline ? -1 : 1;
           if ((b.aggregateRating || 0) !== (a.aggregateRating || 0)) return (b.aggregateRating || 0) - (a.aggregateRating || 0);
-          return (b.completedJobs || 0) - (a.completedJobs || 0);
+          return (b.completedBookings || 0) - (a.completedBookings || 0);
         });
         setProviders(pData.slice(0, 5));
       }
@@ -216,7 +216,7 @@ const HomeScreen = ({ navigation }) => {
           
           <View style={styles.provMetrics}>
             <View style={styles.metric}>
-              <Text style={styles.metricVal}>{item.completedJobs || 0}</Text>
+              <Text style={styles.metricVal}>{item.completedBookings || 0}</Text>
               <Text style={styles.metricLabel}>Jobs Done</Text>
             </View>
             <View style={styles.metricDivider} />

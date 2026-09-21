@@ -10,7 +10,7 @@ import { Avatar } from '../../components/ui/Avatar';
 import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { SectionHeader } from '../../components/ui/SectionHeader';
 import { LoadingSkeleton } from '../../components/ui/LoadingSkeleton';
-import { LogOut } from 'lucide-react-native';
+import { LogOut, Star, Briefcase, Calendar, CheckCircle2 } from 'lucide-react-native';
 
 const ProviderProfileScreen = ({ navigation }) => {
   const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
@@ -63,24 +63,36 @@ const ProviderProfileScreen = ({ navigation }) => {
       >
         <Card style={styles.headerCard}>
           <Avatar name={uName} size={80} />
-          <Text style={styles.name}>{uName} {isVerified && '✅'}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: SPACING.md }}>
+            <Text style={styles.name}>{uName}</Text>
+            {isVerified && <CheckCircle2 size={18} color={COLORS.primary} style={{ marginLeft: 6 }} />}
+          </View>
           <Text style={styles.phone}>{uPhone}</Text>
           
           <View style={styles.metricsRow}>
             <View style={styles.metric}>
-              <Text style={styles.metricVal}>⭐ {profile?.rating?.average > 0 ? Number(profile.rating.average).toFixed(1) : 'New'}</Text>
+              <View style={styles.metricIconRow}>
+                <Star size={16} color={COLORS.star} fill={COLORS.star} />
+                <Text style={styles.metricVal}>{profile?.rating?.average > 0 ? Number(profile.rating.average).toFixed(1) : 'New'}</Text>
+              </View>
               <Text style={styles.metricLabel}>
                 {profile?.rating?.count > 0 ? `${profile.rating.count} Reviews` : 'Rating'}
               </Text>
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metric}>
-              <Text style={styles.metricVal}>💼 {profile?.completedBookings || 0}</Text>
+              <View style={styles.metricIconRow}>
+                <Briefcase size={16} color={COLORS.primary} />
+                <Text style={styles.metricVal}>{profile?.completedBookings || 0}</Text>
+              </View>
               <Text style={styles.metricLabel}>Jobs Done</Text>
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metric}>
-              <Text style={styles.metricVal}>📅 {profile?.experience || 1} yr</Text>
+              <View style={styles.metricIconRow}>
+                <Calendar size={16} color={COLORS.primary} />
+                <Text style={styles.metricVal}>{profile?.experience || 1} yr</Text>
+              </View>
               <Text style={styles.metricLabel}>Experience</Text>
             </View>
           </View>
@@ -126,18 +138,19 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   safe: { flex: 1, backgroundColor: COLORS.background },
   scroll: { padding: SPACING.lg },
   headerCard: { alignItems: 'center', paddingTop: SPACING.xl, paddingBottom: SPACING.lg },
-  name: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.textPrimary, marginTop: SPACING.md },
+  name: { fontSize: FONT_SIZES.xl, fontWeight: '800', color: COLORS.textPrimary },
   phone: { fontSize: FONT_SIZES.md, color: COLORS.textSecondary, marginTop: 4 },
   
   metricsRow: { flexDirection: 'row', marginTop: SPACING.xl, width: '100%', justifyContent: 'space-evenly' },
   metric: { alignItems: 'center' },
-  metricVal: { fontSize: FONT_SIZES.lg, fontWeight: '700', color: COLORS.primary },
-  metricLabel: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 4 },
+  metricIconRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
+  metricVal: { fontSize: FONT_SIZES.lg, fontWeight: '800', color: COLORS.textPrimary },
+  metricLabel: { fontSize: FONT_SIZES.xs, color: COLORS.textSecondary, marginTop: 2, fontWeight: '500' },
   metricDivider: { width: 1, backgroundColor: COLORS.border, height: '80%' },
 
   infoRow: { marginBottom: SPACING.md },
   infoLabel: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, marginBottom: 4 },
-  infoVal: { fontSize: FONT_SIZES.md, color: COLORS.textPrimary, fontWeight: '500' },
+  infoVal: { fontSize: FONT_SIZES.md, color: COLORS.textPrimary, fontWeight: '500', lineHeight: 22 },
   divider: { height: 1, backgroundColor: COLORS.border, marginBottom: SPACING.md },
 
   btnGroup: { marginTop: SPACING.xl },
