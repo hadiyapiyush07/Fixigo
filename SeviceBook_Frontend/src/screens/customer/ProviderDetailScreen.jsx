@@ -8,6 +8,9 @@ import {
 import { providerAPI } from '../../api/provider.api';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 
+import { Avatar } from '../../components/ui/Avatar';
+import { Star, Briefcase, CheckCircle2, Wrench, ArrowLeft } from 'lucide-react-native';
+
 const ProviderDetailScreen = ({ navigation, route }) => {
   const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
   const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
@@ -68,6 +71,7 @@ const ProviderDetailScreen = ({ navigation, route }) => {
   const reviewsCount = provider.rating?.count || 0;
   const jobs = provider.completedBookings || 0;
   const skills = Array.isArray(provider.skills) ? provider.skills : [];
+  const isOnline = provider.status === 'available';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -78,19 +82,17 @@ const ProviderDetailScreen = ({ navigation, route }) => {
         {/* COVER PHOTO */}
         <View style={styles.coverPhoto}>
           <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-            <Text style={{ fontSize: 24, color: '#FFF' }}>←</Text>
+            <ArrowLeft size={24} color="#FFF" />
           </TouchableOpacity>
         </View>
 
         {/* PROFILE INFO */}
         <View style={styles.profileSection}>
           <View style={styles.avatarWrapper}>
-            <View style={styles.avatar}>
-              <Text style={{ fontSize: 40 }}>🧑‍🔧</Text>
-            </View>
+            <Avatar name={pName} size={112} />
             {provider.isVerified && (
               <View style={styles.verifiedBadge}>
-                <Text style={{ fontSize: 10 }}>✅</Text>
+                <CheckCircle2 size={20} color={COLORS.primary} />
               </View>
             )}
           </View>
@@ -100,18 +102,26 @@ const ProviderDetailScreen = ({ navigation, route }) => {
 
           <View style={styles.metricsRow}>
             <View style={styles.metricCard}>
-              <Text style={styles.metricVal}>⭐ {rating}</Text>
+              <View style={styles.metricIconRow}>
+                <Star size={18} color={COLORS.star} fill={COLORS.star} />
+                <Text style={styles.metricVal}>{rating}</Text>
+              </View>
               <Text style={styles.metricLabel}>{reviewsCount} Reviews</Text>
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metricCard}>
-              <Text style={styles.metricVal}>💼 {jobs}</Text>
+              <View style={styles.metricIconRow}>
+                <Briefcase size={18} color={COLORS.textSecondary} />
+                <Text style={styles.metricVal}>{jobs}</Text>
+              </View>
               <Text style={styles.metricLabel}>Completed</Text>
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metricCard}>
-              <Text style={styles.metricVal}>{provider.isOnline ? '🟢' : '⚪'}</Text>
-              <Text style={styles.metricLabel}>{provider.isOnline ? 'Online' : 'Offline'}</Text>
+              <View style={styles.metricIconRow}>
+                <View style={[styles.statusDot, { backgroundColor: isOnline ? COLORS.success : COLORS.textDisabled }]} />
+              </View>
+              <Text style={styles.metricLabel}>{isOnline ? 'Online' : 'Offline'}</Text>
             </View>
           </View>
         </View>
@@ -129,12 +139,10 @@ const ProviderDetailScreen = ({ navigation, route }) => {
           <Text style={styles.sectionTitle}>Services Offered</Text>
           <View style={styles.skillsWrapper}>
             {skills.map((s, idx) => {
-              // s.icon may be an object {url, publicId} from Cloudinary — use emoji fallback
-              const iconEmoji = typeof s.icon === 'string' ? s.icon : '🔧';
               const skillName = typeof s.name === 'string' ? s.name : String(s.name || '');
               return (
                 <View key={idx} style={styles.skillBadge}>
-                  <Text style={styles.skillIcon}>{iconEmoji}</Text>
+                  <Wrench size={16} color={COLORS.primary} style={{ marginRight: 6 }} />
                   <Text style={styles.skillText}>{skillName}</Text>
                 </View>
               );
@@ -184,13 +192,10 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   },
   avatarWrapper: {
     width: 120, height: 120, borderRadius: 60, backgroundColor: '#FFF',
-    padding: 4, elevation: 5, ...SHADOWS.md, marginBottom: 12
-  },
-  avatar: {
-    flex: 1, backgroundColor: '#F3F4F6', borderRadius: 56, alignItems: 'center', justifyContent: 'center'
+    padding: 4, elevation: 5, ...SHADOWS.md, marginBottom: 12, alignItems: 'center', justifyContent: 'center'
   },
   verifiedBadge: {
-    position: 'absolute', bottom: 4, right: 12, backgroundColor: '#FFF', borderRadius: 12,
+    position: 'absolute', bottom: 4, right: 8, backgroundColor: '#FFF', borderRadius: 12,
     padding: 2, elevation: 2
   },
   name: { fontSize: 24, fontWeight: '800', color: '#111827' },
@@ -201,9 +206,11 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
     paddingVertical: 16, marginTop: 24, borderWidth: 1, borderColor: '#F3F4F6'
   },
   metricCard: { flex: 1, alignItems: 'center' },
+  metricIconRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 4 },
   metricVal: { fontSize: 18, fontWeight: '800', color: '#111827' },
-  metricLabel: { fontSize: 12, color: '#6B7280', marginTop: 4, fontWeight: '500' },
+  metricLabel: { fontSize: 12, color: '#6B7280', fontWeight: '500' },
   metricDivider: { width: 1, backgroundColor: '#E5E7EB', marginVertical: 4 },
+  statusDot: { width: 12, height: 12, borderRadius: 6 },
 
   section: { paddingHorizontal: SPACING.lg, marginTop: 32 },
   sectionTitle: { fontSize: 18, fontWeight: '800', color: '#111827', marginBottom: 16 },
@@ -214,7 +221,6 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
     flexDirection: 'row', alignItems: 'center', backgroundColor: '#EEF2FF',
     paddingHorizontal: 12, paddingVertical: 8, borderRadius: 20, marginRight: 10, marginBottom: 10
   },
-  skillIcon: { fontSize: 16, marginRight: 6 },
   skillText: { fontSize: 14, fontWeight: '600', color: COLORS.primary },
 
   detailRow: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#F3F4F6' },
