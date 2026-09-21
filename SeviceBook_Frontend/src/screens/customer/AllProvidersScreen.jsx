@@ -7,6 +7,9 @@ import {
 import { providerAPI } from '../../api/provider.api';
 import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS, SHADOWS } from '../../theme/typography';
 
+import { Avatar } from '../../components/ui/Avatar';
+import { CheckCircle2, Star, Briefcase, Search, ArrowLeft } from 'lucide-react-native';
+
 const AllProvidersScreen = ({ navigation, route }) => {
   const { colors: COLORS, shadows: SHADOWS, statusColors: STATUS_COLORS } = useTheme();
   const styles = React.useMemo(() => createStyles(COLORS, SHADOWS, STATUS_COLORS), [COLORS, SHADOWS, STATUS_COLORS]);
@@ -60,6 +63,7 @@ const AllProvidersScreen = ({ navigation, route }) => {
   const renderProvider = ({ item }) => {
     const pName = item.userId?.name || 'Unknown';
     const rating = item.rating?.average ? Number(item.rating.average).toFixed(1) : 'New';
+    const isOnline = item.status === 'available';
     
     return (
       <TouchableOpacity 
@@ -68,16 +72,17 @@ const AllProvidersScreen = ({ navigation, route }) => {
         onPress={() => navigation.navigate('ProviderDetail', { providerId: item._id })}
       >
         <View style={styles.cardHeader}>
-          <View style={styles.avatar}><Text style={{ fontSize: 24 }}>🧑‍🔧</Text></View>
+          <Avatar name={pName} size={48} />
           <View style={{ flex: 1, marginLeft: SPACING.md }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={styles.name}>{pName}</Text>
-              {item.isVerified && <Text style={{ fontSize: 12, marginLeft: 4 }}>✅</Text>}
+              {item.isVerified && <CheckCircle2 size={16} color={COLORS.primary} style={{ marginLeft: 6 }} />}
             </View>
             <Text style={styles.experience}>{item.experience || 1} years experience</Text>
           </View>
           <View style={styles.statusBadge}>
-            <Text style={styles.statusText}>{item.status === 'available' ? '🟢 Online' : '⚪ Offline'}</Text>
+            <View style={[styles.statusDot, { backgroundColor: isOnline ? COLORS.success : COLORS.textDisabled }]} />
+            <Text style={styles.statusText}>{isOnline ? 'Online' : 'Offline'}</Text>
           </View>
         </View>
 
@@ -93,8 +98,14 @@ const AllProvidersScreen = ({ navigation, route }) => {
         </View>
 
         <View style={styles.metricsBox}>
-          <Text style={styles.metric}>⭐ {rating} Rating</Text>
-          <Text style={styles.metric}>💼 {item.completedBookings || 0} Jobs</Text>
+          <View style={styles.metricRow}>
+            <Star size={16} color={COLORS.star} fill={COLORS.star} />
+            <Text style={styles.metricTxt}>{rating} Rating</Text>
+          </View>
+          <View style={styles.metricRow}>
+            <Briefcase size={16} color={COLORS.textSecondary} />
+            <Text style={styles.metricTxt}>{item.completedBookings || 0} Jobs</Text>
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -104,14 +115,14 @@ const AllProvidersScreen = ({ navigation, route }) => {
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={{ fontSize: 24, color: '#111827' }}>←</Text>
+          <ArrowLeft size={24} color={COLORS.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>All Providers</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <Search size={20} color={COLORS.textTertiary} style={{ marginRight: 8 }} />
         <TextInput
           style={styles.searchInput}
           placeholder="Search by name or skill..."
@@ -138,42 +149,48 @@ const AllProvidersScreen = ({ navigation, route }) => {
 };
 
 const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F9FAFB' },
+  container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, backgroundColor: '#FFF',
-    borderBottomWidth: 1, borderBottomColor: '#F3F4F6'
+    paddingHorizontal: SPACING.lg, paddingVertical: SPACING.md, backgroundColor: COLORS.surface,
+    borderBottomWidth: 1, borderBottomColor: COLORS.border
   },
   backBtn: { padding: 4 },
-  headerTitle: { fontSize: 18, fontWeight: '700', color: '#111827' },
+  headerTitle: { fontSize: 18, fontWeight: '800', color: COLORS.textPrimary },
 
   searchContainer: {
-    flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF',
-    margin: SPACING.lg, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: '#E5E7EB'
+    flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.surface,
+    margin: SPACING.lg, paddingHorizontal: 16, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border,
+    ...SHADOWS.sm
   },
-  searchIcon: { fontSize: 18, marginRight: 8 },
-  searchInput: { flex: 1, fontSize: 15, paddingVertical: 12, color: '#111827' },
+  searchInput: { flex: 1, fontSize: 15, paddingVertical: 12, color: COLORS.textPrimary },
 
   list: { paddingHorizontal: SPACING.lg, paddingBottom: SPACING.xxxl },
 
   card: {
-    backgroundColor: '#FFF', borderRadius: 16, padding: SPACING.lg, marginBottom: SPACING.md,
-    borderWidth: 1, borderColor: '#F3F4F6', ...SHADOWS.sm, elevation: 2
+    backgroundColor: COLORS.surface, borderRadius: 16, padding: SPACING.lg, marginBottom: SPACING.md,
+    borderWidth: 1, borderColor: COLORS.border, ...SHADOWS.md
   },
-  cardHeader: { flexDirection: 'row', alignItems: 'flex-start' },
-  avatar: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#F3F4F6', alignItems: 'center', justifyContent: 'center' },
-  name: { fontSize: 16, fontWeight: '700', color: '#111827' },
-  experience: { fontSize: 13, color: '#6B7280', marginTop: 2 },
-  statusBadge: { backgroundColor: '#F9FAFB', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8 },
-  statusText: { fontSize: 11, fontWeight: '600', color: '#374151' },
+  cardHeader: { flexDirection: 'row', alignItems: 'center' },
+  name: { fontSize: 16, fontWeight: '800', color: COLORS.textPrimary },
+  experience: { fontSize: 13, color: COLORS.textSecondary, marginTop: 4, fontWeight: '500' },
+  
+  statusBadge: { 
+    flexDirection: 'row', alignItems: 'center', 
+    backgroundColor: COLORS.background, paddingHorizontal: 8, paddingVertical: 6, 
+    borderRadius: 8, gap: 6 
+  },
+  statusDot: { width: 8, height: 8, borderRadius: 4 },
+  statusText: { fontSize: 12, fontWeight: '700', color: COLORS.textSecondary },
 
-  skillsBox: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 12, alignItems: 'center' },
-  skillBadge: { backgroundColor: '#EEF2FF', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginRight: 6, marginBottom: 6 },
-  skillText: { fontSize: 12, color: COLORS.primary, fontWeight: '600' },
-  skillMore: { fontSize: 12, color: '#6B7280', marginBottom: 6 },
+  skillsBox: { flexDirection: 'row', flexWrap: 'wrap', marginTop: 16, alignItems: 'center' },
+  skillBadge: { backgroundColor: COLORS.primaryLight, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 8, marginRight: 8, marginBottom: 8 },
+  skillText: { fontSize: 12, color: COLORS.primary, fontWeight: '700' },
+  skillMore: { fontSize: 12, color: COLORS.textSecondary, marginBottom: 8, fontWeight: '600' },
 
-  metricsBox: { flexDirection: 'row', marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#F3F4F6' },
-  metric: { fontSize: 13, fontWeight: '600', color: '#4B5563', marginRight: 16 }
+  metricsBox: { flexDirection: 'row', marginTop: 12, paddingTop: 16, borderTopWidth: 1, borderTopColor: COLORS.border, gap: 24 },
+  metricRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  metricTxt: { fontSize: 13, fontWeight: '700', color: COLORS.textSecondary }
 });
 
 export default AllProvidersScreen;
