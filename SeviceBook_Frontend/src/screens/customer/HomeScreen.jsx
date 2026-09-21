@@ -162,8 +162,10 @@ const HomeScreen = ({ navigation }) => {
     } catch (e) {
       setError('Failed to connect to the server. Please check your internet connection.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      requestAnimationFrame(() => {
+        setLoading(false);
+        setRefreshing(false);
+      });
     }
   };
 

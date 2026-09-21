@@ -43,7 +43,11 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
     } catch (err) {
       if (showLoad) setError('Failed to load booking. Please check your internet connection.');
     } finally {
-      if (showLoad) setLoading(false);
+      if (showLoad) {
+        requestAnimationFrame(() => {
+          setLoading(false);
+        });
+      }
     }
   }, [bookingId]);
 
