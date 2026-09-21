@@ -34,10 +34,10 @@ const apiLimiter = rateLimit({
 });
 
 // ── Auth Limiter — brute-force protection ─────────────────────────────────
-// TEMPORARILY DISABLED FOR TESTING
+// Restricted to 5 attempts per 15 minutes as per security requirements.
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 1000,
+  max: 5,
   skipSuccessfulRequests: true, // Only count failed attempts
   standardHeaders: true,
   legacyHeaders: false,
@@ -48,10 +48,11 @@ const authLimiter = rateLimit({
 });
 
 // ── OTP Limiter — SMS-cost protection ────────────────────────────────────
-// TEMPORARILY DISABLED FOR TESTING
+// Dev  : 100 req / 15 min
+// Prod :   5 req / 15 min
 const otpLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 1000, // unlimited basically
+  max: isDev ? 100 : 5,
   standardHeaders: true,
   legacyHeaders: false,
   message: {
