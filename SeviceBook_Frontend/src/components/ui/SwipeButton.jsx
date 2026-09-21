@@ -91,11 +91,16 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
       ]} />
       
       <View style={styles.textContainer}>
-        {loading ? (
-          <ActivityIndicator color={COLORS.white} size="small" />
+        {loading || completed ? (
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <ActivityIndicator color={COLORS.white} size="small" style={{ marginRight: SPACING.sm }} />
+            <Text style={[styles.text, { color: COLORS.white }]}>
+              Updating...
+            </Text>
+          </View>
         ) : (
-          <Text style={[styles.text, { color: completed ? COLORS.white : COLORS.primary }]}>
-            {completed ? 'Processing...' : title}
+          <Text style={[styles.text, { color: COLORS.primary }]}>
+            {title}
           </Text>
         )}
       </View>
