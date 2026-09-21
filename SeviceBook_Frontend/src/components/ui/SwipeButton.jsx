@@ -36,10 +36,16 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
     }
   }, [loading]);
 
+  const stateRef = useRef({ onSwipeComplete, completed, loading, containerWidth });
+  useEffect(() => {
+    stateRef.current = { onSwipeComplete, completed, loading, containerWidth };
+  }, [onSwipeComplete, completed, loading, containerWidth]);
+
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onPanResponderMove: (e, gesture) => {
+        const { completed, loading, containerWidth } = stateRef.current;
         if (completed || loading) return;
         const maxSwipe = containerWidth - KNOB_SIZE - 12;
         if (gesture.dx > 0 && gesture.dx < maxSwipe) {
@@ -49,6 +55,7 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
         }
       },
       onPanResponderRelease: (e, gesture) => {
+        const { completed, loading, containerWidth, onSwipeComplete } = stateRef.current;
         if (completed || loading) return;
         const maxSwipe = containerWidth - KNOB_SIZE - 12;
         if (gesture.dx > (containerWidth * 0.6)) {
@@ -59,7 +66,7 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
             useNativeDriver: true,
           }).start(() => {
             setCompleted(true);
-            onSwipeComplete();
+            if (onSwipeComplete) onSwipeComplete();
           });
         } else {
           Animated.spring(pan, {
