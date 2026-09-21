@@ -83,7 +83,9 @@ export default function Dashboard() {
         {/* Chart */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 lg:col-span-2">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-bold text-slate-900">{timeframe === 'month' ? 'Monthly Bookings' : 'Weekly Bookings'}</h2>
+            <h2 className="text-lg font-bold text-slate-900">
+              {timeframe === 'month' ? 'Monthly Bookings' : timeframe === 'year' ? 'Yearly Bookings' : 'Weekly Bookings'}
+            </h2>
             <select 
               value={timeframe} 
               onChange={(e) => setTimeframe(e.target.value)}
@@ -91,6 +93,7 @@ export default function Dashboard() {
             >
               <option value="week">This Week</option>
               <option value="month">This Month</option>
+              <option value="year">This Year</option>
             </select>
           </div>
           <div className="h-72">
