@@ -156,6 +156,27 @@ adminRouter.get("/stats", asyncHandler(async (req, res) => {
         bookings: weekTotal
       });
     }
+  } else if (timeframe === 'year') {
+    const currentYear = new Date().getFullYear();
+    const startOfYear = new Date(currentYear, 0, 1);
+    
+    const yearlyData = await Booking.aggregate([
+      { $match: { createdAt: { $gte: startOfYear } } },
+      { $group: { 
+          _id: { $month: "$createdAt" }, 
+          bookings: { $sum: 1 } 
+        } 
+      }
+    ]);
+
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    for (let i = 1; i <= 12; i++) {
+      const monthData = yearlyData.find(m => m._id === i);
+      chartData.push({
+        name: monthNames[i - 1],
+        bookings: monthData ? monthData.bookings : 0
+      });
+    }
   } else {
     // Weekly (7 days)
     const sevenDaysAgo = new Date();
