@@ -28,7 +28,7 @@ const ProviderDetailScreen = ({ navigation, route }) => {
     } catch (e) {
       Alert.alert('Error', e?.response?.data?.message || 'Could not load provider profile');
     } finally {
-      setLoading(false);
+      requestAnimationFrame(() => setLoading(false));
     }
   }, [providerId]);
 

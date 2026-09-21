@@ -29,7 +29,7 @@ const PaymentScreen = ({ route, navigation }) => {
   const handlePay = async () => {
     setLoading(true);
     await new Promise(r => setTimeout(r, 1500));
-    setLoading(false);
+    requestAnimationFrame(() => setLoading(false));
 
     if (selected === 'cod') {
       Alert.alert('✅ Booking Confirmed!', 'Your booking is confirmed. Pay the provider after the service.', [

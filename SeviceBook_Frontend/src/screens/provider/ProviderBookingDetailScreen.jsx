@@ -45,7 +45,7 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
     } finally {
       if (showLoad) {
         requestAnimationFrame(() => {
-          setLoading(false);
+          requestAnimationFrame(() => setLoading(false));
         });
       }
     }

@@ -35,7 +35,7 @@ const ChatScreen = ({ route, navigation }) => {
       } catch (err) {
         console.warn('Could not fetch messages');
       } finally {
-        setLoading(false);
+        requestAnimationFrame(() => setLoading(false));
       }
     };
     fetchMessages();
@@ -219,3 +219,4 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
 });
 
 export default ChatScreen;
+

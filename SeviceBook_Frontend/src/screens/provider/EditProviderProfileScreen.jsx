@@ -119,7 +119,7 @@ const EditProviderProfileScreen = ({ navigation }) => {
     } catch (e) {
       console.log('Initial fetch error:', e);
     } finally {
-      setLoading(false);
+      requestAnimationFrame(() => setLoading(false));
     }
   };
 
@@ -675,3 +675,4 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
 });
 
 export default EditProviderProfileScreen;
+

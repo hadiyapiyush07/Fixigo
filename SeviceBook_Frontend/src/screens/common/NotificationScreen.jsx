@@ -42,7 +42,7 @@ const NotificationScreen = () => {
     } catch (e) {
       console.log('Error fetching notifications:', e);
     } finally {
-      setLoading(false);
+      requestAnimationFrame(() => setLoading(false));
       setRefreshing(false);
     }
   };
@@ -251,3 +251,4 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
 });
 
 export default NotificationScreen;
+

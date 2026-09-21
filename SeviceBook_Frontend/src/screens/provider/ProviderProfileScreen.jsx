@@ -32,7 +32,7 @@ const ProviderProfileScreen = ({ navigation }) => {
     } catch (e) {
       console.log('Error fetching profile', e);
     } finally {
-      setLoading(false);
+      requestAnimationFrame(() => setLoading(false));
       setRefreshing(false);
     }
   };
