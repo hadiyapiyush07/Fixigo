@@ -130,8 +130,8 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
     if (booking.status === 'provider_on_the_way') return 'Mark as Arrived';
     if (booking.status === 'arrived') return 'Enter OTP';
     if (booking.status === 'otp_verification') return 'Start Service';
-    if (booking.status === 'in_progress') return 'Finish & Request Payment';
-    if (booking.status === 'payment_pending') return 'Confirm Payment & Complete Job';
+    if (booking.status === 'in_progress') return 'Swipe to Request Payment';
+    if (booking.status === 'payment_pending') return 'Swipe to Complete Job';
     return null;
   };
 
@@ -326,7 +326,7 @@ const ProviderBookingDetailScreen = ({ route, navigation }) => {
           </Card>
         </Reanimated.View>
 
-        {booking.status !== 'completed' && booking.status !== 'cancelled' && (
+        {['pending', 'accepted', 'confirmed', 'provider_on_the_way', 'arrived', 'otp_verification'].includes(booking.status) && (
           <Reanimated.View entering={FadeInUp.delay(400).springify()}>
             <TouchableOpacity 
               style={[styles.cancelBtn, actionLoading && { opacity: 0.5 }]}

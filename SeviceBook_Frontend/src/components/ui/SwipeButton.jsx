@@ -4,12 +4,12 @@ import { ChevronRight } from 'lucide-react-native';
 import { BORDER_RADIUS, FONT_SIZES, SPACING } from '../../theme/typography';
 import { useTheme } from '../../theme/ThemeContext';
 
-const BUTTON_HEIGHT = 56;
-const KNOB_SIZE = BUTTON_HEIGHT - 8;
+const BUTTON_HEIGHT = 60;
+const KNOB_SIZE = BUTTON_HEIGHT - 12; // 48
 
 export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
   const { colors: COLORS } = useTheme();
-  const pan = useRef(new Animated.ValueXY()).current;
+  const pan = useRef(new Animated.Value(0)).current;
   const [completed, setCompleted] = useState(false);
   const [containerWidth, setContainerWidth] = useState(0);
 
@@ -17,7 +17,7 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
     if (!loading && completed) {
       setCompleted(false);
       Animated.spring(pan, {
-        toValue: { x: 0, y: 0 },
+        toValue: 0,
         useNativeDriver: false,
       }).start();
     }
@@ -28,25 +28,31 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
       onStartShouldSetPanResponder: () => true,
       onPanResponderMove: (e, gesture) => {
         if (completed || loading || containerWidth === 0) return;
-        const maxSwipe = containerWidth - KNOB_SIZE - 8;
+        const maxSwipe = containerWidth - KNOB_SIZE - 12;
         if (gesture.dx > 0 && gesture.dx < maxSwipe) {
-          pan.setValue({ x: gesture.dx, y: 0 });
+          pan.setValue(gesture.dx);
+        } else if (gesture.dx >= maxSwipe) {
+          pan.setValue(maxSwipe);
         }
       },
       onPanResponderRelease: (e, gesture) => {
         if (completed || loading || containerWidth === 0) return;
-        const maxSwipe = containerWidth - KNOB_SIZE - 8;
-        if (gesture.dx > (containerWidth * 0.65)) {
+        const maxSwipe = containerWidth - KNOB_SIZE - 12;
+        if (gesture.dx > (containerWidth * 0.6)) {
           Animated.spring(pan, {
-            toValue: { x: maxSwipe, y: 0 },
-            useNativeDriver: false,
+            toValue: maxSwipe,
+            tension: 40,
+            friction: 5,
+            useNativeDriver: false, // still using false for width interpolation
           }).start(() => {
             setCompleted(true);
             onSwipeComplete();
           });
         } else {
           Animated.spring(pan, {
-            toValue: { x: 0, y: 0 },
+            toValue: 0,
+            tension: 40,
+            friction: 5,
             useNativeDriver: false,
           }).start();
         }
@@ -54,10 +60,9 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
     })
   ).current;
 
-  // Background filler animation based on pan.x
-  const fillWidth = pan.x.interpolate({
-    inputRange: [0, containerWidth ? containerWidth - KNOB_SIZE - 8 : 100],
-    outputRange: [KNOB_SIZE + 8, containerWidth ? containerWidth : 100],
+  const fillWidth = pan.interpolate({
+    inputRange: [0, containerWidth ? containerWidth - KNOB_SIZE - 12 : 100],
+    outputRange: [KNOB_SIZE + 12, containerWidth ? containerWidth : 100],
     extrapolate: 'clamp'
   });
 
@@ -70,9 +75,9 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
       
       <View style={styles.textContainer}>
         {loading ? (
-          <ActivityIndicator color={COLORS.primary} size="small" />
+          <ActivityIndicator color={COLORS.white} size="small" />
         ) : (
-          <Text style={[styles.text, { color: completed ? '#fff' : COLORS.primaryDark }]}>
+          <Text style={[styles.text, { color: completed ? COLORS.white : COLORS.primary }]}>
             {completed ? 'Processing...' : title}
           </Text>
         )}
@@ -80,7 +85,7 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
       
       <Animated.View
         {...panResponder.panHandlers}
-        style={[styles.knob, { transform: [{ translateX: pan.x }] }]}
+        style={[styles.knob, { transform: [{ translateX: pan }] }]}
       >
         <ChevronRight size={24} color={COLORS.primary} style={{ marginLeft: 2 }} />
       </Animated.View>
@@ -91,9 +96,9 @@ export const SwipeButton = ({ title, onSwipeComplete, loading }) => {
 const styles = StyleSheet.create({
   container: {
     height: BUTTON_HEIGHT,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: BUTTON_HEIGHT / 2,
     justifyContent: 'center',
-    borderWidth: 1.5,
+    borderWidth: 2,
     overflow: 'hidden',
     position: 'relative',
     width: '100%',
@@ -103,25 +108,27 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    borderRadius: BORDER_RADIUS.xl,
+    borderRadius: BUTTON_HEIGHT / 2,
   },
   textContainer: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingLeft: 30,
+    paddingLeft: KNOB_SIZE, // push text to right of knob
+    paddingRight: SPACING.md,
     zIndex: 1,
     pointerEvents: 'none',
   },
   text: {
-    fontSize: FONT_SIZES.lg,
+    fontSize: FONT_SIZES.md,
     fontWeight: '800',
     letterSpacing: 0.5,
+    textAlign: 'center',
   },
   knob: {
     width: KNOB_SIZE,
     height: KNOB_SIZE,
-    borderRadius: BORDER_RADIUS.lg,
+    borderRadius: KNOB_SIZE / 2,
     backgroundColor: '#fff',
     flexDirection: 'row',
     alignItems: 'center',
