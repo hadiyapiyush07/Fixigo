@@ -1,11 +1,10 @@
 import { useTheme } from '../../theme/ThemeContext';
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, Text, StyleSheet, FlatList, RefreshControl, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, RefreshControl, Alert, Platform, TouchableOpacity } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { bookingAPI } from '../../api/booking.api';
-import { COLORS, FONT_SIZES, SPACING } from '../../theme/typography';
+import { COLORS, FONT_SIZES, SPACING, BORDER_RADIUS } from '../../theme/typography';
 import { Card } from '../../components/ui/Card';
-import { PrimaryButton } from '../../components/ui/PrimaryButton';
 import { SectionHeader } from '../../components/ui/SectionHeader';
 import { EmptyState } from '../../components/ui/EmptyState';
 import { LoadingSkeleton } from '../../components/ui/LoadingSkeleton';
@@ -45,21 +44,21 @@ const RequestItem = React.memo(({ item, onAccept, onDecline, currentLocation }) 
       </View>
 
       <View style={styles.actionRow}>
-        <PrimaryButton 
-          title="Decline" 
-          variant="danger" 
-          style={styles.btn} 
-          textStyle={{ fontSize: FONT_SIZES.sm }}
+        <TouchableOpacity 
+          style={styles.declineBtn}
           onPress={() => onDecline(item._id)} 
-        />
+          activeOpacity={0.8}
+        >
+          <Text style={styles.declineBtnText}>Decline</Text>
+        </TouchableOpacity>
         <View style={{ width: SPACING.md }} />
-        <PrimaryButton 
-          title="Accept" 
-          variant="primary" 
-          style={styles.btn} 
-          textStyle={{ fontSize: FONT_SIZES.sm }}
-          onPress={() => onAccept(item._id)} 
-        />
+        <TouchableOpacity 
+          style={styles.acceptBtn}
+          onPress={() => onAccept(item._id)}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.acceptBtnText}>Accept</Text>
+        </TouchableOpacity>
       </View>
     </Card>
   );
@@ -177,7 +176,18 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: SPACING.md, marginBottom: SPACING.lg },
   metaTxt: { fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, fontWeight: '600' },
   actionRow: { flexDirection: 'row' },
-  btn: { flex: 1, paddingVertical: SPACING.sm }
+  declineBtn: { 
+    flex: 1, height: 48, borderRadius: BORDER_RADIUS.xl, 
+    backgroundColor: '#FEE2E2', borderWidth: 1, borderColor: '#FCA5A5',
+    alignItems: 'center', justifyContent: 'center'
+  },
+  declineBtnText: { color: '#DC2626', fontWeight: '700', fontSize: FONT_SIZES.sm },
+  acceptBtn: { 
+    flex: 1, height: 48, borderRadius: BORDER_RADIUS.xl, 
+    backgroundColor: COLORS.primary,
+    alignItems: 'center', justifyContent: 'center'
+  },
+  acceptBtnText: { color: '#FFFFFF', fontWeight: '700', fontSize: FONT_SIZES.sm },
 });
 
 export default RequestsScreen;
