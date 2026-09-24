@@ -160,16 +160,23 @@ const ProviderTabs = () => {
   const fetchCount = async () => {
     try {
       const res = await bookingAPI.getProviderBookings({ status: 'pending', page: 1, limit: 1 });
-      setPendingCount(res.data.data?.pagination?.total || 0);
+      const total = res.data.data?.pagination?.total || 0;
+      const requests = res.data.data?.data || [];
+      setPendingCount(total);
+      // If there's a pending request and modal is not already showing → auto-open popup
+      if (total > 0 && requests.length > 0 && !isModalVisible) {
+        setIncomingRequest(requests[0]);
+        setIsModalVisible(true);
+      }
     } catch (e) {}
   };
 
   useFocusEffect(
     useCallback(() => {
       fetchCount();
-      const interval = setInterval(fetchCount, 15000);
+      const interval = setInterval(fetchCount, 8000); // Poll every 8s
       return () => clearInterval(interval);
-    }, [])
+    }, [isModalVisible])
   );
 
   useEffect(() => {

@@ -144,10 +144,24 @@ const BookingTrackScreen = ({ route, navigation }) => {
     };
     socketService.on('location:update', handleLocationUpdate);
 
+    // Poll every 8 seconds when pending — socket on Render may drop
+    // Stops automatically once booking moves past pending/searching
+    const pollInterval = setInterval(() => {
+      setBooking(prev => {
+        if (!prev || TERMINAL_STATUSES.has(prev.status) || prev.status !== 'pending') {
+          clearInterval(pollInterval);
+          return prev;
+        }
+        loadBooking(true); // silent refresh
+        return prev;
+      });
+    }, 8000);
+
     return () => {
       socketService.leaveBookingRoom(bookingId);
       socketService.off('booking:status_update', handleUpdate);
       socketService.off('location:update', handleLocationUpdate);
+      clearInterval(pollInterval);
     };
   }, [bookingId, loadBooking]);
 
@@ -338,6 +352,27 @@ const BookingTrackScreen = ({ route, navigation }) => {
             </View>
           </Card>
         </Animated.View>
+
+        {/* ── REJECTED: No provider found ── */}
+        {status === 'rejected' && (
+          <Reanimated.View entering={FadeInUp.delay(100).springify()}>
+            <Card style={{ marginBottom: SPACING.lg, alignItems: 'center', paddingVertical: SPACING.xl }}>
+              <Text style={{ fontSize: 48, marginBottom: SPACING.md }}>😔</Text>
+              <Text style={{ fontSize: FONT_SIZES.lg, fontWeight: '800', color: COLORS.textPrimary, marginBottom: SPACING.sm, textAlign: 'center' }}>
+                No Provider Available
+              </Text>
+              <Text style={{ fontSize: FONT_SIZES.sm, color: COLORS.textSecondary, textAlign: 'center', marginBottom: SPACING.xl, lineHeight: 20 }}>
+                All nearby providers are busy right now. You can try again or cancel this booking.
+              </Text>
+              <TouchableOpacity
+                style={{ backgroundColor: COLORS.primary, borderRadius: BORDER_RADIUS.xl, paddingVertical: SPACING.md, paddingHorizontal: SPACING.xl, marginBottom: SPACING.md, width: '100%', alignItems: 'center' }}
+                onPress={() => navigation.navigate('CustomerTabs')}
+              >
+                <Text style={{ color: '#FFF', fontWeight: '700', fontSize: FONT_SIZES.md }}>🔄 Try Again</Text>
+              </TouchableOpacity>
+            </Card>
+          </Reanimated.View>
+        )}
 
         {(status === 'accepted' || status === 'confirmed' || status === 'provider_on_the_way' || status === 'arrived') && (
           <Reanimated.View entering={FadeInUp.delay(100).springify()}>
