@@ -104,10 +104,9 @@ export const PrimaryButton = React.memo(({
 
 const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container: {
-    width: '100%',
     height: 56, // Enforced 56px height
     borderRadius: BORDER_RADIUS.xl, // 18px radius
-    overflow: 'hidden', // to keep gradient inside borders
+    // overflow: 'hidden' removed so shadows don't clip on Android
   },
   gradient: {
     flex: 1,
@@ -115,6 +114,7 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
   },
   contentContainer: {
     flex: 1,
@@ -122,6 +122,7 @@ const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: SPACING.lg,
+    borderRadius: BORDER_RADIUS.xl,
   },
   text: {
     fontSize: FONT_SIZES.lg,

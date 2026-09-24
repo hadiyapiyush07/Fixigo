@@ -41,6 +41,13 @@ const authLimiter = rateLimit({
   skipSuccessfulRequests: true, // Only count failed attempts
   standardHeaders: true,
   legacyHeaders: false,
+  handler: (req, res, next, options) => {
+    res.status(options.statusCode).json({
+      success: false,
+      message: options.message.message,
+      retryAfter: Math.ceil((req.rateLimit.resetTime - Date.now()) / 1000)
+    });
+  },
   message: {
     success: false,
     message: "Too many failed attempts. Please try again after 15 minutes.",

@@ -7,11 +7,11 @@ class NotificationService {
     
     // High Priority channel for new bookings
     await notifee.createChannel({
-      id: 'booking_requests_v2',
+      id: 'booking_requests_v3',
       name: 'Booking Requests',
       importance: AndroidImportance.HIGH,
       vibration: true,
-      sound: 'default',
+      sound: 'ringtone',
     });
 
     // Standard updates channel
@@ -30,7 +30,7 @@ class NotificationService {
       body: bookingData.body || 'Tap to view details and accept the booking.',
       data: { bookingId: bookingData.bookingId },
       android: {
-        channelId: 'booking_requests_v2',
+        channelId: 'booking_requests_v3',
         importance: AndroidImportance.HIGH,
         pressAction: {
           id: 'default',
