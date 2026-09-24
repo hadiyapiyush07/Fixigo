@@ -19,11 +19,34 @@ const FILTER_TABS = [
   { key: 'cancelled', label: 'Cancelled' },
 ];
 
+// ─── Same images as ServiceOptionsScreen for consistency ────────────────────
 const CATEGORY_IMAGES = {
-  'Electrician': 'https://images.unsplash.com/photo-1621905251189-08b45d6a269e?q=80&w=200&auto=format&fit=crop',
-  'Plumber': 'https://images.unsplash.com/photo-1585704032915-c3400ca199e7?q=80&w=200&auto=format&fit=crop',
-  'AC Repair': 'https://images.unsplash.com/photo-1581092160562-40aa08e78837?q=80&w=200&auto=format&fit=crop',
-  'Home Cleaning': 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=200&auto=format&fit=crop',
+  electrician: 'https://images.pexels.com/photos/5691588/pexels-photo-5691588.jpeg?auto=compress&cs=tinysrgb&w=400',
+  plumb:       'https://images.pexels.com/photos/6419128/pexels-photo-6419128.jpeg?auto=compress&cs=tinysrgb&w=400',
+  ac:          'https://images.pexels.com/photos/7347538/pexels-photo-7347538.jpeg?auto=compress&cs=tinysrgb&w=400',
+  clean:       'https://images.pexels.com/photos/4108715/pexels-photo-4108715.jpeg?auto=compress&cs=tinysrgb&w=400',
+  paint:       'https://images.pexels.com/photos/1669754/pexels-photo-1669754.jpeg?auto=compress&cs=tinysrgb&w=400',
+  carpent:     'https://images.pexels.com/photos/36866655/pexels-photo-36866655.jpeg?auto=compress&cs=tinysrgb&w=400',
+  washing:     'https://images.pexels.com/photos/8774642/pexels-photo-8774642.jpeg?auto=compress&cs=tinysrgb&w=400',
+  refrigerat:  'https://images.pexels.com/photos/9551373/pexels-photo-9551373.jpeg?auto=compress&cs=tinysrgb&w=400',
+  ro:          'https://images.pexels.com/photos/36847822/pexels-photo-36847822.jpeg?auto=compress&cs=tinysrgb&w=400',
+  purifier:    'https://images.pexels.com/photos/36847822/pexels-photo-36847822.jpeg?auto=compress&cs=tinysrgb&w=400',
+  cctv:        'https://images.pexels.com/photos/5966513/pexels-photo-5966513.jpeg?auto=compress&cs=tinysrgb&w=400',
+};
+
+const DEFAULT_IMAGE = 'https://images.pexels.com/photos/4108715/pexels-photo-4108715.jpeg?auto=compress&cs=tinysrgb&w=400';
+
+const getCategoryImage = (categoryName) => {
+  if (!categoryName) return DEFAULT_IMAGE;
+  const name = categoryName.toLowerCase();
+  for (const key of Object.keys(CATEGORY_IMAGES)) {
+    if (key === 'ac') {
+      if (/\bac\b/i.test(name)) return CATEGORY_IMAGES[key];
+    } else if (name.includes(key)) {
+      return CATEGORY_IMAGES[key];
+    }
+  }
+  return DEFAULT_IMAGE;
 };
 
 const BookingCard = React.memo(({ item, index, onPressDetail, onPressTrack, onPressReview }) => {
@@ -32,7 +55,7 @@ const BookingCard = React.memo(({ item, index, onPressDetail, onPressTrack, onPr
 
   const canTrack = ['confirmed', 'provider_on_the_way', 'in_progress', 'arrived', 'otp_verification'].includes(item.status);
   const catName = item.categoryId?.name || 'Service';
-  const imgUrl = CATEGORY_IMAGES[catName] || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=200&auto=format&fit=crop';
+  const imgUrl = getCategoryImage(catName);
   
   return (
     <Animated.View entering={FadeInUp.delay(index * 100).springify()} layout={Layout.springify()}>
