@@ -204,6 +204,7 @@ const DashboardScreen = ({ navigation }) => {
               await loadDashboard(false);
             } catch (e) {
               console.log("Toggle Error", e);
+              Alert.alert("Action Failed", e?.response?.data?.message || "Could not change online status. Please check your profile.");
               setIsOnline(!newValue);
               await BackgroundLocationService.stop();
             } finally {

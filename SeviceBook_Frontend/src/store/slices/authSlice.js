@@ -10,7 +10,10 @@ export const loginUser = createAsyncThunk(
       const res = await authAPI.login(credentials);
       return res.data.data; // Returns { phone, mockOtp }
     } catch (error) {
-      return rejectWithValue(error.response?.data?.message || 'Login failed');
+      return rejectWithValue({
+        message: error.response?.data?.message || 'Login failed',
+        retryAfter: error.response?.data?.retryAfter || null
+      });
     }
   }
 );

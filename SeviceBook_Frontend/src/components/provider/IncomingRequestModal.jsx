@@ -1,6 +1,6 @@
 import { useTheme } from '../../theme/ThemeContext';
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Vibration, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Vibration, Platform, ActivityIndicator, Alert } from 'react-native';
 import Modal from 'react-native-modal';
 import { Bell, MapPin, Wrench, IndianRupee, X } from 'lucide-react-native';
 import Sound from 'react-native-sound';
@@ -30,12 +30,16 @@ const IncomingRequestModal = ({ isVisible, requestData, onAccept, onDecline }) =
       setLoadingData(true);
       
       // Initialize and play sound
-      soundRef.current = new Sound('ringtone.mp3', Sound.MAIN_BUNDLE, (error) => {
-        if (!error) {
-          soundRef.current.setNumberOfLoops(-1); // Loop indefinitely
-          soundRef.current.play();
+      const soundInstance = new Sound('ringtone.wav', Sound.MAIN_BUNDLE, (error) => {
+        if (error) {
+          console.error('Failed to load sound', error);
+          Alert.alert('Sound Error', 'Failed to load ringtone.wav: ' + JSON.stringify(error));
+        } else if (soundRef.current === soundInstance) {
+          soundInstance.setNumberOfLoops(-1);
+          soundInstance.play();
         }
       });
+      soundRef.current = soundInstance;
 
       const fetchFull = async () => {
         try {
@@ -79,10 +83,11 @@ const IncomingRequestModal = ({ isVisible, requestData, onAccept, onDecline }) =
   }, [isVisible, requestData, onDecline]);
 
   const stopRingtone = () => {
-    if (soundRef.current) {
-      soundRef.current.stop(() => {
-        soundRef.current.release();
-        soundRef.current = null;
+    const soundInstance = soundRef.current;
+    if (soundInstance) {
+      soundRef.current = null;
+      soundInstance.stop(() => {
+        soundInstance.release();
       });
     }
   };
@@ -132,12 +137,7 @@ const IncomingRequestModal = ({ isVisible, requestData, onAccept, onDecline }) =
         
         {/* Distance/Address Info inside Premium Card */}
         <Card style={styles.infoCard} noPadding>
-          {loadingData ? (
-            <View style={styles.loaderContainer}>
-              <ActivityIndicator size="small" color={COLORS.primary} />
-            </View>
-          ) : (
-            <View style={styles.infoContent}>
+          <View style={styles.infoContent}>
               <View style={styles.row}>
                 <View style={styles.iconBox}>
                   <MapPin size={20} color={COLORS.primary} />
@@ -169,7 +169,6 @@ const IncomingRequestModal = ({ isVisible, requestData, onAccept, onDecline }) =
                 </Text>
               </View>
             </View>
-          )}
         </Card>
 
         {/* Minimalist Countdown Timer */}
