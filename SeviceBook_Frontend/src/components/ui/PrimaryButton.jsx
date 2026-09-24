@@ -78,7 +78,6 @@ export const PrimaryButton = React.memo(({
           styles.container,
           getBorder(),
           { backgroundColor: getBgColor() },
-          variant === 'primary' && !disabled ? SHADOWS.md : {},
           animatedStyle,
           style
         ]}
