@@ -183,10 +183,10 @@ const ProviderTabs = () => {
           vibration: true,
         });
         await notifee.createChannel({
-          id: 'booking_requests_v2',
+          id: 'booking_requests_v3',
           name: 'Booking Requests',
           importance: AndroidImportance.HIGH,
-          sound: 'default',
+          sound: 'ringtone',
           vibration: true,
         });
       }
@@ -199,7 +199,7 @@ const ProviderTabs = () => {
         title: "New Service Request!",
         body: "You have a new request waiting for you.",
         android: { 
-          channelId: 'booking_requests_v2',
+          channelId: 'booking_requests_v3',
           pressAction: { id: 'default' }
         },
       });

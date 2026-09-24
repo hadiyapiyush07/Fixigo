@@ -186,7 +186,7 @@ const HomeScreen = ({ navigation }) => {
           <View style={styles.catIconBox}>
             {icon}
           </View>
-          <Text style={styles.catName} numberOfLines={2}>{item.name}</Text>
+          <Text style={styles.catName} numberOfLines={2} adjustsFontSizeToFit minimumFontScale={0.8}>{item.name}</Text>
         </TouchableOpacity>
       </Reanimated.View>
     );
@@ -444,7 +444,7 @@ const styles = StyleSheet.create({
   },
   promoCodeText: { color: COLORS.white, fontWeight: '800', fontSize: FONT_SIZES.sm, letterSpacing: 1 },
 
-  catCard: { alignItems: 'center', width: 90, marginRight: SPACING.md },
+  catCard: { alignItems: 'center', width: 100, marginRight: SPACING.md },
   catIconBox: { 
     width: 72, height: 72, borderRadius: 24, backgroundColor: COLORS.surface, 
     alignItems: 'center', justifyContent: 'center', marginBottom: SPACING.sm,

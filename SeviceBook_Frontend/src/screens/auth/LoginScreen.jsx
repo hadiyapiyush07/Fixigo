@@ -20,10 +20,24 @@ const LoginScreen = ({ navigation }) => {
 
   const [form, setForm] = useState({ phoneOrEmail: '', password: '' });
   const [errors, setErrors] = useState({});
+  const [blockTimeLeft, setBlockTimeLeft] = useState(null);
 
   useEffect(() => {
     // If somehow isLoggedIn becomes true (e.g., from OTP screen), AppNavigator handles it
   }, [isLoggedIn]);
+
+  useEffect(() => {
+    let timer;
+    if (blockTimeLeft > 0) {
+      timer = setInterval(() => {
+        setBlockTimeLeft(prev => prev - 1);
+      }, 1000);
+    } else if (blockTimeLeft === 0) {
+      setBlockTimeLeft(null);
+      setErrors(prev => ({ ...prev, apiError: null }));
+    }
+    return () => clearInterval(timer);
+  }, [blockTimeLeft]);
 
   const validate = () => {
     const e = {};
@@ -35,6 +49,7 @@ const LoginScreen = ({ navigation }) => {
 
   const handleLogin = async () => {
     if (!validate()) return;
+    if (blockTimeLeft > 0) return;
     
     let credentials = { password: form.password };
     if (form.phoneOrEmail.includes('@')) {
@@ -51,8 +66,20 @@ const LoginScreen = ({ navigation }) => {
         mockOtp: resultAction.payload.mockOtp 
       });
     } else {
-      setErrors({ apiError: resultAction.payload || "Invalid credentials" });
+      const payload = resultAction.payload;
+      if (payload && payload.retryAfter) {
+        setBlockTimeLeft(payload.retryAfter);
+        setErrors({ apiError: payload.message });
+      } else {
+        setErrors({ apiError: typeof payload === 'string' ? payload : (payload?.message || "Invalid credentials") });
+      }
     }
+  };
+
+  const formatTime = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
   };
 
   return (
@@ -65,7 +92,14 @@ const LoginScreen = ({ navigation }) => {
 
         <View style={styles.form}>
           {errors.apiError && (
-            <Text style={styles.apiErrorText}>{errors.apiError}</Text>
+            <View style={{ alignItems: 'center', marginBottom: SPACING.sm }}>
+              <Text style={styles.apiErrorText}>{errors.apiError}</Text>
+              {blockTimeLeft !== null && blockTimeLeft > 0 && (
+                <Text style={{ color: '#EF4444', fontSize: FONT_SIZES.lg, fontWeight: '800', marginTop: 4 }}>
+                  ⏳ Try again in {formatTime(blockTimeLeft)}
+                </Text>
+              )}
+            </View>
           )}
 
           <Input 
@@ -94,8 +128,8 @@ const LoginScreen = ({ navigation }) => {
             title="Continue" 
             onPress={handleLogin} 
             loading={isLoading} 
-            disabled={isLoading} 
-            style={{ marginTop: SPACING.md }} 
+            disabled={isLoading || blockTimeLeft > 0} 
+            style={{ marginTop: SPACING.md, opacity: blockTimeLeft > 0 ? 0.6 : 1 }} 
           />
         </View>
 
