@@ -103,9 +103,10 @@ export const PrimaryButton = React.memo(({
 
 const createStyles = (COLORS, SHADOWS, STATUS_COLORS) => StyleSheet.create({
   container: {
-    height: 56, // Enforced 56px height
-    borderRadius: BORDER_RADIUS.xl, // 18px radius
-    // overflow: 'hidden' removed so shadows don't clip on Android
+    height: 56,
+    borderRadius: BORDER_RADIUS.xl,
+    overflow: 'hidden',  // Clips LinearGradient to button bounds — no more green blob
+    elevation: 0,        // Explicitly remove Android shadow
   },
   gradient: {
     flex: 1,
