@@ -32,7 +32,7 @@ const BookingCard = React.memo(({ item, index, onPressDetail, onPressTrack, onPr
 
   const canTrack = ['confirmed', 'provider_on_the_way', 'in_progress', 'arrived', 'otp_verification'].includes(item.status);
   const catName = item.categoryId?.name || 'Service';
-  const imgUrl = item.categoryId?.icon || CATEGORY_IMAGES[catName] || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=200&auto=format&fit=crop';
+  const imgUrl = CATEGORY_IMAGES[catName] || 'https://images.unsplash.com/photo-1581578731548-c64695cc6952?q=80&w=200&auto=format&fit=crop';
   
   return (
     <Animated.View entering={FadeInUp.delay(index * 100).springify()} layout={Layout.springify()}>

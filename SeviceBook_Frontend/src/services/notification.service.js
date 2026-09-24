@@ -1,7 +1,7 @@
 // src/services/notification.service.js
 // Firebase Messaging v22+ modular API (no deprecated namespace warnings)
 
-import { Platform, PermissionsAndroid, Alert } from 'react-native';
+import { Platform, PermissionsAndroid } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { navigationRef } from '../navigation/RootNavigation';
 import api from '../api/axiosInstance';
@@ -16,6 +16,21 @@ import {
   AuthorizationStatus,
 } from '@react-native-firebase/messaging';
 import { getApp } from '@react-native-firebase/app';
+
+// ─── Global listener registry for incoming booking requests ─────────────────
+// This lets AppNavigator subscribe to FCM "booking_request" events
+// so the IncomingRequestModal pops up even when socket is disconnected (background)
+const bookingRequestListeners = [];
+export const onFCMBookingRequest = (cb) => {
+  bookingRequestListeners.push(cb);
+  return () => {
+    const idx = bookingRequestListeners.indexOf(cb);
+    if (idx !== -1) bookingRequestListeners.splice(idx, 1);
+  };
+};
+const emitBookingRequest = (bookingId) => {
+  bookingRequestListeners.forEach(cb => cb(bookingId));
+};
 
 // Safe getter for the Firebase messaging instance
 const safeGetMessaging = () => {
@@ -97,35 +112,30 @@ class NotificationService {
       const messaging = safeGetMessaging();
       if (!messaging) return;
 
-      // Foreground messages
+      // ── FOREGROUND: FCM message received while app is open ──────────────
       this.unsubscribeMessage = onMessage(messaging, async remoteMessage => {
-        const { title, body } = remoteMessage.notification || {};
-        const { bookingId, targetScreen } = remoteMessage.data || {};
-        if (title || body) {
-          Alert.alert(
-            title || 'New Notification',
-            body || '',
-            [
-              { text: 'Dismiss', style: 'cancel' },
-              {
-                text: 'View',
-                onPress: () => {
-                  if (navigationRef.current && targetScreen) {
-                    navigationRef.current.navigate(
-                      targetScreen,
-                      bookingId ? { bookingId } : {}
-                    );
-                  }
-                },
-              },
-            ]
-          );
+        const { type, bookingId } = remoteMessage.data || {};
+
+        // If it's a booking request notification → trigger the popup modal
+        if (type === 'booking_request' && bookingId) {
+          emitBookingRequest(bookingId);
+          return; // Don't show Alert, modal will show instead
         }
+
+        // All other notifications → show a simple in-app alert (optional)
+        // Intentionally left minimal to avoid noise
       });
 
-      // Background → foreground tap
+      // ── BACKGROUND → FOREGROUND: User taps the notification ─────────────
       onNotificationOpenedApp(messaging, remoteMessage => {
-        const { bookingId, targetScreen } = remoteMessage.data || {};
+        const { type, bookingId, targetScreen } = remoteMessage.data || {};
+
+        if (type === 'booking_request' && bookingId) {
+          // Small delay so the navigator is ready
+          setTimeout(() => emitBookingRequest(bookingId), 500);
+          return;
+        }
+
         if (navigationRef.current && targetScreen) {
           navigationRef.current.navigate(
             targetScreen,
@@ -134,17 +144,22 @@ class NotificationService {
         }
       });
 
-      // Quit state → opened via notification
+      // ── QUIT STATE: App was fully closed, opened via notification ────────
       getInitialNotification(messaging).then(remoteMessage => {
-        if (remoteMessage) {
-          const { bookingId, targetScreen } = remoteMessage.data || {};
+        if (!remoteMessage) return;
+        const { type, bookingId, targetScreen } = remoteMessage.data || {};
+
+        if (type === 'booking_request' && bookingId) {
+          setTimeout(() => emitBookingRequest(bookingId), 1500);
+          return;
+        }
+
+        if (navigationRef.current && targetScreen) {
           setTimeout(() => {
-            if (navigationRef.current && targetScreen) {
-              navigationRef.current.navigate(
-                targetScreen,
-                bookingId ? { bookingId } : {}
-              );
-            }
+            navigationRef.current.navigate(
+              targetScreen,
+              bookingId ? { bookingId } : {}
+            );
           }, 1000);
         }
       });

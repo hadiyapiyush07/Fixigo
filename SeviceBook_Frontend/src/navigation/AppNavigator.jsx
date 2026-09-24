@@ -35,7 +35,7 @@ import ServiceOptionsScreen from '../screens/customer/ServiceOptionsScreen';
 import BookingSummaryScreen from '../screens/customer/BookingSummaryScreen';
 
 import { socketService } from '../services/socket.service';
-import { notificationService } from '../services/notification.service';
+import { notificationService, onFCMBookingRequest } from '../services/notification.service';
 import ChatScreen from '../screens/customer/ChatScreen';
 import AllProvidersScreen from '../screens/customer/AllProvidersScreen';
 import NotificationScreen from '../screens/common/NotificationScreen';
@@ -193,6 +193,7 @@ const ProviderTabs = () => {
     };
     setupChannels();
 
+    // ── Handler: show modal when a new booking arrives ──────────────────
     const handleNewBooking = async (data) => {
       fetchCount();
       await notifee.displayNotification({
@@ -203,9 +204,27 @@ const ProviderTabs = () => {
           pressAction: { id: 'default' }
         },
       });
-      // Show Uber-like Modal
-      setIncomingRequest(data.booking || data);
+      // Show Uber-like Modal — data from socket has booking object or bookingId
+      const bookingPayload = data?.booking || data;
+      setIncomingRequest(bookingPayload);
       setIsModalVisible(true);
+    };
+
+    // ── Handler: FCM notification → open modal (works in background/Render) ─
+    const handleFCMBookingRequest = async (bookingId) => {
+      fetchCount();
+      try {
+        const res = await bookingAPI.getById(bookingId);
+        const bookingData = res?.data?.data;
+        if (bookingData) {
+          setIncomingRequest(bookingData);
+          setIsModalVisible(true);
+        }
+      } catch (e) {
+        // Even if fetch fails, show modal with bookingId so provider can act
+        setIncomingRequest({ _id: bookingId, bookingId });
+        setIsModalVisible(true);
+      }
     };
 
     const handleNewMessage = async (msg) => {
@@ -220,14 +239,19 @@ const ProviderTabs = () => {
       Vibration.vibrate(200);
     };
     
+    // Socket listener (works when app is foreground + socket connected)
     socketService.on('booking:new', handleNewBooking);
     socketService.on('booking:status_update', fetchCount);
     socketService.on('newMessage', handleNewMessage);
+
+    // FCM listener (works in ALL states: foreground, background, Render)
+    const unsubscribeFCM = onFCMBookingRequest(handleFCMBookingRequest);
 
     return () => {
       socketService.off('booking:new', handleNewBooking);
       socketService.off('booking:status_update', fetchCount);
       socketService.off('newMessage', handleNewMessage);
+      unsubscribeFCM();
     };
   }, []);
 
