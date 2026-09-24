@@ -19,7 +19,7 @@ import Config from 'react-native-config';
 // Your phone and PC MUST be on the same WiFi network!
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-// Loaded from .env.development or .env.emulator via react-native-config
+// Production URL — popup works via FCM (not socket) so Render is fine
 const BASE_URL = Config.API_URL || 'https://fixigo-backend-hnxs.onrender.com/api';
 
 const axiosInstance = axios.create({

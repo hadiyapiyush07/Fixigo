@@ -90,15 +90,25 @@ const notifyNextProvider = async (booking) => {
 
   if (selectedProvider.userId) {
     const { emitToUser } = require("../socket/socket");
-    emitToUser(selectedProvider.userId._id, "booking:new", { bookingId: String(booking._id) });
+
+    // Send full booking data so the app modal shows INSTANTLY without a second API call
+    const bookingPayload = await Booking.findById(booking._id)
+      .populate("customerId", "name phone profilePhoto")
+      .populate("categoryId", "name icon")
+      .lean();
+
+    emitToUser(selectedProvider.userId._id, "booking:new", {
+      bookingId: String(booking._id),
+      booking:   bookingPayload,
+    });
 
     await notificationService.sendNotification({
-      userId: selectedProvider.userId._id,
+      userId:   selectedProvider.userId._id,
       fcmToken: selectedProvider.userId.fcmToken,
-      title: "New Job Request!",
-      body: "A new booking request is waiting for your response.",
-      type: "booking_request",
-      data: { bookingId: String(booking._id), screen: "BookingRequest" }
+      title:    "New Job Request!",
+      body:     "A new booking request is waiting for your response.",
+      type:     "booking_request",
+      data:     { bookingId: String(booking._id), screen: "BookingRequest" }
     });
   }
 };
